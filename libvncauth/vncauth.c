@@ -53,7 +53,7 @@ vncEncryptAndStorePasswd(char *passwd, char *fname)
 
     if ((fp = fopen(fname,"w")) == NULL) return 1;
 
-    chmod(fname, S_IRUSR|S_IWUSR);
+    fchmod(fp, S_IRUSR|S_IWUSR);
 
     /* pad password with nulls */
 
