@@ -50,7 +50,12 @@ extern int endianTest;
 
 #define FLASH_PORT_OFFSET 5400
 #define LISTEN_PORT_OFFSET 5500
+#define TUNNEL_PORT_OFFSET 5500
 #define SERVER_PORT_OFFSET 5900
+
+#define DEFAULT_SSH_CMD "/usr/bin/ssh"
+#define DEFAULT_TUNNEL_CMD DEFAULT_SSH_CMD \
+                           " -f -L %L:%H:%R %H sleep 20"
 
 
 /* argsresources.c */
@@ -214,6 +219,7 @@ extern Bool errorMessageOnReadFailure;
 
 extern Bool ReadFromRFBServer(char *out, unsigned int n);
 extern Bool WriteExact(int sock, char *buf, int n);
+extern int FindFreeTcpPort(void);
 extern int ListenAtTcpPort(int port);
 extern int ConnectToTcpAddr(unsigned int host, int port);
 extern int AcceptTcpConnection(int listenSock);
@@ -221,6 +227,10 @@ extern Bool SetNonBlocking(int sock);
 
 extern int StringToIPAddr(const char *str, unsigned int *addr);
 extern Bool SameMachine(int sock);
+
+/* tunnel.c */
+
+extern Bool createTunnel(int *argc, char **argv, int tunnelArgIndex);
 
 /* vncviewer.c */
 

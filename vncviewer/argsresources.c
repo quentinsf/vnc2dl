@@ -249,6 +249,7 @@ usage()
 	  "\n"
 	  "usage: %s [<options>] <host>:<display#>\n"
 	  "       %s [<options>] -listen [<display#>]\n"
+	  "       %s [<options>] -tunnel <host>:<display#>\n"
 	  "\n"
 	  "<options> are standard Xt options, or:\n"
 	  "              -shared\n"
@@ -260,7 +261,7 @@ usage()
 	  "              -owncmap\n"
 	  "              -truecolour\n"
 	  "              -depth <depth>\n"
-	  ,programName,programName);
+	  ,programName,programName,programName);
   exit(1);
 }
 

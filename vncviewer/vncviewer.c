@@ -49,6 +49,10 @@ main(int argc, char **argv)
       listenForIncomingConnections(&argc, argv, i);
       break;
     }
+    if (strcmp(argv[i], "-tunnel") == 0) {
+      createTunnel(&argc, argv, i);
+      break;
+    }
   }
 
   /* Call the main Xt initialisation function.  It parses command-line options,

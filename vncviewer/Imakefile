@@ -33,6 +33,7 @@ SRCS = \
   selection.c \
   shm.c \
   sockets.c \
+  tunnel.c \
   vncviewer.c
 
 OBJS = $(SRCS:.c=.o)
