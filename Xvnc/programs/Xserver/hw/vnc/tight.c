@@ -32,6 +32,11 @@
 /* Note: The following constant should not be changed. */
 #define TIGHT_MIN_TO_COMPRESS 12
 
+/* The parameters below may be adjusted. */
+#define MIN_SPLIT_RECT_SIZE     4096
+#define MIN_SOLID_SUBRECT_SIZE  2048
+#define MAX_SPLIT_TILE_SIZE       16
+
 /* May be set to TRUE with "-lazytight" Xvnc option. */
 Bool rfbTightDisableGradient = FALSE;
 
@@ -53,7 +58,7 @@ typedef struct TIGHT_CONF_s {
 } TIGHT_CONF;
 
 static TIGHT_CONF tightConf[10] = {
-    {   512,   32,   6, 65536, 0, 0, 0, 0,   0,   0,   4, 20, 10000, 25000 },
+    {   512,   32,   6, 65536, 0, 0, 0, 0,   0,   0,   4, 20, 10000, 23000 },
     {  2048,  128,   6, 65536, 1, 1, 1, 0,   0,   0,   8, 30,  8000, 18000 },
     {  6144,  256,   8, 65536, 3, 3, 2, 0,   0,   0,  24, 40,  6500, 15000 },
     { 10240, 1024,  12, 65536, 5, 5, 3, 0,   0,   0,  32, 50,  5000, 12000 },
@@ -174,10 +179,6 @@ static void JpegSetDstManager(j_compress_ptr cinfo);
  * Tight encoding implementation.
  */
 
-#define MIN_SPLIT_RECT_SIZE     4096
-#define MIN_SOLID_SUBRECT_SIZE  2048
-#define MAX_SPLIT_TILE_SIZE       16
-
 int
 rfbNumCodedRectsTight(cl, x, y, w, h)
     rfbClientPtr cl;
@@ -209,10 +210,14 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
     rfbClientPtr cl;
     int x, y, w, h;
 {
+    int nMaxRows;
     CARD32 colorValue;
     int dx, dy, dw, dh;
     int x_best, y_best, w_best, h_best;
     char *fbptr;
+
+    compressLevel = cl->tightCompressLevel;
+    qualityLevel = cl->tightQualityLevel;
 
     if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
          cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
@@ -224,7 +229,7 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
     if (!cl->enableLastRectEncoding || w * h < MIN_SPLIT_RECT_SIZE)
         return SendRectSimple(cl, x, y, w, h);
 
-    /* Make sure we can write one pixel into tightBeforeBuf. */
+    /* Make sure we can write at least one pixel into tightBeforeBuf. */
 
     if (tightBeforeBufSize < 4) {
         tightBeforeBufSize = 4;
@@ -235,9 +240,29 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
                                               tightBeforeBufSize);
     }
 
+    /* Calculate maximum number of rows in one non-solid rectangle. */
+
+    {
+        int maxRectSize, maxRectWidth, nMaxWidth;
+
+        maxRectSize = tightConf[compressLevel].maxRectSize;
+        maxRectWidth = tightConf[compressLevel].maxRectWidth;
+        nMaxWidth = (w > maxRectWidth) ? maxRectWidth : w;
+        nMaxRows = maxRectSize / nMaxWidth;
+    }
+
     /* Try to find large solid-color areas and send them separately. */
 
     for (dy = y; dy < y + h; dy += MAX_SPLIT_TILE_SIZE) {
+
+        /* If a rectangle becomes too large, send its upper part now. */
+
+        if (dy - y >= nMaxRows) {
+            if (!SendRectSimple(cl, x, y, w, nMaxRows))
+                return 0;
+            y += nMaxRows;
+            h -= nMaxRows;
+        }
 
         dh = (dy + MAX_SPLIT_TILE_SIZE <= y + h) ?
             MAX_SPLIT_TILE_SIZE : (y + h - dy);
@@ -458,8 +483,6 @@ SendRectSimple(cl, x, y, w, h)
     int dx, dy;
     int rw, rh;
 
-    compressLevel = cl->tightCompressLevel;
-    qualityLevel = cl->tightQualityLevel;
     maxRectSize = tightConf[compressLevel].maxRectSize;
     maxRectWidth = tightConf[compressLevel].maxRectWidth;
 
@@ -512,6 +535,12 @@ SendSubrect(cl, x, y, w, h)
     char *fbptr;
     Bool success = FALSE;
 
+    /* Send pending data if there is more than 128 bytes. */
+    if (ublen > 128) {
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
+    }
+
     if (!SendTightHeader(cl, x, y, w, h))
         return FALSE;
 
@@ -562,7 +591,7 @@ SendSubrect(cl, x, y, w, h)
         break;
     default:
         /* Up to 256 different colors */
-        if ( paletteNumColors > 64 &&
+        if ( paletteNumColors > 96 &&
              qualityLevel != -1 && qualityLevel <= 3 &&
              DetectSmoothImage(&cl->format, w, h) ) {
             success = SendJpegRect(cl, x, y, w, h,
@@ -640,7 +669,8 @@ SendMonoRect(cl, w, h)
     int streamId = 1;
     int paletteLen, dataLen;
 
-    if ( ublen + 6 + 2 * cl->format.bitsPerPixel / 8 > UPDATE_BUF_SIZE ) {
+    if ( (ublen + TIGHT_MIN_TO_COMPRESS + 6 +
+          2 * cl->format.bitsPerPixel / 8) > UPDATE_BUF_SIZE ) {
         if (!rfbSendUpdateBuf(cl))
             return FALSE;
     }
@@ -704,8 +734,8 @@ SendIndexedRect(cl, w, h)
     int streamId = 2;
     int i, entryLen;
 
-    if ( ublen + 6 + paletteNumColors * cl->format.bitsPerPixel / 8 >
-         UPDATE_BUF_SIZE ) {
+    if ( (ublen + TIGHT_MIN_TO_COMPRESS + 6 +
+          paletteNumColors * cl->format.bitsPerPixel / 8) > UPDATE_BUF_SIZE ) {
         if (!rfbSendUpdateBuf(cl))
             return FALSE;
     }
@@ -898,18 +928,17 @@ static Bool SendCompressedData(cl, compressedLen)
         }
     }
 
-    for (i = 0; i < compressedLen; ) {
-        portionLen = compressedLen - i;
-        if (portionLen > UPDATE_BUF_SIZE - ublen)
-            portionLen = UPDATE_BUF_SIZE - ublen;
-
+    portionLen = UPDATE_BUF_SIZE;
+    for (i = 0; i < compressedLen; i += portionLen) {
+        if (i + portionLen > compressedLen) {
+            portionLen = compressedLen - i;
+        }
+        if (ublen + portionLen > UPDATE_BUF_SIZE) {
+            if (!rfbSendUpdateBuf(cl))
+                return FALSE;
+        }
         memcpy(&updateBuf[ublen], &tightAfterBuf[i], portionLen);
-
         ublen += portionLen;
-        i += portionLen;
-
-        if (!rfbSendUpdateBuf(cl))
-            return FALSE;
     }
     cl->rfbBytesSent[rfbEncodingTight] += compressedLen;
     return TRUE;
