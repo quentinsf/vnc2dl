@@ -816,8 +816,8 @@ static Bool HandleXCursor(int xhot, int yhot, int width, int height)
   fg.green = (unsigned short)colors.foreGreen << 8 | colors.foreGreen;
   fg.blue  = (unsigned short)colors.foreBlue  << 8 | colors.foreBlue;
 
-  mask = XCreateBitmapFromData(dpy, dr, buf, width, height);
-  source = XCreateBitmapFromData(dpy, dr, &buf[bytesData], width, height);
+  source = XCreateBitmapFromData(dpy, dr, buf, width, height);
+  mask = XCreateBitmapFromData(dpy, dr, &buf[bytesData], width, height);
   cursor = XCreatePixmapCursor(dpy, source, mask, &fg, &bg, xhot, yhot);
   XFreePixmap(dpy, source);
   XFreePixmap(dpy, mask);
