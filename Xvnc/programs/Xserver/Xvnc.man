@@ -10,7 +10,7 @@
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH Xvnc 1 "May 2002" "" "TightVNC"
+.TH Xvnc 1 "August 2002" "" "TightVNC"
 .SH NAME
 Xvnc \- an X server providing VNC connectivity
 .SH SYNOPSIS
@@ -23,8 +23,8 @@ Xvnc \- an X server providing VNC connectivity
 [\-rfbauth \fIpasswd-file\fR] [\-httpd \fIdir\fR]
 [\-httpport \fIport\fR] [\-deferupdate \fItime\fR]
 [\-economictranslate] [\-lazytight] [\-desktop \fIname\fR] [\-alwaysshared]
-[\-nevershared] [\-dontdisconnect] [\-localhost] [\-interface ipaddr]
-[\-inetd] [\-compatiblekbd]
+[\-nevershared] [\-dontdisconnect] [\-viewonly] [\-localhost]
+[\-interface ipaddr] [\-inetd] [\-compatiblekbd]
 [\fIX-options\fR...]
 .SH DESCRIPTION
 \fBXvnc\fR is a VNC (Virtual Network Computing) server. It acts like
@@ -114,6 +114,10 @@ client connections.
 \fB\-dontdisconnect\fR
 Don't disconnect existing clients when a new non-shared connection
 comes in, refuse new connection instead.
+.TP
+\fB\-viewonly\fR
+Don't accept keboard and pointer events from clients. All clients will
+be able to see the desktop but won't be able to control it.
 .TP
 \fB\-localhost\fR
 Only allow loopback connections from localhost. This option is useful
