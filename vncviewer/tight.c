@@ -26,8 +26,6 @@
  * macro BPP. For each value of BPP, this file defines a function
  * which handles an zlib encoded rectangle with BPP bits per pixel.
  *
- * FIXME: Print messages to stderr on errors.
- * FIXME: Split into separate functions in a better way.
  */
 
 #define CARDBPP CONCAT2E(CARD,BPP)
@@ -92,16 +90,13 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
   /* Flush zlib streams if we are told by the server to do so. */
   for (stream_id = 0; stream_id < 4; stream_id++) {
     if ((comp_ctl & 1) && zlibStreamActive[stream_id]) {
-      fprintf(stderr, "DEBUG: Resetting zlib stream #%d.\n", stream_id);
-      if (inflateEnd (&zlibStream[stream_id]) != Z_OK)
-        fprintf(stderr, "inflateEnd: %s\n",
-                zlibStream[stream_id].msg); /* DEBUG */
+      if (inflateEnd (&zlibStream[stream_id]) != Z_OK &&
+          zlibStream[stream_id].msg != NULL)
+        fprintf(stderr, "inflateEnd: %s\n", zlibStream[stream_id].msg);
       zlibStreamActive[stream_id] = False;
     }
     comp_ctl >>= 1;
   }
-
-  fprintf(stderr, "DEBUG: Subencoding value %d.\n", (int)comp_ctl);
 
   /* Handle solid rectangles. */
   if (comp_ctl == rfbTightFill) {
@@ -122,7 +117,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
 
 #if (BPP == 8)
     gcv.foreground = (appData.useBGR233) ?
-        BGR233ToPixel[fill_colour] : fill_colour;
+      BGR233ToPixel[fill_colour] : fill_colour;
 #else
     gcv.foreground = fill_colour;
 #endif
@@ -134,7 +129,6 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
 
   /* Quit on unsupported subencoding value. */
   if (comp_ctl >=8) {
-    /* DEBUG: Text of the message should be changed. */
     fprintf(stderr, "Tight encoding: bad subencoding value received.\n");
     return False;
   }
@@ -148,7 +142,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
   if (comp_ctl >= 4) {
     if (!ReadFromRFBServer((char*)&filter_id, 1))
       return False;
-    fprintf(stderr, "DEBUG: Filter id %d.\n", (int)filter_id);
+
     switch (filter_id) {
     case rfbTightFilterCopy:
       filterFn = FilterCopyBPP;
@@ -163,7 +157,6 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
       bitsPixel = InitFilterGradientBPP(rw, rh);
       break;
     delault:
-      /* DEBUG: Text of the message should be changed. */
       fprintf(stderr, "Tight encoding: unknown filter code received.\n");
       return False;
     }
@@ -172,15 +165,13 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
     bitsPixel = InitFilterCopyBPP(rw, rh);
   }
   if (bitsPixel == 0) {
-    /* DEBUG: Text of the message should be changed. */
     fprintf(stderr, "Tight encoding: error receiving palette.\n");
     return False;
   }
 
   /* Read the length (1..3 bytes) of compressed data following. */
   compressedLen = ReadCompactLen();
-  fprintf(stderr, "DEBUG: Compressed size is %d.\n", compressedLen);
-  if (compressedLen < 0) {
+  if (compressedLen <= 0) {
     fprintf(stderr, "Incorrect data received from the server.\n");
     return False;
   }
@@ -194,7 +185,8 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
     zs->opaque = Z_NULL;
     err = inflateInit(zs);
     if (err != Z_OK) {
-      fprintf(stderr, "InflateInit error: %s.\n", zs->msg);
+      if (zs->msg != NULL)
+        fprintf(stderr, "InflateInit error: %s.\n", zs->msg);
       return False;
     }
     zlibStreamActive[stream_id] = True;
@@ -234,7 +226,8 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
 
       err = inflate(zs, Z_SYNC_FLUSH);
       if (err != Z_OK && err != Z_STREAM_END) {
-        fprintf(stderr, "Inflate error: %s.\n", zs->msg);
+        if (zs->msg != NULL)
+          fprintf(stderr, "Inflate error: %s.\n", zs->msg);
         return False;
       }
 
@@ -437,8 +430,6 @@ InitFilterPaletteBPP (int rw, int rh)
 
   if (!ReadFromRFBServer((char*)&numColors, 1))
     return 0;
-
-  fprintf(stderr, "DEBUG: Palette size is %d.\n", (int)numColors + 1);
 
   rectColors = (int)numColors;
   if (++rectColors < 2)
