@@ -281,6 +281,7 @@ usage(void)
 	  "\n"
 	  "Usage: %s [<OPTIONS>] [<HOST>][:<DISPLAY#>]\n"
 	  "       %s [<OPTIONS>] -listen [<DISPLAY#>]\n"
+	  "       %s -help\n"
 	  "\n"
 	  "<OPTIONS> are standard Xt options, or:\n"
 	  "        -via <GATEWAY>\n"
@@ -299,8 +300,8 @@ usage(void)
 	  "        -quality <JPEG-QUALITY-VALUE> (0..9: 0-low, 9-high)\n"
 	  "        -nocursorshape\n"
 	  "\n"
-	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233.\n"
-	  "\n", programName, programName);
+	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233."
+	  "\n", programName, programName, programName);
   exit(1);
 }
 
