@@ -503,7 +503,7 @@ SendSubrect(cl, x, y, w, h)
     default:
         /* Up to 256 different colors */
         if ( paletteNumColors > 64 &&
-             qualityLevel != 1 && qualityLevel <= 3 &&
+             qualityLevel != -1 && qualityLevel <= 3 &&
              DetectStillImage(&cl->format, w, h) ) {
             success = SendJpegRect(cl, x, y, w, h,
                                    tightConf[qualityLevel].jpegQuality);
