@@ -887,7 +887,7 @@ EncodeMonoRect##bpp(buf, w, h)                                          \
     int w, h;                                                           \
 {                                                                       \
     CARD##bpp *ptr;                                                     \
-    CARD##bpp bg, sample;                                               \
+    CARD##bpp bg;                                                       \
     unsigned int value, mask;                                           \
     int aligned_width;                                                  \
     int x, y, bg_bits;                                                  \
