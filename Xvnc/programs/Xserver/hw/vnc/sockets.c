@@ -81,6 +81,27 @@ rfbInitSockets()
 
     done = TRUE;
 
+    if (inetdSock != -1) {
+	const int one = 1;
+
+	if (fcntl(inetdSock, F_SETFL, O_NONBLOCK) < 0) {
+	    rfbLogPerror("fcntl");
+	    exit(1);
+	}
+
+	if (setsockopt(inetdSock, IPPROTO_TCP, TCP_NODELAY,
+		       (char *)&one, sizeof(one)) < 0) {
+	    rfbLogPerror("setsockopt");
+	    exit(1);
+	}
+
+    	AddEnabledDevice(inetdSock);
+    	FD_ZERO(&allFds);
+    	FD_SET(inetdSock, &allFds);
+    	maxFd = inetdSock;
+	return;
+    }
+
     if (rfbPort == 0) {
 	rfbPort = 5900 + atoi(display);
     }
@@ -130,6 +151,12 @@ rfbCheckFds()
     char buf[6];
     const int one = 1;
     int sock;
+    static Bool inetdInitDone = FALSE;
+
+    if (!inetdInitDone && inetdSock != -1) {
+	rfbNewClientConnection(inetdSock); 
+	inetdInitDone = TRUE;
+    }
 
     memcpy((char *)&fds, (char *)&allFds, sizeof(fd_set));
     tv.tv_sec = 0;
@@ -143,7 +170,7 @@ rfbCheckFds()
 	return;
     }
 
-    if (FD_ISSET(rfbListenSock, &fds)) {
+    if (rfbListenSock != -1 && FD_ISSET(rfbListenSock, &fds)) {
 
 	if ((sock = accept(rfbListenSock,
 			   (struct sockaddr *)&addr, &addrlen)) < 0) {
@@ -238,6 +265,8 @@ rfbCloseSock(sock)
     RemoveEnabledDevice(sock);
     FD_CLR(sock, &allFds);
     rfbClientConnectionGone(sock);
+    if (sock == inetdSock)
+	GiveUp(0);
 }
 
 
@@ -289,16 +318,20 @@ rfbConnect(host, port)
     rfbLog("Making connection to client on host %s port %d\n",
 	   host,port);
 
-    if ((sock = ConnectToTcpAddr(host, port)) < 0)
+    if ((sock = ConnectToTcpAddr(host, port)) < 0) {
+	rfbLogPerror("connection failed");
 	return -1;
+    }
 
     if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
+	rfbLogPerror("fcntl failed");
 	close(sock);
 	return -1;
     }
 
     if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		   (char *)&one, sizeof(one)) < 0) {
+	rfbLogPerror("setsockopt failed");
 	close(sock);
 	return -1;
     }
@@ -450,12 +483,15 @@ ListenOnTCPPort(port)
     }
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
 		   (char *)&one, sizeof(one)) < 0) {
+	close(sock);
 	return -1;
     }
     if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+	close(sock);
 	return -1;
     }
     if (listen(sock, 5) < 0) {
+	close(sock);
 	return -1;
     }
 
@@ -489,6 +525,7 @@ ConnectToTcpAddr(host, port)
     }
 
     if (connect(sock, (struct sockaddr *)&addr, (sizeof(addr))) < 0) {
+	close(sock);
 	return -1;
     }
 

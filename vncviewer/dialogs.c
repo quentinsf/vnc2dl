@@ -37,7 +37,8 @@ char *
 DoServerDialog()
 {
   Widget pshell, dialog;
-  char *sn, *vncServerName;
+  char *vncServerName;
+  char *valueString;
 
   pshell = XtVaCreatePopupShell("serverDialog", transientShellWidgetClass,
 				toplevel, NULL);
@@ -54,8 +55,8 @@ DoServerDialog()
     XtAppProcessEvent(appContext, XtIMAll);
   }
 
-  sn = XawDialogGetValueString(dialog);
-  vncServerName = XtNewString(sn);
+  valueString = XawDialogGetValueString(dialog);
+  vncServerName = XtNewString(valueString);
 
   XtPopdown(pshell);
   return vncServerName;
@@ -72,7 +73,8 @@ char *
 DoPasswordDialog()
 {
   Widget pshell, dialog;
-  char *pw, *password;
+  char *password;
+  char *valueString;
 
   pshell = XtVaCreatePopupShell("passwordDialog", transientShellWidgetClass,
 				toplevel, NULL);
@@ -89,8 +91,8 @@ DoPasswordDialog()
     XtAppProcessEvent(appContext, XtIMAll);
   }
 
-  pw = XawDialogGetValueString(dialog);
-  password = XtNewString(pw);
+  valueString = XawDialogGetValueString(dialog);
+  password = XtNewString(valueString);
 
   XtPopdown(pshell);
   return password;

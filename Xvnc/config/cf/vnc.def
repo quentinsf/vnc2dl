@@ -104,8 +104,8 @@
 #define BuildServer		YES
 
 #define XVendorString		"AT&T Laboratories Cambridge"
-#define XVendorRelease		3331
-#define XvncRelease		"3r1"
+#define XVendorRelease		3332
+#define XvncRelease		"3r2"
 
 
 /*****************************************************************************/

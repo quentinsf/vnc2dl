@@ -1153,8 +1153,8 @@ rfbPolyArc(pDrawable, pGC, narcs, arcs)
 	{
 	    rects[i].x = arcs[i].x - extra + pDrawable->x;
 	    rects[i].y = arcs[i].y - extra + pDrawable->y;
-	    rects[i].width = arcs[i].width + 2 * extra;
-	    rects[i].height = arcs[i].height + 2 * extra;
+	    rects[i].width = arcs[i].width + lw;
+	    rects[i].height = arcs[i].height + lw;
 	}
 
 	tmpRegion = RECTS_TO_REGION(pDrawable->pScreen, narcs, rects, CT_NONE);
@@ -1332,8 +1332,8 @@ rfbPolyFillArc(pDrawable, pGC, narcs, arcs)
 	{
 	    rects[i].x = arcs[i].x - extra + pDrawable->x;
 	    rects[i].y = arcs[i].y - extra + pDrawable->y;
-	    rects[i].width = arcs[i].width + 2 * extra;
-	    rects[i].height = arcs[i].height + 2 * extra;
+	    rects[i].width = arcs[i].width + lw;
+	    rects[i].height = arcs[i].height + lw;
 	}
 
 	tmpRegion = RECTS_TO_REGION(pDrawable->pScreen, narcs, rects, CT_NONE);

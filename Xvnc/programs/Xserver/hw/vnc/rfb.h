@@ -287,6 +287,8 @@ extern Atom VNC_LAST_CLIENT_ID;
 extern rfbScreenInfo rfbScreen;
 extern int rfbGCIndex;
 
+extern int inetdSock;
+
 extern int rfbBitsPerPixel(int depth);
 extern void rfbLog(char *format, ...);
 extern void rfbLogPerror(char *str);
@@ -344,7 +346,8 @@ extern RegionPtr rfbRestoreAreas(WindowPtr, RegionPtr);
 
 /* cutpaste.c */
 
-extern void rfbSetCutText(char *str, int len);
+extern void rfbSetXCutText(char *str, int len);
+extern void rfbGotXCutText(char *str, int len);
 
 
 /* kbdptr.c */
