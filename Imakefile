@@ -9,13 +9,11 @@ World:
 	make all
 	@echo ""
 	@echo Built $(SUBDIRS).
-	@echo 'To build Xvnc, do "cd Xvnc", followed by "make World"'
+	@echo 'To build Xvnc, do "cd Xvnc", followed by "./configure" then "make"'
 	@echo ""
 
 libs:
-	@echo 'Building libraries...'
-	( cd lib/zlib/ ; ./configure ; make libz.a CFLAGS=-O2 )
-	( cd lib/jpeg/ ; ./configure ; make libjpeg.a CFLAGS=-O2 )
+	@echo 'No libraries included.'
 
 MakeSubdirs($(SUBDIRS))
 DependSubdirs($(SUBDIRS))

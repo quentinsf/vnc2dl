@@ -206,6 +206,9 @@ static XtResource appDataResourceList[] = {
 
   {"useRemoteCursor", "UseRemoteCursor", XtRBool, sizeof(Bool),
    XtOffsetOf(AppData, useRemoteCursor), XtRImmediate, (XtPointer) True},
+
+  {"autoPass", "AutoPass", XtRBool, sizeof(Bool),
+   XtOffsetOf(AppData, autoPass), XtRImmediate, (XtPointer) False}
 };
 
 
@@ -230,6 +233,7 @@ XrmOptionDescRec cmdLineOptions[] = {
   {"-compresslevel", "*compressLevel",      XrmoptionSepArg, 0},
   {"-quality",       "*qualityLevel",       XrmoptionSepArg, 0},
   {"-nocursorshape", "*useRemoteCursor",    XrmoptionNoArg,  "False"},
+  {"-autopass",      "*autoPass",           XrmoptionNoArg,  "True"}
 };
 
 int numCmdLineOptions = XtNumber(cmdLineOptions);
@@ -299,6 +303,7 @@ usage(void)
 	  "        -compresslevel <COMPRESS-VALUE> (0..9: 0-fast, 9-best)\n"
 	  "        -quality <JPEG-QUALITY-VALUE> (0..9: 0-low, 9-high)\n"
 	  "        -nocursorshape\n"
+	  "        -autopass\n"
 	  "\n"
 	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233."
 	  "\n", programName, programName, programName);

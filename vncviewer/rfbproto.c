@@ -153,6 +153,9 @@ InitialiseRFBConnection()
   char *passwd;
   int i;
   rfbClientInitMsg ci;
+  char  buffer[64];
+  char* cstatus;
+  int   len;
 
   /* if the connection is immediately closed, don't report anything, so
        that pmw's monitor can make test connections */
@@ -211,6 +214,17 @@ InitialiseRFBConnection()
 	fprintf(stderr,"Cannot read valid password from file \"%s\"\n",
 		appData.passwordFile);
 	return False;
+      }
+    } else if (appData.autoPass) {
+      passwd = buffer;
+      cstatus = fgets(buffer, sizeof buffer, stdin);
+      if (cstatus == NULL)
+         buffer[0] = '\0';
+      else
+      {
+         len = strlen(buffer);
+         if (len > 0 && buffer[len - 1] == '\n')
+            buffer[len - 1] = '\0';
       }
     } else if (appData.passwordDialog) {
       passwd = DoPasswordDialog();

@@ -1,7 +1,6 @@
+
 #ifdef SunArchitecture
-CC = gcc
-CCOPTIONS =
-CDEBUGFLAGS = -O2
+EXTRA_DEFINES = -D__EXTENSIONS__
 #endif
 
 XCOMM Shared memory support works OK on x86 linux, not tested elsewhere but
@@ -11,10 +10,12 @@ XCOMM seems to cause problems on Digital Unix.
 DEFINES = -DMITSHM
 #endif
 
-INCLUDES = -I../include -I. -I../lib/zlib -I../lib/jpeg -I/usr/include
+ZLIB_INC = -I/usr/local/include
+JPEG_INC = -I/usr/local/include
+INCLUDES = -I../include -I. $(ZLIB_INC) $(JPEG_INC) -I/usr/include
 VNCAUTH_LIB = ../libvncauth/libvncauth.a
-ZLIB_LIB = -L../lib/zlib -lz
-JPEG_LIB = -L../lib/jpeg -ljpeg
+ZLIB_LIB = -L/usr/local/lib -lz
+JPEG_LIB = -L/usr/local/lib -ljpeg
 
 DEPLIBS = XawClientDepLibs $(VNCAUTH_LIB)
 LOCAL_LIBRARIES = XawClientLibs $(VNCAUTH_LIB) $(ZLIB_LIB) $(JPEG_LIB)

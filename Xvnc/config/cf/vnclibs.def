@@ -6,5 +6,5 @@
  */
 
 VNCLIBS = $(TOP)/../libvncauth/libvncauth.a
-VNCSYSLIBS = -L$(TOP)/../lib/jpeg -ljpeg
-VNCCPPFLAGS = -I$(TOP)/../include -I$(TOP)/../lib/zlib -I$(TOP)/../lib/jpeg
+VNCSYSLIBS = -L/usr/local/lib -ljpeg -lz
+VNCCPPFLAGS = -I$(TOP)/../include -I/usr/local/include

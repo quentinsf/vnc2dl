@@ -34,18 +34,14 @@ There are five programs here:
 
 First you must have a reasonably recent version of X installed (this includes
 /usr/openwin on Solaris machines).  Also, TightVNC requires JPEG and zlib
-libraries either installed in the system or included in this distribution
-archive.  To build everything but Xvnc, do:
+libraries either installed in the system (e.g. under /usr/local).  To build
+everything but Xvnc, do:
 
 	% xmkmf
-	% make libs	# if source archive includes zlib and JPEG libraries
 	% make World
 
 This should build first the vncauth library which is used by each of the
-programs, then vncviewer, vncpasswd and vncconnect.  The "make libs" command
-additionally builds zlib and JPEG libraries included in the lib/ directory.
-Don't do "make libs" if you have these libraries installed in the system and
-want to link to these libraries dynamically.
+programs, then vncviewer, vncpasswd and vncconnect.
 
 Xvnc differs from the other programs in that it is built inside a cut-down
 version of the X build tree.  This is based around the XFree86 3.3.2 "server
@@ -53,7 +49,8 @@ only" distribution, which in turn is based on the X11R6.3 distribution from
 the X consortium.  To build Xvnc, do:
 
 	% cd Xvnc
-	% make World
+	% ./configure
+	% make
 
 If you have trouble building Xvnc, see the Xvnc/README file for more details.
 

@@ -358,7 +358,7 @@ DoBumpScroll()
   return False;
 }
 
-void
+static void
 BumpScrollTimerCallback(XtPointer clientData, XtIntervalId *id)
 {
   DoBumpScroll();

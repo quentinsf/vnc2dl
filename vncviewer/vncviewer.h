@@ -100,6 +100,7 @@ typedef struct {
   int compressLevel;
   int qualityLevel;
   Bool useRemoteCursor;
+  Bool autoPass;
 
 } AppData;
 

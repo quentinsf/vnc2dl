@@ -180,7 +180,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
       filterFn = FilterGradientBPP;
       bitsPixel = InitFilterGradientBPP(rw, rh);
       break;
-    delault:
+    default:
       fprintf(stderr, "Tight encoding: unknown filter code received.\n");
       return False;
     }

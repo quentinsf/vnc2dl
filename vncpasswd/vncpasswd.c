@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
       }
       for (i = 0; i < strlen(passwd); i++)
 	passwd[i] = passwd1[i] = '\0';
-      return;
+      exit(0);
     }
 
     fprintf(stderr,"Passwords do not match. Please try again.\n\n");

@@ -202,10 +202,10 @@ XCOMM $XFree86: xc/config/cf/Imake.cf,v 3.34.2.3 1997/07/27 02:41:02 dawes Exp $
 # define SunArchitecture
 #endif /* sun */
 
-#ifdef hpux
+#ifdef __hpux
 # define MacroIncludeFile <hp.cf>
 # define MacroFile hp.cf
-# undef hpux
+# undef __hpux
 # define HPArchitecture
 #endif /* hpux */
 
@@ -547,6 +547,31 @@ XCOMM $XFree86: xc/config/cf/Imake.cf,v 3.34.2.3 1997/07/27 02:41:02 dawes Exp $
 # ifdef i386
 #  define i386Architecture
 #  undef i386
+XCOMM Keep cpp from replacing path elements containing i486/i586/i686/k6
+#  ifdef i486
+#  ifndef i386Architecture
+#   define i386Architecture
+#  endif
+#   undef i486
+#  endif
+#  ifdef i586
+#  ifndef i386Architecture
+#   define i386Architecture
+#  endif
+#   undef i586
+#  endif
+#  ifdef i686
+#  ifndef i386Architecture
+#   define i386Architecture
+#  endif
+#   undef i686
+#  endif
+#  ifdef k6
+#  ifndef i386Architecture
+#   define i386Architecture
+#  endif
+#   undef k6
+#  endif
 # endif /* i386 */
 # ifdef __i386__
 #  ifndef i386Architecture

@@ -305,7 +305,7 @@ XCOMM the platform-specific parameters - edit site.def to change
 #define HasZlib			NO
 #endif
 #if !HasZlib		/* GzipLibrary was valid only if HasZlib */
-#define GzipLibrary -L$(TOP)/../lib/zlib -lz
+#define GzipLibrary -L/usr/local/lib -lz
 #endif
 #ifndef GzipLibrary	/* if OS config didn't define it, assume it's -lz */
 #define GzipLibrary -lz
@@ -910,10 +910,12 @@ TCLIBDIR = TclLibDir
 #ifndef ExportListCmd
 # ifndef ExportListGenSource
 #  define ExportListCmd		/**/
-# elif !defined(UseInstalled)
-#  define ExportListCmd		$(CONFIGSRC)/util/exportlistgen
 # else
-#  define ExportListCmd		exportlistgen
+#  if !defined(UseInstalled)
+#   define ExportListCmd		$(CONFIGSRC)/util/exportlistgen
+#  else
+#   define ExportListCmd		exportlistgen
+#  endif
 # endif
 #endif
 #ifndef MkdirHierCmd

@@ -66,6 +66,10 @@ SOFTWARE.
 #include <sys/resource.h>
 #endif
 
+#ifdef AIXV3
+#include <sys/resource.h>
+#endif
+
 #ifndef ADMPATH
 #define ADMPATH "/usr/adm/X%smsgs"
 #endif

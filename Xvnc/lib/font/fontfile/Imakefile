@@ -3,7 +3,7 @@ XCOMM $XFree86: xc/lib/font/fontfile/Imakefile,v 3.4 1996/12/26 03:41:32 dawes E
 #include <Server.tmpl>
 
 #if !HasZlib
-    ZLIBINC = $(TOP)/../lib/zlib
+    ZLIBINC = /usr/local/include
 #endif
    INCLUDES = -I$(FONTINCSRC) -I../include -I$(SERVERSRC)/include -I$(ZLIBINC)
     HEADERS = 
