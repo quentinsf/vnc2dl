@@ -60,11 +60,29 @@ static unsigned char _reverse_byte[0x100] = {
 	0x1f, 0x9f, 0x5f, 0xdf, 0x3f, 0xbf, 0x7f, 0xff
 };
 
+/* Data kept for HandleXCursor() function. */
+static Bool prevXCursorSet = False;
+static Cursor prevXCursor;
+
+/* Data kept for RichCursor encoding support. */
+static Bool prevRichCursorSet = False;
+static Pixmap rcSavedArea;
+static CARD8 *rcSource, *rcMask;
+static int rcHotX, rcHotY, rcWidth, rcHeight;
+static int rcCursorX, rcCursorY;
+static int rcHideCounter;
+
+static void SoftCursorCopyArea(Bool toScreen);
+static void SoftCursorDraw(void);
+static void FreeCursors(Bool setDotCursor);
+
+/*
+ * XCursor encoding support. XCursor shape updates are translated
+ * directly into X cursors and saved in the prevXCursor variable.
+ */
 
 Bool HandleXCursor(int xhot, int yhot, int width, int height)
 {
-  static Cursor prevCursor;
-  static Bool prevCursorSet = False;
   rfbXCursorColors colors;
   size_t bytesPerRow, bytesData;
   char *buf = NULL;
@@ -96,14 +114,10 @@ Bool HandleXCursor(int xhot, int yhot, int width, int height)
   }
 
   if (width * height == 0 || wret < width || hret < height) {
-    XDefineCursor(dpy, desktopWin, dotCursor);
-
+    /* Free resources, restore dot cursor. */
     if (buf != NULL)
       free(buf);
-    if (prevCursorSet)
-      XFreeCursor(dpy, prevCursor);
-    prevCursorSet = False;
-
+    FreeCursors(True);
     return True;
   }
 
@@ -124,18 +138,224 @@ Bool HandleXCursor(int xhot, int yhot, int width, int height)
   XFreePixmap(dpy, mask);
   free(buf);
 
+  FreeCursors(False);
   XDefineCursor(dpy, desktopWin, cursor);
-
-  if (prevCursorSet)
-    XFreeCursor(dpy, prevCursor);
-  prevCursor = cursor;
-  prevCursorSet = True;
+  prevXCursor = cursor;
+  prevXCursorSet = True;
 
   return True;
 }
 
 Bool HandleRichCursor(int xhot, int yhot, int width, int height)
 {
-  return False;
+  size_t bytesPerRow, bytesMaskData;
+  Drawable dr;
+  char *buf;
+  CARD8 *ptr;
+  int x, y, b;
+
+  bytesPerRow = (width + 7) / 8;
+  bytesMaskData = bytesPerRow * height;
+  dr = DefaultRootWindow(dpy);
+
+  FreeCursors(True);
+
+  if (width * height == 0)
+    return True;
+
+  /* Read cursor pixel data. */
+
+  rcSource = malloc(width * height * (myFormat.bitsPerPixel / 8));
+  if (rcSource == NULL)
+    return False;
+
+  if (!ReadFromRFBServer((char *)rcSource,
+                         width * height * (myFormat.bitsPerPixel / 8))) {
+    free(rcSource);
+    return False;
+  }
+
+  /* Read and decode mask data. */
+
+  buf = malloc(bytesMaskData);
+  if (buf == NULL) {
+    free(rcSource);
+    return False;
+  }
+
+  if (!ReadFromRFBServer(buf, bytesMaskData)) {
+    free(rcSource);
+    free(buf);
+    return False;
+  }
+
+  rcMask = malloc(width * height);
+  if (rcMask == NULL) {
+    free(rcSource);
+    free(buf);
+    return False;
+  }
+
+  ptr = rcMask;
+  for (y = 0; y < height; y++) {
+    for (x = 0; x < width / 8; x++) {
+      for (b = 7; b >= 0; b--) {
+        *ptr++ = buf[y * bytesPerRow + x] >> b & 1;
+      }
+    }
+    for (b = 7; b > 7 - width % 8; b--) {
+      *ptr++ = buf[y * bytesPerRow + x] >> b & 1;
+    }
+  }
+
+  free(buf);
+
+  /* Set remaining data associated with cursor. */
+
+  dr = DefaultRootWindow(dpy);
+  rcSavedArea = XCreatePixmap(dpy, dr, width, height, visdepth);
+  rcHotX = xhot;
+  rcHotY = yhot;
+  rcWidth = width;
+  rcHeight = height;
+
+  SoftCursorCopyArea(False);
+  SoftCursorDraw();
+
+  rcHideCounter = 0;
+  prevRichCursorSet = True;
+  return True;
+}
+
+Bool SoftCursorInArea(int x, int y, int w, int h)
+{
+  if (!prevRichCursorSet)
+    return False;
+
+  return (x < rcCursorX - rcHotX + rcWidth &&
+          y < rcCursorY - rcHotY + rcHeight &&
+          x + w >= rcCursorX - rcHotX &&
+          y + h >= rcCursorY - rcHotY);
+}
+
+void SoftCursorHide(void)
+{
+  if (!prevRichCursorSet)
+    return;
+
+  if (!rcHideCounter++)
+    SoftCursorCopyArea(True);
+}
+
+void SoftCursorShow(void)
+{
+  if (!prevRichCursorSet)
+    return;
+
+  if (!--rcHideCounter) {
+    SoftCursorCopyArea(False);
+    SoftCursorDraw();
+  }
+}
+
+void SoftCursorMove(int x, int y)
+{
+  if (prevRichCursorSet && !rcHideCounter) {
+    SoftCursorCopyArea(True);
+  }
+
+  rcCursorX = x;
+  rcCursorY = y;
+
+  if (prevRichCursorSet && !rcHideCounter) {
+    SoftCursorCopyArea(False);
+    SoftCursorDraw();
+  }
+}
+
+/*
+ * Internal low-level functions.
+ */
+
+static void SoftCursorCopyArea(Bool toScreen)
+{
+  int x, y, w, h;
+
+  x = rcCursorX - rcHotX;
+  y = rcCursorY - rcHotY;
+  if (x >= si.framebufferWidth || y >= si.framebufferHeight)
+    return;
+
+  w = rcWidth;
+  h = rcHeight;
+  if (x < 0) {
+    w += x;
+    x = 0;
+  } else if (x + w > si.framebufferWidth) {
+    w = si.framebufferWidth - x;
+  }
+  if (y < 0) {
+    h += y;
+    y = 0;
+  } else if (y + h > si.framebufferHeight) {
+    h = si.framebufferHeight - y;
+  }
+
+  if (!toScreen) {
+    /* Save screen area in memory. */
+#ifdef MITSHM
+    if (appData.useShm)
+      XSync(dpy, False);
+#endif
+    XCopyArea(dpy, desktopWin, rcSavedArea, gc, x, y, w, h, 0, 0);
+  } else {
+    /* Restore screen area. */
+    XCopyArea(dpy, rcSavedArea, desktopWin, gc, 0, 0, w, h, x, y);
+  }
+}
+
+static void SoftCursorDraw(void)
+{
+  int x, y, x0, y0;
+  int offset, bytesPerPixel;
+  char *pos;
+
+  bytesPerPixel = myFormat.bitsPerPixel / 8;
+
+  /* FIXME: Implementation may be inefficient. */
+  for (y = 0; y < rcHeight; y++) {
+    y0 = rcCursorY - rcHotY + y;
+    if (y0 >= 0 && y0 < si.framebufferHeight) {
+      for (x = 0; x < rcWidth; x++) {
+        x0 = rcCursorX - rcHotX + x;
+        if (x0 >= 0 && x0 < si.framebufferWidth) {
+          offset = y * rcWidth + x;
+          if (rcMask[offset]) {
+            pos = (char *)&rcSource[offset * bytesPerPixel];
+            CopyDataToScreen(pos, x0, y0, 1, 1);
+          }
+        }
+      }
+    }
+  }
+}
+
+static void FreeCursors(Bool setDotCursor)
+{
+  if (setDotCursor)
+    XDefineCursor(dpy, desktopWin, dotCursor);
+
+  if (prevXCursorSet) {
+    XFreeCursor(dpy, prevXCursor);
+    prevXCursorSet = False;
+  }
+
+  if (prevRichCursorSet) {
+    SoftCursorCopyArea(True);
+    XFreePixmap(dpy, rcSavedArea);
+    free(rcSource);
+    free(rcMask);
+    prevRichCursorSet = False;
+  }
 }
 

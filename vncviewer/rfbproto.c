@@ -420,6 +420,7 @@ SendPointerEvent(int x, int y, int buttonMask)
   pe.buttonMask = buttonMask;
   if (x < 0) x = 0;
   if (y < 0) y = 0;
+  SoftCursorMove(x, y);
   pe.x = Swap16IfLE(x);
   pe.y = Swap16IfLE(y);
   return WriteExact(rfbsock, (char *)&pe, sz_rfbPointerEventMsg);
@@ -511,6 +512,7 @@ HandleRFBServerMessage()
     int bytesPerLine;
     int i;
     int usecs;
+    Bool repaintCursor = False;
 
     if (!ReadFromRFBServer(((char *)&msg.fu) + 1,
 			   sz_rfbFramebufferUpdateMsg - 1))
@@ -536,7 +538,7 @@ HandleRFBServerMessage()
 	continue;
       }
       if (rect.encoding == rfbEncodingRichCursor) {
-	if (!HandleXCursor(rect.r.x, rect.r.y, rect.r.w, rect.r.h)) {
+	if (!HandleRichCursor(rect.r.x, rect.r.y, rect.r.w, rect.r.h)) {
 	  return False;
         }
 	continue;
@@ -553,6 +555,11 @@ HandleRFBServerMessage()
       if (rect.r.h * rect.r.w == 0) {
 	fprintf(stderr,"Zero size rect - ignoring\n");
 	continue;
+      }
+
+      if (SoftCursorInArea(rect.r.x, rect.r.y, rect.r.w, rect.r.h)) {
+        SoftCursorHide();
+        repaintCursor = True;
       }
 
       switch (rect.encoding) {
@@ -587,6 +594,12 @@ HandleRFBServerMessage()
 
 	cr.srcX = Swap16IfLE(cr.srcX);
 	cr.srcY = Swap16IfLE(cr.srcY);
+
+        if (!repaintCursor &&
+            SoftCursorInArea(cr.srcX, cr.srcY, rect.r.w, rect.r.h)) {
+          SoftCursorHide();
+          repaintCursor = True;
+        }
 
 	if (appData.copyRectDelay != 0) {
 	  XFillRectangle(dpy, desktopWin, srcGC, cr.srcX, cr.srcY,
@@ -687,6 +700,11 @@ HandleRFBServerMessage()
 	fprintf(stderr,"Unknown rect encoding %d\n",
 		(int)rect.encoding);
 	return False;
+      }
+
+      if (repaintCursor) {
+        SoftCursorShow();
+        repaintCursor = False;
       }
     }
 
