@@ -386,6 +386,22 @@ SOFTWARE.
 
 #endif /* linux/m68k */
 
+#if defined (linux) && defined(__powerpc__)
+
+#define IMAGE_BYTE_ORDER       MSBFirst
+#define BITMAP_BIT_ORDER       MSBFirst
+#define GLYPHPADBYTES          4
+#define GETLEFTBITS_ALIGNMENT  1
+
+#define LARGE_INSTRUCTION_CACHE  
+#define FAST_CONSTANT_OFFSET_MODE
+#define PLENTIFUL_REGISTERS
+#define AVOID_MEMORY_READ
+
+#define FAST_MEMCPY
+
+#endif /* Linux/PPC */
+
 #ifdef sgi
 
 #define IMAGE_BYTE_ORDER	MSBFirst
