@@ -27,7 +27,7 @@
 
 static char* encNames[] = {
     "raw", "copyRect", "RRE", "[encoding 3]", "CoRRE", "hextile",
-    "[encoding 6]", "tight", "[encoding 8]", "[encoding 9]"
+    "zlib", "tight", "[encoding 8]", "[encoding 9]"
 };
 
 
@@ -39,6 +39,8 @@ rfbResetStats(rfbClientPtr cl)
 	cl->rfbBytesSent[i] = 0;
 	cl->rfbRectanglesSent[i] = 0;
     }
+    cl->rfbXCursorBytesSent = 0;
+    cl->rfbXCursorUpdatesSent = 0;
     cl->rfbFramebufferUpdateMessagesSent = 0;
     cl->rfbRawBytesEquivalent = 0;
     cl->rfbKeyEventsRcvd = 0;
@@ -62,10 +64,16 @@ rfbPrintStats(rfbClientPtr cl)
 	totalRectanglesSent += cl->rfbRectanglesSent[i];
 	totalBytesSent += cl->rfbBytesSent[i];
     }
+    totalRectanglesSent += cl->rfbXCursorUpdatesSent;
+    totalBytesSent += cl->rfbXCursorBytesSent;
 
     rfbLog("  framebuffer updates %d, rectangles %d, bytes %d\n",
 	    cl->rfbFramebufferUpdateMessagesSent, totalRectanglesSent,
 	    totalBytesSent);
+
+    if (cl->rfbXCursorUpdatesSent != 0)
+	rfbLog("    cursor shape updates %d, bytes %d\n",
+		cl->rfbXCursorUpdatesSent, cl->rfbXCursorBytesSent);
 
     for (i = 0; i < MAX_ENCODINGS; i++) {
 	if (cl->rfbRectanglesSent[i] != 0)
@@ -77,7 +85,8 @@ rfbPrintStats(rfbClientPtr cl)
 	rfbLog("  raw bytes equivalent %d, compression ratio %f\n",
 		cl->rfbRawBytesEquivalent,
 		(double)cl->rfbRawBytesEquivalent
-		/ (double)(totalBytesSent
-			   - cl->rfbBytesSent[rfbEncodingCopyRect]));
+		/ (double)(totalBytesSent -
+			   cl->rfbBytesSent[rfbEncodingCopyRect] -
+			   cl->rfbXCursorBytesSent));
     }
 }

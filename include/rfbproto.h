@@ -476,21 +476,33 @@ typedef struct {
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
- * XCursor encoding.  This is a special encoding used to transmit X-style
- * cursor shapes from server to clients.  Note that for this encoding,
+ * XCursor encoding. This is a special encoding used to transmit X-style
+ * cursor shapes from server to clients. Note that for this encoding,
  * coordinates in rfbFramebufferUpdateRectHeader structure hold hotspot
- * position (r.x, r.y) and cursor size (r.w, r.h).  After header, two RGB
- * samples in client pixel format follow: background color and foreground
- * color (in that order).  If a client supports only black-and-white cursors,
- * it should ignore these colors and assume that foreground is black and
- * background is white.  Next, two bitmaps (1 bits per pixel) follow: first
- * one with transparency data (bits with zero value mean that this pixel is
- * transparent), second with actual data (value 0 denotes background color,
- * value 1 denotes foreground color).  Bitmaps represent cursor data in a
- * byte stream, from left to right, from top to bottom, and each row is
- * byte-aligned.  Most significant bits correspond to leftmost pixels.  The
- * number of bytes in each row can be calculated as ((w + 7) / 8).
+ * position (r.x, r.y) and cursor size (r.w, r.h). After header, two RGB
+ * samples follow in the rfbXCursorColors structure: foreground and background
+ * colors. If a client supports only black-and-white cursors, it should ignore
+ * these colors and assume that foreground is black and background is white.
+ * Next, two bitmaps (1 bits per pixel) follow: first one with transparency
+ * data (bits with zero value mean that this pixel is transparent), second
+ * with actual data (value 0 denotes background color, value 1 denotes
+ * foreground color). Bitmaps represent cursor data in a byte stream, from
+ * left to right, from top to bottom, and each row is byte-aligned. Most
+ * significant bits correspond to leftmost pixels. The number of bytes in each
+ * row can be calculated as ((w + 7) / 8). If (w * h == 0), cursor should be
+ * hidden (or default local cursor should be set by the client).
  */
+
+typedef struct {
+    CARD8 foreRed;
+    CARD8 foreGreen;
+    CARD8 foreBlue;
+    CARD8 backRed;
+    CARD8 backGreen;
+    CARD8 backBlue;
+} rfbXCursorColors;
+
+#define sz_rfbXCursorColors 6
 
 
 /*-----------------------------------------------------------------------------

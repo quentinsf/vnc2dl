@@ -31,6 +31,7 @@
 GC gc;
 GC srcGC, dstGC; /* used for debugging copyrect */
 Window desktopWin;
+Cursor dotCursor;
 Widget form, viewport, desktop;
 
 static Bool modifierPressed[256];
@@ -132,7 +133,8 @@ DesktopInitAfterRealization()
   XtVaGetApplicationResources(desktop, (XtPointer)&attr.backing_store,
 			      desktopBackingStoreResources, 1, NULL);
 
-  attr.cursor = CreateDotCursor();
+  dotCursor = CreateDotCursor();
+  attr.cursor = dotCursor;
 
   XChangeWindowAttributes(dpy, desktopWin, CWBackingStore|CWCursor, &attr);
 }

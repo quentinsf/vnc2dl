@@ -196,7 +196,10 @@ static XtResource appDataResourceList[] = {
    XtOffsetOf(AppData, bumpScrollPixels), XtRImmediate, (XtPointer) 20},
 
   {"compressLevel", "CompressionLevel", XtRInt, sizeof(int),
-   XtOffsetOf(AppData, compressLevel), XtRImmediate, (XtPointer) 6},
+   XtOffsetOf(AppData, compressLevel), XtRImmediate, (XtPointer) -1},
+
+  {"useRemoteCursor", "UseRemoteCursor", XtRBool, sizeof(Bool),
+   XtOffsetOf(AppData, useRemoteCursor), XtRImmediate, (XtPointer) True},
 };
 
 
@@ -217,6 +220,7 @@ XrmOptionDescRec cmdLineOptions[] = {
   {"-truecolour",    "*forceTrueColour",    XrmoptionNoArg,  "True"},
   {"-depth",         "*requestedDepth",     XrmoptionSepArg, 0},
   {"-compresslevel", "*compressLevel",      XrmoptionSepArg, 0},
+  {"-nocursorshape", "*useRemoteCursor",    XrmoptionNoArg,  "False"},
 };
 
 int numCmdLineOptions = XtNumber(cmdLineOptions);
@@ -281,6 +285,7 @@ usage(void)
 	  "        -truecolour\n"
 	  "        -depth <depth>\n"
           "        -compresslevel <compress-value> (0-9)\n"
+          "        -nocursorshape\n"
 	  "\n", programName, programName, programName);
   exit(1);
 }

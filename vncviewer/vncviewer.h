@@ -93,6 +93,7 @@ typedef struct {
   int bumpScrollPixels;
 
   int compressLevel;
+  Bool useRemoteCursor;
 
 } AppData;
 
@@ -126,6 +127,7 @@ extern void SetVisualAndCmap();
 extern Atom wmDeleteWindow;
 extern Widget form, viewport, desktop;
 extern Window desktopWin;
+extern Cursor dotCursor;
 extern GC gc;
 extern GC srcGC, dstGC;
 extern Dimension dpyWidth, dpyHeight;

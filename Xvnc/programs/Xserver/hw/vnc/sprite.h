@@ -106,3 +106,16 @@ extern void rfbSpriteRestoreCursor(
     ScreenPtr	/*pScreen*/
 #endif
 );
+
+extern void rfbSpriteRemoveCursor(
+#if NeedFunctionPrototypes
+    ScreenPtr	/*pScreen*/
+#endif
+);
+
+extern CursorPtr rfbSpriteGetCursorPtr(
+#if NeedFunctionPrototypes
+    ScreenPtr	/*pScreen*/
+#endif
+);
+

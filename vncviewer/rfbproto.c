@@ -43,6 +43,8 @@ static Bool HandleTight8(int rx, int ry, int rw, int rh);
 static Bool HandleTight16(int rx, int ry, int rw, int rh);
 static Bool HandleTight32(int rx, int ry, int rw, int rh);
 
+static Bool HandleXCursor(int xhot, int yhot, int width, int height);
+
 int rfbsock;
 char *desktopName;
 rfbPixelFormat myFormat;
@@ -307,7 +309,8 @@ SetFormatAndEncodings()
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
       } else if (strncasecmp(encStr,"tight",encStrLen) == 0) {
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
-        requestCompressLevel = True;
+	if (appData.compressLevel >= 0 && appData.compressLevel <= 9)
+	  requestCompressLevel = True;
       } else if (strncasecmp(encStr,"hextile",encStrLen) == 0) {
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
       } else if (strncasecmp(encStr,"corre",encStrLen) == 0) {
@@ -321,10 +324,12 @@ SetFormatAndEncodings()
       encStr = nextEncStr;
     } while (encStr && se->nEncodings < MAX_ENCODINGS);
 
-    if (se->nEncodings < MAX_ENCODINGS && requestCompressLevel &&
-        appData.compressLevel >= 0 && appData.compressLevel <= 9) {
+    if (se->nEncodings < MAX_ENCODINGS && appData.useRemoteCursor)
+	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
+
+    if (se->nEncodings < MAX_ENCODINGS && requestCompressLevel) {
       encs[se->nEncodings++] = Swap32IfLE(appData.compressLevel +
-                                          rfbEncodingCompressLevel0);
+					  rfbEncodingCompressLevel0);
     }
   } else {
     if (SameMachine(rfbsock)) {
@@ -337,7 +342,16 @@ SetFormatAndEncodings()
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRRE);
-    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCompressLevel1);
+
+    if (appData.compressLevel >= 0 && appData.compressLevel <= 9) {
+      encs[se->nEncodings++] = Swap32IfLE(appData.compressLevel +
+					  rfbEncodingCompressLevel0);
+    } else {
+      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCompressLevel1);
+    }
+
+    if (appData.useRemoteCursor)
+      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
   }
 
   len = sz_rfbSetEncodingsMsg + se->nEncodings * 4;
@@ -507,6 +521,13 @@ HandleRFBServerMessage()
 
       rect.encoding = Swap32IfLE(rect.encoding);
 
+      if (rect.encoding == rfbEncodingXCursor) {
+	if (!HandleXCursor(rect.r.x, rect.r.y, rect.r.w, rect.r.h)) {
+	  return False;
+        }
+	continue;
+      }
+
       if ((rect.r.x + rect.r.w > si.framebufferWidth) ||
 	  (rect.r.y + rect.r.h > si.framebufferHeight))
 	{
@@ -515,7 +536,7 @@ HandleRFBServerMessage()
 	  return False;
 	}
 
-      if ((rect.r.h * rect.r.w) == 0) {
+      if (rect.r.h * rect.r.w == 0) {
 	fprintf(stderr,"Zero size rect - ignoring\n");
 	continue;
       }
@@ -742,6 +763,75 @@ HandleRFBServerMessage()
 #include "tight.c"
 #undef BPP
 
+
+static Bool HandleXCursor(int xhot, int yhot, int width, int height)
+{
+  static Cursor prevCursor;
+  static Bool prevCursorSet = False;
+  rfbXCursorColors colors;
+  size_t bytesPerRow, bytesData;
+  char *buf = NULL;
+  XColor bg, fg;
+  Drawable dr;
+  unsigned int wret = 0, hret = 0;
+  Pixmap source, mask;
+  Cursor cursor;
+
+  bytesPerRow = (width + 7) / 8;
+  bytesData = bytesPerRow * height;
+  dr = DefaultRootWindow(dpy);
+
+  if (!ReadFromRFBServer((char *)&colors, sz_rfbXCursorColors))
+    return False;
+
+  if (width * height) {
+    buf = malloc(bytesData * 2);
+    if (buf == NULL)
+      return False;
+
+    if (!ReadFromRFBServer(buf, bytesData * 2)) {
+      free(buf);
+      return False;
+    }
+
+    XQueryBestCursor(dpy, dr, width, height, &wret, &hret);
+  }
+
+  if (width * height == 0 || wret < width || hret < height) {
+    XDefineCursor(dpy, desktopWin, dotCursor);
+
+    if (buf != NULL)
+      free(buf);
+    if (prevCursorSet)
+      XFreeCursor(dpy, prevCursor);
+    prevCursorSet = False;
+
+    return True;
+  }
+
+  bg.red   = (unsigned short)colors.backRed   << 8 | colors.backRed;
+  bg.green = (unsigned short)colors.backGreen << 8 | colors.backGreen;
+  bg.blue  = (unsigned short)colors.backBlue  << 8 | colors.backBlue;
+  fg.red   = (unsigned short)colors.foreRed   << 8 | colors.foreRed;
+  fg.green = (unsigned short)colors.foreGreen << 8 | colors.foreGreen;
+  fg.blue  = (unsigned short)colors.foreBlue  << 8 | colors.foreBlue;
+
+  mask = XCreateBitmapFromData(dpy, dr, buf, width, height);
+  source = XCreateBitmapFromData(dpy, dr, &buf[bytesData], width, height);
+  cursor = XCreatePixmapCursor(dpy, source, mask, &fg, &bg, xhot, yhot);
+  XFreePixmap(dpy, source);
+  XFreePixmap(dpy, mask);
+  free(buf);
+
+  XDefineCursor(dpy, desktopWin, cursor);
+
+  if (prevCursorSet)
+    XFreeCursor(dpy, prevCursor);
+  prevCursor = cursor;
+  prevCursorSet = True;
+
+  return True;
+}
 
 /*
  * PrintPixelFormat.

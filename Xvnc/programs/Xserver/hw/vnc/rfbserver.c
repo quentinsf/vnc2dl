@@ -3,6 +3,7 @@
  */
 
 /*
+ *  Copyright (C) Const Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -36,6 +37,8 @@
 #include "input.h"
 #include "mipointer.h"
 #include "sprite.h"
+#include "cursorstr.h"
+#include "servermd.h"
 
 #ifdef CORBA
 #include <vncserverctrl.h>
@@ -56,6 +59,7 @@ static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
 static void rfbProcessClientNormalMessage(rfbClientPtr cl);
 static void rfbProcessClientInitMessage(rfbClientPtr cl);
 static Bool rfbSendCopyRegion(rfbClientPtr cl, RegionPtr reg, int dx, int dy);
+static Bool rfbSendXCursorShape(rfbClientPtr cl, ScreenPtr pScreen);
 
 
 /*
@@ -167,6 +171,8 @@ rfbNewClient(sock)
     cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
     for (i = 0; i < 4; i++)
         cl->zsActive[i] = FALSE;
+
+    cl->enableCursorShapeUpdates = FALSE;
 
     cl->next = rfbClientHead;
     rfbClientHead = cl;
@@ -522,6 +528,7 @@ rfbProcessClientNormalMessage(cl)
 
 	cl->preferredEncoding = -1;
 	cl->useCopyRect = FALSE;
+	cl->enableCursorShapeUpdates = FALSE;
 
 	for (i = 0; i < msg.se.nEncodings; i++) {
 	    if ((n = ReadExact(cl->sock, (char *)&enc, 4)) <= 0) {
@@ -572,6 +579,14 @@ rfbProcessClientNormalMessage(cl)
 			   cl->host);
 		}
 		break;
+
+	    case rfbEncodingXCursor:
+		rfbLog("Enabling cursor shape updates for client %s\n",
+		    cl->host);
+		cl->enableCursorShapeUpdates = TRUE;
+		cl->cursorWasChanged = TRUE;
+		break;
+
 	    default:
 		if ( enc >= (CARD32)rfbEncodingCompressLevel0 &&
 		     enc <= (CARD32)rfbEncodingCompressLevel9 ) {
@@ -754,13 +769,21 @@ rfbSendFramebufferUpdate(cl)
     rfbFramebufferUpdateMsg *fu = (rfbFramebufferUpdateMsg *)updateBuf;
     RegionRec updateRegion, updateCopyRegion;
     int dx, dy;
+    Bool sendCursorShape = FALSE;
 
     /*
-     * If the cursor isn't drawn, make sure it's put up.
+     * If this client understands cursor shape updates, cursor should be
+     * removed from the framebuffer. Otherwise, make sure it's put up.
      */
 
-    if (!rfbScreen.cursorIsDrawn) {
-	rfbSpriteRestoreCursor(pScreen);
+    if (cl->enableCursorShapeUpdates) {
+	if (rfbScreen.cursorIsDrawn)
+	    rfbSpriteRemoveCursor(pScreen);
+	if (!rfbScreen.cursorIsDrawn && cl->cursorWasChanged)
+	    sendCursorShape = TRUE;
+    } else {
+	if (!rfbScreen.cursorIsDrawn)
+	    rfbSpriteRestoreCursor(pScreen);
     }
 
     /*
@@ -785,7 +808,7 @@ rfbSendFramebufferUpdate(cl)
     REGION_INTERSECT(pScreen, &updateRegion, &cl->requestedRegion,
 		     &updateRegion);
 
-    if (!REGION_NOTEMPTY(pScreen,&updateRegion)) {
+    if (!REGION_NOTEMPTY(pScreen,&updateRegion) && !sendCursorShape) {
 	REGION_UNINIT(pScreen,&updateRegion);
 	return TRUE;
     }
@@ -868,8 +891,14 @@ rfbSendFramebufferUpdate(cl)
 
     fu->type = rfbFramebufferUpdate;
     fu->nRects = Swap16IfLE(REGION_NUM_RECTS(&updateCopyRegion)
-			    + nUpdateRegionRects);
+			    + nUpdateRegionRects + !!sendCursorShape);
     ublen = sz_rfbFramebufferUpdateMsg;
+
+    if (sendCursorShape) {
+	cl->cursorWasChanged = FALSE;
+	if (!rfbSendXCursorShape(cl, pScreen))
+	    return FALSE;
+    }
 
     if (REGION_NOTEMPTY(pScreen,&updateCopyRegion)) {
 	if (!rfbSendCopyRegion(cl,&updateCopyRegion,dx,dy)) {
@@ -1096,6 +1125,102 @@ rfbSendRectEncodingRaw(cl, x, y, w, h)
     }
 }
 
+
+/*
+ * Send cursor shape in X-style format.
+ */
+
+static Bool
+rfbSendXCursorShape(cl, pScreen)
+    rfbClientPtr cl;
+    ScreenPtr pScreen;
+{
+    CursorPtr pCursor;
+    rfbFramebufferUpdateRectHeader rect;
+    rfbXCursorColors colors;
+    int rowBytes, pixmapRowBytes, dataBytes;
+    int i, j;
+
+    pCursor = rfbSpriteGetCursorPtr(pScreen);
+    if (pCursor == NULL) {
+	/* Send update with empty cursor data. */
+
+	rect.r.x = rect.r.y = 0;
+	rect.r.w = rect.r.h = 0;
+	rect.encoding = Swap32IfLE(rfbEncodingXCursor);
+	memcpy(&updateBuf[ublen], (char *)&rect,
+	       sz_rfbFramebufferUpdateRectHeader);
+	ublen += sz_rfbFramebufferUpdateRectHeader;
+
+	colors.foreRed = colors.foreGreen = colors.foreBlue = (CARD8)0x00;
+	colors.backRed = colors.backGreen = colors.backBlue = (CARD8)0xFF;
+	memcpy(&updateBuf[ublen], (char *)&colors, sz_rfbXCursorColors);
+	ublen += sz_rfbXCursorColors;
+
+	cl->rfbXCursorUpdatesSent++;
+	cl->rfbXCursorBytesSent += (sz_rfbFramebufferUpdateRectHeader +
+				    sz_rfbXCursorColors);
+
+	if (!rfbSendUpdateBuf(cl))
+	    return FALSE;
+
+	return TRUE;
+    }
+
+    rowBytes = (pCursor->bits->width + 7) / 8;
+    pixmapRowBytes = PixmapBytePad(pCursor->bits->width, 1);
+    dataBytes = rowBytes * pCursor->bits->height;
+
+    if ( ublen + sz_rfbFramebufferUpdateRectHeader +
+	 sz_rfbXCursorColors + 2 * dataBytes > UPDATE_BUF_SIZE ) {
+	if (!rfbSendUpdateBuf(cl))
+	    return FALSE;
+    }
+
+    if ( ublen + sz_rfbFramebufferUpdateRectHeader +
+	 sz_rfbXCursorColors + 2 * dataBytes > UPDATE_BUF_SIZE ) {
+	return FALSE;		/* FIXME. */
+    }
+
+    rect.r.x = Swap16IfLE(pCursor->bits->xhot);
+    rect.r.y = Swap16IfLE(pCursor->bits->yhot);
+    rect.r.w = Swap16IfLE(pCursor->bits->width);
+    rect.r.h = Swap16IfLE(pCursor->bits->height);
+    rect.encoding = Swap32IfLE(rfbEncodingXCursor);
+
+    memcpy(&updateBuf[ublen], (char *)&rect,sz_rfbFramebufferUpdateRectHeader);
+    ublen += sz_rfbFramebufferUpdateRectHeader;
+
+    colors.foreRed   = (char)(pCursor->foreRed >> 8);
+    colors.foreGreen = (char)(pCursor->foreGreen >> 8);
+    colors.foreBlue  = (char)(pCursor->foreBlue >> 8);
+    colors.backRed   = (char)(pCursor->backRed >> 8);
+    colors.backGreen = (char)(pCursor->backGreen >> 8);
+    colors.backBlue  = (char)(pCursor->backBlue >> 8);
+
+    memcpy(&updateBuf[ublen], (char *)&colors, sz_rfbXCursorColors);
+    ublen += sz_rfbXCursorColors;
+
+    for (i = 0; i < pCursor->bits->height; i++) {
+      for (j = 0; j < rowBytes; j++) {
+        updateBuf[ublen] =
+          ((char *)pCursor->bits->mask)[i * pixmapRowBytes + j];
+        updateBuf[ublen + dataBytes] =
+          ((char *)pCursor->bits->source)[i * pixmapRowBytes + j];
+        ublen++;
+      }
+    }
+    ublen += dataBytes;
+
+    cl->rfbXCursorUpdatesSent++;
+    cl->rfbXCursorBytesSent += (sz_rfbFramebufferUpdateRectHeader +
+				sz_rfbXCursorColors + 2 * dataBytes);
+
+    if (!rfbSendUpdateBuf(cl))
+	return FALSE;
+
+    return TRUE;
+}
 
 
 /*

@@ -203,6 +203,8 @@ typedef struct rfbClientRec {
 
     int rfbBytesSent[MAX_ENCODINGS];
     int rfbRectanglesSent[MAX_ENCODINGS];
+    int rfbXCursorBytesSent;
+    int rfbXCursorUpdatesSent;
     int rfbFramebufferUpdateMessagesSent;
     int rfbRawBytesEquivalent;
     int rfbKeyEventsRcvd;
@@ -215,6 +217,9 @@ typedef struct rfbClientRec {
     int zsLevel[4];
     int tightCompressLevel;
 
+    Bool enableCursorShapeUpdates; /* client supports cursor shape updates */
+    Bool cursorWasChanged;         /* cursor shape update should be sent */
+
     struct rfbClientRec *next;
 
 } rfbClientRec, *rfbClientPtr;
@@ -225,9 +230,10 @@ typedef struct rfbClientRec {
  * be sent to the client.
  */
 
-#define FB_UPDATE_PENDING(cl)				\
-    (!rfbScreen.cursorIsDrawn ||			\
-     REGION_NOTEMPTY((pScreen),&(cl)->copyRegion) ||	\
+#define FB_UPDATE_PENDING(cl)                                           \
+    ((!(cl)->enableCursorShapeUpdates && !rfbScreen.cursorIsDrawn) ||   \
+     ((cl)->enableCursorShapeUpdates && (cl)->cursorWasChanged) ||      \
+     REGION_NOTEMPTY((pScreen),&(cl)->copyRegion) ||                    \
      REGION_NOTEMPTY((pScreen),&(cl)->modifiedRegion))
 
 /*
