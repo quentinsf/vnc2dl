@@ -10,7 +10,7 @@
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH vncviewer 1 "January 2002" "" "TightVNC"
+.TH vncviewer 1 "March 2002" "" "TightVNC"
 .SH NAME
 vncviewer \- an X viewer client for VNC
 .SH SYNOPSIS
