@@ -135,7 +135,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
   if (!zlibStreamActive[stream_id]) {
     zlibStream[stream_id].zalloc = Z_NULL;
     zlibStream[stream_id].zfree = Z_NULL;
-    zlibStream[stream_id].opaque = NULL;
+    zlibStream[stream_id].opaque = Z_NULL;
     err = inflateInit(&zlibStream[stream_id]);
     if (err != Z_OK)
       return False;
@@ -256,11 +256,11 @@ FilterHdiffBPP (char *rgb, CARDBPP *clientData, int w, int h)
   if (w && h) {
     clientData[0] = rgb[0];
     for (x = 1; x < w; x++)
-      clientData[x] = rgb[x] - rgb[x-1];
+      clientData[x] = rgb[x] + clientData[x-1];
     for (y = 1; y < h; y++) {
-      clientData[y*w] = rgb[y*w] - rgb[y*w-1];
+      clientData[y*w] = rgb[y*w] + clientData[(y-1)*w];
       for (x = 1; x < w; x++)
-        clientData[y*w] = rgb[y*w+x] - rgb[y*w+x-1];
+        clientData[y*w] = rgb[y*w+x] + clientData[y*w+x-1];
     }
   }
 }
@@ -280,6 +280,7 @@ FilterCopyBPP (char *rgb, CARDBPP *clientData, int w, int h)
   }
 }
 
+/* FIXME: this function is incorrect. */
 static void
 FilterHdiffBPP (char *rgb, CARDBPP *clientData, int w, int h)
 {
@@ -288,18 +289,18 @@ FilterHdiffBPP (char *rgb, CARDBPP *clientData, int w, int h)
   if (w && h) {
     clientData[0] = TransFnBPP(rgb[0], rgb[1], rgb[2]);
     for (x = 1; x < w; x++) {
-      clientData[x] = TransFnBPP(rgb[x*3] - rgb[(x-1)*3],
-                                 rgb[x*3+1] - rgb[(x-1)*3+1],
-                                 rgb[x*3+2] - rgb[(x-1)*3+2]);
+      clientData[x] = TransFnBPP(rgb[x*3] + rgb[(x-1)*3],
+                                 rgb[x*3+1] + rgb[(x-1)*3+1],
+                                 rgb[x*3+2] + rgb[(x-1)*3+2]);
     }
     for (y = 1; y < h; y++) {
-      clientData[y*w] = TransFnBPP(rgb[y*w*3] - rgb[(y*w-1)*3],
-                                   rgb[y*w*3+1] - rgb[(y*w-1)*3+1],
-                                   rgb[y*w*3+2] - rgb[(y*w-1)*3+2]);
+      clientData[y*w] = TransFnBPP(rgb[y*w*3] + rgb[(y*w-1)*3],
+                                   rgb[y*w*3+1] + rgb[(y*w-1)*3+1],
+                                   rgb[y*w*3+2] + rgb[(y*w-1)*3+2]);
       for (x = 1; x < w; x++) {
-        clientData[y*w] = TransFnBPP(rgb[(y*w+x)*3] - rgb[(y*w+x-1)*3],
-                                     rgb[(y*w+x)*3+1] - rgb[(y*w+x-1)*3+1],
-                                     rgb[(y*w+x)*3+2] - rgb[(y*w+x-1)*3+2]);
+        clientData[y*w] = TransFnBPP(rgb[(y*w+x)*3] + rgb[(y*w+x-1)*3],
+                                     rgb[(y*w+x)*3+1] + rgb[(y*w+x-1)*3+1],
+                                     rgb[(y*w+x)*3+2] + rgb[(y*w+x-1)*3+2]);
       }
     }
   }
