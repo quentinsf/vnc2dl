@@ -735,11 +735,8 @@ DEFINE_FILL_PALETTE_FUNCTION(32)
 static void
 PaletteReset(void)
 {
-    int i;
-
     paletteNumColors = 0;
-    for (i = 0; i < 256; i++)
-        palette.hash[i] = NULL;
+    memset(palette.hash, 0, 256 * sizeof(COLOR_LIST *));
 }
 
 static int
