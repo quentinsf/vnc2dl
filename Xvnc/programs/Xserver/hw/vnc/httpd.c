@@ -31,6 +31,7 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <unistd.h>
 #include <pwd.h>
 
 #ifndef USE_LIBWRAP
@@ -200,7 +201,9 @@ httpProcessInput()
     int fd;
     Bool performSubstitutions = FALSE;
     char str[256];
-    struct passwd *user = getpwuid(getuid());;
+    struct passwd *user;
+
+    user = getpwuid(getuid());
 
     if (strlen(httpDir) > 255) {
 	rfbLog("-httpd directory too long\n");
