@@ -380,7 +380,7 @@ FilterGradient24 (int numRows, CARD32 *dst)
 /* The following filter implementation is not very efficient, and in fact
    it's currently not used. For now, this filter appies only to 24-bit
    color samples, see FilterGradient24() above. The version below is
-   provided for compatibility with future implementations. */
+   provided for compatibility with possible future implementations. */
 
 static void
 FilterGradientBPP (int numRows, CARDBPP *dst)
@@ -410,11 +410,14 @@ FilterGradientBPP (int numRows, CARDBPP *dst)
   shift[2] = myFormat.blueShift;
 
   for (y = 0; y < numRows; y++) {
+
     /* First pixel in a row */
     for (c = 0; c < 3; c++) {
       pix[c] = (CARD16)((src[y*rectWidth] >> shift[c]) + thatRow[c] & max[c]);
       thisRow[c] = pix[c];
     }
+    dst[y*rectWidth] = RGB_TO_PIXEL(BPP, pix[0], pix[1], pix[2]);
+
     /* Remaining pixels of a row */
     for (x = 1; x < rectWidth; x++) {
       for (c = 0; c < 3; c++) {
