@@ -194,9 +194,9 @@ typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
  * Once the protocol version has been decided, the server then sends two lists
  * of supported protocol extensions. First list tells the client what tunneling
  * methods can be used, the second list provides information about supported
- * authentication schemes. Each list is an array of rfbCapabilityInfo structures.
- * Before sending the lists, the server sends two 16-bit words with number of
- * elements in each one.
+ * authentication schemes. Each list is an array of rfbCapabilityInfo
+ * structures. Before sending the lists, the server sends two 16-bit
+ * words with number of elements in each one.
  */
 
 typedef struct _rfbHandshakingCapsMsg {
