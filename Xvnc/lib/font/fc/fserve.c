@@ -1232,6 +1232,10 @@ fs_wakeup(fpe, LastSelectMask)
     int         err;
     fsGenericReply rep;
 
+    if (awaiting_reconnect) {
+	_fs_try_reconnect();
+    }
+
     /* see if there's any data to be read */
 
     /* 
