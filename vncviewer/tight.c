@@ -28,6 +28,8 @@
  *
  */
 
+#define TIGHT_MIN_TO_COMPRESS 12
+
 #define CARDBPP CONCAT2E(CARD,BPP)
 #define filterPtrBPP CONCAT2E(filterPtr,BPP)
 #define RGB_TO_PIXELBPP CONCAT2E(RGB_TO_PIXEL,BPP)
@@ -169,6 +171,19 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
     return False;
   }
 
+  /* Determine if the data should be decompressed or just copied. */
+  rowSize = (rw * bitsPixel + 7) / 8;
+  if (rh * rowSize < TIGHT_MIN_TO_COMPRESS) {
+    if (!ReadFromRFBServer((char*)buffer, rh * rowSize))
+      return False;
+
+    buffer2 = &buffer[TIGHT_MIN_TO_COMPRESS * 4];
+    filterFn(rh, (CARDBPP *)buffer2);
+    CopyDataToScreen(buffer2, rx, ry, rw, rh);
+
+    return True;
+  }
+
   /* Read the length (1..3 bytes) of compressed data following. */
   compressedLen = ReadCompactLen();
   if (compressedLen <= 0) {
@@ -196,7 +211,6 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
 
   bufferSize = BUFFER_SIZE * bitsPixel / (bitsPixel + BPP) & 0xFFFFFFFC;
   buffer2 = &buffer[bufferSize];
-  rowSize = (rw * bitsPixel + 7) / 8;
   if (rowSize > bufferSize) {
     /* Should be impossible when BUFFER_SIZE >= 16384 */
     fprintf(stderr, "Internal error: incorrect buffer size.\n");
