@@ -167,6 +167,7 @@ rfbNewClient(sock)
     cl->translateLookupTable = NULL;
 
     cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
+    cl->tightQualityLevel = -1;
     for (i = 0; i < 4; i++)
         cl->zsActive[i] = FALSE;
 
@@ -621,6 +622,11 @@ rfbProcessClientNormalMessage(cl)
 		    cl->tightCompressLevel = enc & 0x0F;
 		    rfbLog("Using compression level %d for client %s\n",
 			   cl->tightCompressLevel, cl->host);
+		} else if ( enc >= (CARD32)rfbEncodingQualityLevel0 &&
+			    enc <= (CARD32)rfbEncodingQualityLevel9 ) {
+		    cl->tightQualityLevel = enc & 0x0F;
+		    rfbLog("Using image quality level %d for client %s\n",
+			   cl->tightQualityLevel, cl->host);
 		} else {
 		    rfbLog("rfbProcessClientNormalMessage: ignoring unknown "
 			   "encoding %d\n", (int)enc);

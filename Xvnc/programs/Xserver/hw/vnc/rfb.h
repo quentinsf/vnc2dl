@@ -225,6 +225,7 @@ typedef struct rfbClientRec {
     Bool zsActive[4];
     int zsLevel[4];
     int tightCompressLevel;
+    int tightQualityLevel;
 
     Bool enableCursorShapeUpdates; /* client supports cursor shape updates */
     Bool useRichCursorEncoding;    /* rfbEncodingRichCursor is preferred */

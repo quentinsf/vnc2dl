@@ -40,7 +40,8 @@ static BOOL usePixelFormat24;
 
 
 /* Compression level stuff. The following array contains various
-   encoder parameters for each of 10 compression levels (0..9). */
+   encoder parameters for each of 10 compression levels (0..9).
+   Last three parameters correspond to JPEG quality levels (0..9). */
 
 typedef struct TIGHT_CONF_s {
     int maxRectSize, maxRectWidth;
@@ -48,22 +49,24 @@ typedef struct TIGHT_CONF_s {
     int idxZlibLevel, monoZlibLevel, rawZlibLevel, gradientZlibLevel;
     int gradientThreshold, gradientThreshold24;
     int idxMaxColorsDivisor;
+    int jpegQuality, jpegThreshold, jpegThreshold24;
 } TIGHT_CONF;
 
 static TIGHT_CONF tightConf[10] = {
-    {   512,   32,   6, 65536, 0, 0, 0, 0,   0,   0,   4 },
-    {  2048,  128,   6, 65536, 1, 1, 1, 0,   0,   0,   8 },
-    {  6144,  256,   8, 65536, 3, 3, 2, 0,   0,   0,  24 },
-    { 10240, 1024,  12, 65536, 5, 5, 3, 0,   0,   0,  32 },
-    { 16384, 2048,  12, 65536, 6, 6, 4, 0,   0,   0,  32 },
-    { 32768, 2048,  12,  4096, 7, 7, 5, 4, 150, 380,  32 },
-    { 65536, 2048,  16,  4096, 7, 7, 6, 4, 170, 420,  48 },
-    { 65536, 2048,  16,  4096, 8, 8, 7, 5, 180, 450,  64 },
-    { 65536, 2048,  32,  8192, 9, 9, 8, 6, 190, 475,  64 },
-    { 65536, 2048,  32,  8192, 9, 9, 9, 6, 200, 500,  96 }
+    {   512,   32,   6, 65536, 0, 0, 0, 0,   0,   0,   4, 20, 10000, 25000 },
+    {  2048,  128,   6, 65536, 1, 1, 1, 0,   0,   0,   8, 30,  8000, 18000 },
+    {  6144,  256,   8, 65536, 3, 3, 2, 0,   0,   0,  24, 40,  6500, 15000 },
+    { 10240, 1024,  12, 65536, 5, 5, 3, 0,   0,   0,  32, 50,  5000, 12000 },
+    { 16384, 2048,  12, 65536, 6, 6, 4, 0,   0,   0,  32, 55,  4000, 10000 },
+    { 32768, 2048,  12,  4096, 7, 7, 5, 4, 150, 380,  32, 60,  3000,  8000 },
+    { 65536, 2048,  16,  4096, 7, 7, 6, 4, 170, 420,  48, 65,  2000,  5000 },
+    { 65536, 2048,  16,  4096, 8, 8, 7, 5, 180, 450,  64, 70,  1000,  2500 },
+    { 65536, 2048,  32,  8192, 9, 9, 8, 6, 190, 475,  64, 75,   500,  1200 },
+    { 65536, 2048,  32,  8192, 9, 9, 9, 6, 200, 500,  96, 80,   200,   500 }
 };
 
 static int compressLevel;
+static int qualityLevel;
 
 /* Stuff dealing with palettes. */
 
@@ -132,9 +135,9 @@ static void FilterGradient16(CARD16 *buf, rfbPixelFormat *fmt, int w, int h);
 static void FilterGradient32(CARD32 *buf, rfbPixelFormat *fmt, int w, int h);
 
 static int DetectStillImage(rfbPixelFormat *fmt, int w, int h);
-static int DetectStillImage24(rfbPixelFormat *fmt, int w, int h);
-static int DetectStillImage16(rfbPixelFormat *fmt, int w, int h);
-static int DetectStillImage32(rfbPixelFormat *fmt, int w, int h);
+static unsigned long DetectStillImage24(rfbPixelFormat *fmt, int w, int h);
+static unsigned long DetectStillImage16(rfbPixelFormat *fmt, int w, int h);
+static unsigned long DetectStillImage32(rfbPixelFormat *fmt, int w, int h);
 
 static BOOL SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h,
                          int quality);
@@ -186,6 +189,7 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
     int rw, rh;
 
     compressLevel = cl->tightCompressLevel;
+    qualityLevel = cl->tightQualityLevel;
     maxRectSize = tightConf[compressLevel].maxRectSize;
     maxRectWidth = tightConf[compressLevel].maxRectWidth;
 
@@ -244,6 +248,7 @@ SendSubrect(cl, x, y, w, h)
 {
     rfbFramebufferUpdateRectHeader rect;
     char *fbptr;
+    int imageType;
     int success = 0;
 
     if (ublen + sz_rfbFramebufferUpdateRectHeader > UPDATE_BUF_SIZE) {
@@ -290,9 +295,13 @@ SendSubrect(cl, x, y, w, h)
     switch (paletteNumColors) {
     case 0:
         /* Truecolor image */
-        if (!rfbTightDisableGradient && DetectStillImage(&cl->format, w, h)) {
-/*             success = SendGradientRect(cl, w, h); */
-            success = SendJpegRect(cl, x, y, w, h, 75);
+        if (DetectStillImage(&cl->format, w, h)) {
+            if (qualityLevel != -1) {
+                success = SendJpegRect(cl, x, y, w, h,
+                                       tightConf[qualityLevel].jpegQuality);
+            } else {
+                success = SendGradientRect(cl, w, h);
+            }
         } else {
             success = SendFullColorRect(cl, w, h);
         }
@@ -964,7 +973,8 @@ DEFINE_MONO_ENCODE_FUNCTION(32)
  * Color components assumed to be byte-aligned.
  */
 
-static void FilterGradient24(buf, fmt, w, h)
+static void
+FilterGradient24(buf, fmt, w, h)
     char *buf;
     rfbPixelFormat *fmt;
     int w, h;
@@ -1024,7 +1034,8 @@ static void FilterGradient24(buf, fmt, w, h)
 
 #define DEFINE_GRADIENT_FILTER_FUNCTION(bpp)                             \
                                                                          \
-static void FilterGradient##bpp(buf, fmt, w, h)                          \
+static void                                                              \
+FilterGradient##bpp(buf, fmt, w, h)                                      \
     CARD##bpp *buf;                                                      \
     rfbPixelFormat *fmt;                                                 \
     int w, h;                                                            \
@@ -1093,32 +1104,56 @@ DEFINE_GRADIENT_FILTER_FUNCTION(32)
  * compression.
  */
 
-#define DETECT_SUBROW_WIDTH   7
-#define DETECT_MIN_WIDTH      8
-#define DETECT_MIN_HEIGHT     8
+#define JPEG_MIN_RECT_SIZE  4096
 
-static int DetectStillImage (fmt, w, h)
+#define DETECT_SUBROW_WIDTH    7
+#define DETECT_MIN_WIDTH       8
+#define DETECT_MIN_HEIGHT      8
+
+static int
+DetectStillImage (fmt, w, h)
     rfbPixelFormat *fmt;
     int w, h;
 {
-    if ( fmt->bitsPerPixel == 8 ||
-         w * h < tightConf[compressLevel].gradientMinRectSize ||
+    unsigned long avgError;
+
+    if ( rfbServerFormat.bitsPerPixel == 8 || fmt->bitsPerPixel == 8 ||
          w < DETECT_MIN_WIDTH || h < DETECT_MIN_HEIGHT ) {
         return 0;
     }
 
-    if (fmt->bitsPerPixel == 32) {
-        if (usePixelFormat24) {
-            return DetectStillImage24(fmt, w, h);
-        } else {
-            return DetectStillImage32(fmt, w, h);
+    if (qualityLevel != -1) {
+        if (w * h < JPEG_MIN_RECT_SIZE) {
+            return 0;
         }
     } else {
-        return DetectStillImage16(fmt, w, h);
+        if ( rfbTightDisableGradient ||
+             w * h < tightConf[compressLevel].gradientMinRectSize ) {
+            return 0;
+        }
     }
+
+    if (fmt->bitsPerPixel == 32) {
+        if (usePixelFormat24) {
+            avgError = DetectStillImage24(fmt, w, h);
+            if (qualityLevel != -1) {
+                return (avgError < tightConf[qualityLevel].jpegThreshold24);
+            }
+            return (avgError < tightConf[compressLevel].gradientThreshold24);
+        } else {
+            avgError = DetectStillImage32(fmt, w, h);
+        }
+    } else {
+        avgError = DetectStillImage16(fmt, w, h);
+    }
+    if (qualityLevel != -1) {
+        return (avgError < tightConf[qualityLevel].jpegThreshold);
+    }
+    return (avgError < tightConf[compressLevel].gradientThreshold);
 }
 
-static int DetectStillImage24 (fmt, w, h)
+static unsigned long
+DetectStillImage24 (fmt, w, h)
     rfbPixelFormat *fmt;
     int w, h;
 {
@@ -1173,12 +1208,13 @@ static int DetectStillImage24 (fmt, w, h)
     }
     avgError /= (pixelCount * 3 - diffStat[0]);
 
-    return (avgError < tightConf[compressLevel].gradientThreshold24);
+    return avgError;
 }
 
 #define DEFINE_DETECT_FUNCTION(bpp)                                          \
                                                                              \
-static int DetectStillImage##bpp (fmt, w, h)                                 \
+static unsigned long                                                         \
+DetectStillImage##bpp (fmt, w, h)                                            \
     rfbPixelFormat *fmt;                                                     \
     int w, h;                                                                \
 {                                                                            \
@@ -1252,7 +1288,7 @@ static int DetectStillImage##bpp (fmt, w, h)                                 \
     }                                                                        \
     avgError /= (pixelCount - diffStat[0]);                                  \
                                                                              \
-    return (avgError < tightConf[compressLevel].gradientThreshold);          \
+    return avgError;                                                         \
 }
 
 DEFINE_DETECT_FUNCTION(16)
