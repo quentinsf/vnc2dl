@@ -69,11 +69,14 @@ static BOOL SendIndexedRect(rfbClientPtr cl, int w, int h);
 static BOOL SendFullColorRect(rfbClientPtr cl, int w, int h);
 static BOOL CompressData(rfbClientPtr cl, int streamId, int dataLen);
 static void FillPalette(rfbClientPtr cl, int w, int h);
+
 static void PaletteReset(void);
 static int PaletteFind(CARD32 rgb);
 static int PaletteInsert(CARD32 rgb);
 static void PaletteReset8(void);
 static int PaletteInsert8(CARD8 value);
+
+static void Pack24(char *buf, rfbPixelFormat *format, int count);
 
 static void EncodeIndexedRect8(CARD8 *buf, int w, int h);
 static void EncodeIndexedRect16(CARD8 *buf, int w, int h);
@@ -147,8 +150,6 @@ SendSubrect(cl, x, y, w, h)
 	    return FALSE;
     }
 
-    rfbLog("DEBUG: Sending rect (%d,%d) [%d*%d]\n", x, y, w, h);
-
     rect.r.x = Swap16IfLE(x);
     rect.r.y = Swap16IfLE(y);
     rect.r.w = Swap16IfLE(w);
@@ -170,8 +171,6 @@ SendSubrect(cl, x, y, w, h)
                        rfbScreen.paddedWidthInBytes, w, h);
 
     FillPalette(cl, w, h);
-
-    rfbLog("DEBUG: Number of colors: %d\n", paletteNumColors);
 
     switch (paletteNumColors) {
 
@@ -203,14 +202,23 @@ SendSolidRect(cl, w, h)
     rfbClientPtr cl;
     int w, h;
 {
-    if (ublen + 1 + cl->format.bitsPerPixel / 8 > UPDATE_BUF_SIZE) {
+    int len;
+
+    if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
+         cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
+        Pack24(tightBeforeBuf, &cl->format, 1);
+        len = 3;
+    } else
+        len = cl->format.bitsPerPixel / 8;
+
+    if (ublen + 1 + len > UPDATE_BUF_SIZE) {
 	if (!rfbSendUpdateBuf(cl))
 	    return FALSE;
     }
 
     updateBuf[ublen++] = (char)0x80;
-    memcpy (&updateBuf[ublen], tightBeforeBuf, cl->format.bitsPerPixel / 8);
-    ublen += cl->format.bitsPerPixel / 8;
+    memcpy (&updateBuf[ublen], tightBeforeBuf, len);
+    ublen += len;
 
     return TRUE;
 }
@@ -220,7 +228,7 @@ SendIndexedRect(cl, w, h)
     rfbClientPtr cl;
     int w, h;
 {
-    int streamId, dataLen;
+    int streamId, entryLen, dataLen;
     int x, y, i, width_bytes;
 
     if ( ublen + 6 + paletteNumColors * cl->format.bitsPerPixel / 8 >
@@ -228,8 +236,6 @@ SendIndexedRect(cl, w, h)
 	if (!rfbSendUpdateBuf(cl))
 	    return FALSE;
     }
-
-    rfbLog("DEBUG: Sending rectangle using indexed colors.\n");
 
     /* Prepare tight encoding header. */
     if (paletteNumColors == 2) {
@@ -254,8 +260,16 @@ SendIndexedRect(cl, w, h)
             ((CARD32 *)tightAfterBuf)[i] =
                 palette.entry[i].listNode->rgb;
         }
-        memcpy(&updateBuf[ublen], tightAfterBuf, paletteNumColors * 4);
-        ublen += paletteNumColors * 4;
+
+        if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
+             cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
+            Pack24(tightAfterBuf, &cl->format, paletteNumColors);
+            entryLen = 3;
+        } else
+            entryLen = 4;
+
+        memcpy(&updateBuf[ublen], tightAfterBuf, paletteNumColors * entryLen);
+        ublen += paletteNumColors * entryLen;
 
         EncodeIndexedRect32((CARD8 *)tightBeforeBuf, w, h);
         break;
@@ -286,6 +300,8 @@ SendFullColorRect(cl, w, h)
     rfbClientPtr cl;
     int w, h;
 {
+    int len;
+
     if ( ublen + 4 > UPDATE_BUF_SIZE ) {
 	if (!rfbSendUpdateBuf(cl))
 	    return FALSE;
@@ -293,9 +309,14 @@ SendFullColorRect(cl, w, h)
 
     updateBuf[ublen++] = 0x00;  /* stream id = 0, no flushing, no filter */
 
-    rfbLog("DEBUG: Sending full-color rectangle.\n");
+    if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
+         cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
+        Pack24(tightBeforeBuf, &cl->format, w * h);
+        len = 3;
+    } else
+        len = cl->format.bitsPerPixel / 8;
 
-    return CompressData(cl, 0, w * h * (cl->format.bitsPerPixel / 8));
+    return CompressData(cl, 0, w * h * len);
 }
 
 static BOOL
@@ -328,17 +349,12 @@ CompressData(cl, streamId, dataLen)
     pz->next_out = (Bytef *)tightAfterBuf;
     pz->avail_out = tightAfterBufSize;
 
-    rfbLog("DEBUG: Raw bytes: %d\n", dataLen);
-
     if ( deflate (pz, Z_SYNC_FLUSH) != Z_OK ||
          pz->avail_in != 0 || pz->avail_out == 0 ) {
-        rfbLog("DEBUG: deflate() error: %s.\n", pz->msg);
         return FALSE;
     }
 
     compressedLen = (size_t)(tightAfterBufSize - pz->avail_out);
-
-    rfbLog("DEBUG: Compressed bytes: %d\n", compressedLen);
 
     /* Prepare compressed data size for sending. */
     updateBuf[ublen++] = compressedLen & 0x7F;
@@ -543,6 +559,29 @@ PaletteInsert8(CARD8 value)
 
     return (++paletteNumColors);
 }
+
+
+/*
+ * Converting from 32-bit color samples to 24-bit colors.
+ * Should be called only when redMax, greenMax and blueMax are 256.
+ */
+
+static void Pack24(buf, format, count)
+    char *buf;
+    rfbPixelFormat *format;
+    int count;
+{
+    int i;
+    CARD32 pix;
+
+    for (i = 0; i < count; i++) {
+        pix = ((CARD32 *)buf)[i];
+        buf[i*3]   = (char)(pix >> format->redShift);
+        buf[i*3+1] = (char)(pix >> format->greenShift);
+        buf[i*3+2] = (char)(pix >> format->blueShift);
+    }
+}
+
 
 /*
  * Most ugly part.
