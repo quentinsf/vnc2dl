@@ -440,15 +440,17 @@ typedef struct {
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
- * ``Tight'' Encoding.  Sorry, not documented yet.
+ * ``Tight'' Encoding.  FIXME: Add more documentation.
  */
 
 /* FIXME: either remove this or add other constants */
 #define rfbTightFill  0x08
 
-/* Filters (predictors) to improve compression efficiency */
-#define rfbTightFilterCopy   0x00
-#define rfbTightFilterHdiff  0x01
+/* Filters to improve compression efficiency */
+#define rfbTightFilterCopy             0x00
+#define rfbTightFilterPalette          0x01
+#define rfbTightFilterGradient         0x02
+#define rfbTightFilterGradientPalette  0x03
 
 
 /*-----------------------------------------------------------------------------

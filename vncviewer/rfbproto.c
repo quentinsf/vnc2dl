@@ -53,9 +53,10 @@ Bool newServerCutText = False;
 int endianTest = 1;
 
 
-/* note that the CoRRE encoding uses this buffer and assumes it is big enough
-   to hold 255 * 255 * 32 bits -> 260100 bytes.  640*480 = 307200 bytes */
-/* also hextile assumes it is big enough to hold 16 * 16 * 32 bits */
+/* Note that the CoRRE encoding uses this buffer and assumes it is big enough
+   to hold 255 * 255 * 32 bits -> 260100 bytes.  640*480 = 307200 bytes.
+   Hextile also assumes it is big enough to hold 16 * 16 * 32 bits.
+   Tight encoding assumes BUFFER_SIZE is at least 16384 bytes. */
 
 #define BUFFER_SIZE (640*480)
 static char buffer[BUFFER_SIZE];
@@ -65,19 +66,21 @@ static char buffer[BUFFER_SIZE];
  * Variables for the ``tight'' encoding implementation.
  */
 
-/* Compression streams for zlib library */
+/* Separate buffer for compressed data. */
+#define ZLIB_BUFFER_SIZE 4096
+static char zlib_buffer[ZLIB_BUFFER_SIZE];
+
+/* Four independent compression streams for zlib library. */
 static z_stream zlibStream[4];
 static Bool zlibStreamActive[4] = {
   False, False, False, False
 };
 
-/* DEBUG -- use BUFFER_SIZE instead. */
-#define DEBUG_BUFFER_SIZE 1024
+/* Filter stuff. Should be initialized by filter initialization code. */
+static Bool cutZeros;
+static int rectWidth, rectHeight, rectColors, currentLine;
+static char tightPalette[256*3];
 
-static char *rgbBuffer = NULL;
-static int rgbBufferSize = 0;
-static char *rawBuffer = NULL;
-static int rawBufferSize = 0;
 
 /*
  * ConnectToRFBServer.

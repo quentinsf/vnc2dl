@@ -31,34 +31,20 @@
  */
 
 #define CARDBPP CONCAT2E(CARD,BPP)
-#define transPtrBPP CONCAT2E(transPtr,BPP)
 #define filterPtrBPP CONCAT2E(filterPtr,BPP)
 
 #define HandleTightBPP CONCAT2E(HandleTight,BPP)
-#define HandleTightDataBPP CONCAT2E(HandleTightData,BPP)
+#define InitFilterCopyBPP CONCAT2E(InitFilterCopy,BPP)
 #define FilterCopyBPP CONCAT2E(FilterCopy,BPP)
-#define FilterHdiffBPP CONCAT2E(FilterHdiff,BPP)
-#define TransFnBPP CONCAT2E(TransFn,BPP)
 
 /* Type declarations */
 
-#if BPP != 8
-typedef CARDBPP (*transPtrBPP)(CARD8, CARD8, CARD8);
-#endif
-
-typedef void (*filterPtrBPP)(char *, CARDBPP *, int, int);
+typedef void (*filterPtrBPP)(int, CARDBPP *);
 
 /* Prototypes */
 
-static Bool HandleTightDataBPP (int compressedLen, int stream_id,
-                                filterPtrBPP filterFn,
-                                int rx, int ry, int rw, int rh);
-static void FilterCopyBPP (char *rgb, CARDBPP *clientData, int w, int h);
-static void FilterHdiffBPP (char *rgb, CARDBPP *clientData, int w, int h);
-
-#if BPP != 8
-static CARDBPP TransFnBPP (CARD8 r, CARD8 g, CARD8 b);
-#endif
+static int InitFilterCopyBPP (int rw, int rh);
+static void FilterCopyBPP (int numRows, CARDBPP *destBuffer);
 
 /* Definitions */
 
@@ -70,9 +56,11 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
   CARD8 comp_ctl;
   CARD8 filter_id;
   filterPtrBPP filterFn;
-  int stream_id;
-  int compressedLen;
-  int err;
+  z_streamp zs;
+  char *buffer2;
+  int err, stream_id, compressedLen, bitsPixel;
+  int bufferSize, rowSize, numRows, portionLen, rowsProcessed, extraBytes;
+  CARDBPP *rawData;
 
   if (!ReadFromRFBServer((char *)&comp_ctl, 1))
     return False;
@@ -103,7 +91,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
     return False;
 
   /*
-   * Here handling of primary compression mode begins.
+   * Here primary compression mode handling begins.
    * Data was processed with optional filter + zlib compression.
    */
 
@@ -112,18 +100,33 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
     if (!ReadFromRFBServer((char*)&filter_id, 1))
       return False;
     switch (filter_id) {
-    case rfbTightFilterCopy:  filterFn = FilterCopyBPP;
+    case rfbTightFilterCopy:
+      filterFn = FilterCopyBPP;
+      bitsPixel = InitFilterCopyBPP(rw, rh);
       break;
-    case rfbTightFilterHdiff: filterFn = FilterHdiffBPP;
+/*
+    case rfbTightFilterPalette:
+      filterFn = FilterPaletteBPP;
+      bitsPixel = InitFilterPaletteBPP(rw, rh);
       break;
+    case rfbTightFilterGradient:
+      filterFn = FilterGradientBPP;
+      bitsPixel = InitFilterGradientBPP(rw, rh);
+      break;
+    case rfbTightFilterGradientPalette:
+      filterFn = FilterGradientPaletteBPP;
+      bitsPixel = InitFilterGradientPaletteBPP(rw, rh);
+      break;
+*/
     delault:
       return False;
     }
-  } else
+  } else {
     filterFn = FilterCopyBPP;
-
-  /* FIXME: Here we should read parameters for current filter */
-  /*        (currently none of filters needs parameters).     */
+    bitsPixel = InitFilterCopyBPP(rw, rh);
+  }
+  if (!bitsPixel)
+    return False;               /* Filter initialization failed. */
 
   /* Read the length (1..3 bytes) of compressed data following. */
   compressedLen = ReadCompactLen();
@@ -132,200 +135,126 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
 
   /* Now let's initialize compression stream if needed. */
   stream_id = comp_ctl & 0x03;
+  zs = &zlibStream[stream_id];
   if (!zlibStreamActive[stream_id]) {
-    zlibStream[stream_id].zalloc = Z_NULL;
-    zlibStream[stream_id].zfree = Z_NULL;
-    zlibStream[stream_id].opaque = Z_NULL;
-    err = inflateInit(&zlibStream[stream_id]);
+    zs->zalloc = Z_NULL;
+    zs->zfree = Z_NULL;
+    zs->opaque = Z_NULL;
+    err = inflateInit(zs);
     if (err != Z_OK)
       return False;
     zlibStreamActive[stream_id] = True;
   }
 
-  /* Read compressed data, restore and draw the whole rectangle. */
-  if (!HandleTightDataBPP(compressedLen, stream_id, filterFn, rx, ry, rw, rh))
-    return False;
+  /* Read, decode and draw actual pixel data in a loop. */
 
-  return True;
-}
+  bufferSize = BUFFER_SIZE * bitsPixel / (bitsPixel + BPP) & 0xFFFFFFFC;
+  buffer2 = &buffer[bufferSize];
+  rowSize = (rw * bitsPixel + 7) / 8;
+  if (rowSize > bufferSize)
+    return False;               /* Impossible when BUFFER_SIZE >= 16384 */
 
-static Bool
-HandleTightDataBPP(int compressedLen, int stream_id, filterPtrBPP filterFn,
-                   int rx, int ry, int rw, int rh)
-{
-  z_streamp zs;
-  int rgbLen, readLen;
-  int err;
+  rowsProcessed = 0;
+  extraBytes = 0;
 
-  /* 
-   * FIXME: get rid of such large output buffers (rgbBuffer, rawBuffer).
-   */
-
-  zs = &zlibStream[stream_id];
-#if BPP == 8
-  rgbLen = rw * rh;
-#else
-  rgbLen = rw * rh * 3;
-#endif
-
-  /* Allocate space for 8-bit colors or 24-bit RGB samples */
-  if (rgbBufferSize < rgbLen) {
-    if (rgbBuffer != NULL)
-      free(rgbBuffer);
-    rgbBufferSize = rgbLen;
-    rgbBuffer = malloc(rgbBufferSize);
-    if (rgbBuffer == NULL)
-      return False;
-  }
-
-  /* Allocate space for raw data */
-  if (rawBufferSize < rw * rh * (BPP / 8)) {
-    if (rawBuffer != NULL)
-      free(rawBuffer);
-    rawBufferSize = rw * rh * (BPP / 8);
-    rawBuffer = malloc(rawBufferSize);
-    if (rawBuffer == NULL)
-      return False;
-  }
-
-  /* Prepare compression stream */
-  zs->next_out = (Bytef *)rgbBuffer;
-  zs->avail_out = rgbLen;
-
-  /* Read compressed stream and decompress it with zlib */
   while (compressedLen > 0) {
-    if (compressedLen < DEBUG_BUFFER_SIZE)
-      readLen = compressedLen;
+    if (compressedLen > ZLIB_BUFFER_SIZE)
+      portionLen = ZLIB_BUFFER_SIZE;
     else
-      readLen = DEBUG_BUFFER_SIZE;
-    if (!ReadFromRFBServer(buffer, readLen))
+      portionLen = compressedLen;
+
+    if (!ReadFromRFBServer((char*)zlib_buffer, portionLen))
       return False;
 
-    zs->next_in = (Bytef *)buffer;
-    zs->avail_in = readLen;
+    compressedLen -= portionLen;
 
-    err = inflate (zs, Z_SYNC_FLUSH);
-    if (err != Z_OK && err != Z_STREAM_END) {
-      fprintf(stderr, "inflate: %s\n", zs->msg);
-      return False;
+    zs->next_in = (Bytef *)zlib_buffer;
+    zs->avail_in = portionLen;
+
+    do {
+      zs->next_out = (Bytef *)&buffer[extraBytes];
+      zs->avail_out = bufferSize - extraBytes;
+
+      err = inflate(zs, Z_SYNC_FLUSH);
+      if (err != Z_OK && err != Z_STREAM_END) {
+        fprintf(stderr, "inflate: %s\n", zs->msg);
+        return False;
+      }
+
+      numRows = (bufferSize - zs->avail_out) / rowSize;
+
+      filterFn(numRows, (CARDBPP *)buffer2);
+
+      extraBytes = bufferSize - zs->avail_out - numRows * rowSize;
+      if (extraBytes > 0)
+        memcpy(buffer, &buffer[numRows * rowSize], extraBytes);
+
+      CopyDataToScreen(buffer2, rx, ry + rowsProcessed, rw, numRows);
+      rowsProcessed += numRows;
     }
-    if (err == Z_STREAM_END)    /* DEBUG */
-      fprintf(stderr, "inflate: %s\n", zs->msg);
-
-    if (zs->avail_in) {
-      fprintf(stderr, "inflate: extra data in compressed stream\n");
-      return False;
-    }
-
-    compressedLen -= readLen;
+    while (zs->avail_out == 0);
   }
 
-  if (zs->avail_out != 0) {
-    fprintf(stderr, "inflate: not enough data in compressed stream\n");
+  if (rowsProcessed != rh)
     return False;
-  }
-
-  filterFn(rgbBuffer, (CARDBPP *)rawBuffer, rw, rh);
-
-  CopyDataToScreen(rawBuffer, rx, ry, rw, rh);
 
   return True;
 }
 
 /*----------------------------------------------------------------------------
  *
- * Filter functions.
+ * Filter stuff.
  *
  */
 
-#if BPP == 8
+/*
+   The following variables are defined in rfbproto.c:
+     Bool cutZeros;
+     int rectWidth, rectHeight, currentLine, colorsUsed;
+     char rgbPalette[256*3];
+*/
 
-static void
-FilterCopyBPP (char *rgb, CARDBPP *clientData, int w, int h)
+static int
+InitFilterCopyBPP (int rw, int rh)
 {
-  int x, y;
+  rectWidth = rw;
 
-  for (y = 0; y < h; y++) {
-    for (x = 0; x < w; x++)
-      clientData[y*w] = rgb[y*w+x];
+#if BPP == 32
+  if (myFormat.depth == 24 && myFormat.redMax == 0xFF &&
+      myFormat.greenMax == 0xFF && myFormat.blueMax == 0xFF) {
+    cutZeros = True;
+    return 24;
   }
-}
-
-static void
-FilterHdiffBPP (char *rgb, CARDBPP *clientData, int w, int h)
-{
-  int x, y;
-
-  if (w && h) {
-    clientData[0] = rgb[0];
-    for (x = 1; x < w; x++)
-      clientData[x] = rgb[x] + clientData[x-1];
-    for (y = 1; y < h; y++) {
-      clientData[y*w] = rgb[y*w] + clientData[(y-1)*w];
-      for (x = 1; x < w; x++)
-        clientData[y*w] = rgb[y*w+x] + clientData[y*w+x-1];
-    }
-  }
-}
-
+  cutZeros = False;
+  return BPP;
 #else
-
-static void
-FilterCopyBPP (char *rgb, CARDBPP *clientData, int w, int h)
-{
-  int x, y;
-
-  for (y = 0; y < h; y++) {
-    for (x = 0; x < w; x++)
-      clientData[y*w+x] = TransFnBPP(rgb[(y*w+x)*3],
-                                     rgb[(y*w+x)*3+1],
-                                     rgb[(y*w+x)*3+2]);
-  }
+  return BPP;
+#endif
 }
 
-/* FIXME: this function is incorrect. */
 static void
-FilterHdiffBPP (char *rgb, CARDBPP *clientData, int w, int h)
+FilterCopyBPP (int numRows, CARDBPP *destBuffer)
 {
+#if BPP == 32
   int x, y;
 
-  if (w && h) {
-    clientData[0] = TransFnBPP(rgb[0], rgb[1], rgb[2]);
-    for (x = 1; x < w; x++) {
-      clientData[x] = TransFnBPP(rgb[x*3] + rgb[(x-1)*3],
-                                 rgb[x*3+1] + rgb[(x-1)*3+1],
-                                 rgb[x*3+2] + rgb[(x-1)*3+2]);
-    }
-    for (y = 1; y < h; y++) {
-      clientData[y*w] = TransFnBPP(rgb[y*w*3] + rgb[(y*w-1)*3],
-                                   rgb[y*w*3+1] + rgb[(y*w-1)*3+1],
-                                   rgb[y*w*3+2] + rgb[(y*w-1)*3+2]);
-      for (x = 1; x < w; x++) {
-        clientData[y*w] = TransFnBPP(rgb[(y*w+x)*3] + rgb[(y*w+x-1)*3],
-                                     rgb[(y*w+x)*3+1] + rgb[(y*w+x-1)*3+1],
-                                     rgb[(y*w+x)*3+2] + rgb[(y*w+x-1)*3+2]);
+  if (cutZeros) {
+    for (y = 0; y < numRows; y++) {
+      for (x = 0; x < rectWidth; x++) {
+        destBuffer[y*rectWidth+x] =
+          ((CARDBPP)buffer[(y*rectWidth+x)*3] & 0xFF)
+            << myFormat.redShift |
+          ((CARDBPP)buffer[(y*rectWidth+x)*3+1] & 0xFF)
+            << myFormat.greenShift |
+          ((CARDBPP)buffer[(y*rectWidth+x)*3+2] & 0xFF)
+            << myFormat.blueShift;
       }
     }
+  } else {
+    memcpy (destBuffer, buffer, numRows * rectWidth * (BPP / 8));
   }
-}
-
+#else
+  memcpy (destBuffer, buffer, numRows * rectWidth * (BPP / 8));
 #endif
-
-/*----------------------------------------------------------------------------
- *
- * Functions to translate RGB sample into local pixel format.
- *
- */
-
-#if BPP != 8
-
-static CARDBPP
-TransFnBPP (CARD8 r, CARD8 g, CARD8 b)
-{
-  return (((CARDBPP)r & myFormat.redMax) << myFormat.redShift |
-          ((CARDBPP)g & myFormat.greenMax) << myFormat.greenShift |
-          ((CARDBPP)b & myFormat.blueMax) << myFormat.blueShift);
 }
-
-#endif
 
