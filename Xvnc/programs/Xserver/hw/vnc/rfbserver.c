@@ -1024,10 +1024,8 @@ rfbSendFramebufferUpdate(cl)
 
     REGION_UNINIT(pScreen,&updateRegion);
 
-    if ( nUpdateRegionRects == 0xFFFF &&
-	 !rfbSendLastRectMarker(cl) ) {
+    if (nUpdateRegionRects == 0xFFFF && !rfbSendLastRectMarker(cl))
 	return FALSE;
-    }
 
     if (!rfbSendUpdateBuf(cl))
 	return FALSE;
@@ -1251,7 +1249,7 @@ rfbSendUpdateBuf(cl)
     fprintf(stderr,"\n");
     */
 
-    if (WriteExact(cl->sock, updateBuf, ublen) < 0) {
+    if (ublen > 0 && WriteExact(cl->sock, updateBuf, ublen) < 0) {
 	rfbLogPerror("rfbSendUpdateBuf: write");
 	rfbCloseSock(cl->sock);
 	return FALSE;
