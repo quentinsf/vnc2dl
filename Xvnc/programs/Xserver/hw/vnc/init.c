@@ -360,6 +360,11 @@ ddxProcessArgument (argc, argv, i)
 	return 1;
     }
 
+    if (strcmp(argv[i], "-compatiblekbd") == 0) {
+	compatibleKbd = TRUE;
+	return 1;
+    }
+
     if (inetdSock != -1 && argv[i][0] == ':') {
 	FatalError("can't specify both -inetd and :displaynumber");
     }
@@ -903,6 +908,8 @@ ddxUseMsg()
     ErrorF("-interface ipaddr      only bind to specified interface "
 								"address\n");
     ErrorF("-inetd                 Xvnc is launched by inetd\n");
+    ErrorF("-compatiblekbd         set META key = ALT key as in the original "
+								"VNC\n");
     exit(1);
 }
 

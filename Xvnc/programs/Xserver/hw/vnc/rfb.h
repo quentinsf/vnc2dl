@@ -304,7 +304,6 @@ extern rfbScreenInfo rfbScreen;
 extern int rfbGCIndex;
 
 extern int inetdSock;
-
 extern unsigned long interface;
 
 extern int rfbBitsPerPixel(int depth);
@@ -369,6 +368,7 @@ extern void rfbGotXCutText(char *str, int len);
 
 /* kbdptr.c */
 
+extern Bool compatibleKbd;
 extern unsigned char ptrAcceleration;
 
 extern void PtrDeviceInit();
