@@ -10,7 +10,7 @@
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH vncpasswd 1 "May 2002" "" "TightVNC"
+.TH vncpasswd 1 "August 2002" "" "TightVNC"
 .SH NAME
 vncpasswd \- set password for VNC server
 .SH SYNOPSIS
