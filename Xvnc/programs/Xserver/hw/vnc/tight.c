@@ -81,9 +81,9 @@ static BOOL SendFullColorRect(rfbClientPtr cl, int w, int h);
 static BOOL SendGradientRect(rfbClientPtr cl, int w, int h);
 static BOOL CompressData(rfbClientPtr cl, int streamId, int dataLen);
 
-static void FillPalette8(rfbClientPtr cl, int w, int h);
-static void FillPalette16(rfbClientPtr cl, int w, int h);
-static void FillPalette32(rfbClientPtr cl, int w, int h);
+static void FillPalette8(int w, int h);
+static void FillPalette16(int w, int h);
+static void FillPalette32(int w, int h);
 
 static void PaletteReset(void);
 static int PaletteFind(CARD32 rgb);
@@ -203,13 +203,13 @@ SendSubrect(cl, x, y, w, h)
     paletteMaxColors = w * h / 128;
     switch (cl->format.bitsPerPixel) {
     case 8:
-        FillPalette8(cl, w, h);
+        FillPalette8(w, h);
         break;
     case 16:
-        FillPalette16(cl, w, h);
+        FillPalette16(w, h);
         break;
     default:
-        FillPalette32(cl, w, h);
+        FillPalette32(w, h);
     }
 
     switch (paletteNumColors) {
@@ -484,8 +484,7 @@ CompressData(cl, streamId, dataLen)
  */
 
 static void
-FillPalette8(cl, w, h)
-    rfbClientPtr cl;
+FillPalette8(w, h)
     int w, h;
 {
     CARD8 *data = (CARD8 *)tightBeforeBuf;
@@ -534,8 +533,7 @@ FillPalette8(cl, w, h)
 #define DEFINE_FILL_PALETTE_FUNCTION(bpp)                               \
                                                                         \
 static void                                                             \
-FillPalette##bpp(cl, w, h)                                              \
-    rfbClientPtr cl;                                                    \
+FillPalette##bpp(w, h)                                                  \
     int w, h;                                                           \
 {                                                                       \
     CARD##bpp *data = (CARD##bpp *)tightBeforeBuf;                      \
