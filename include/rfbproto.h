@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2000-2003 Constantin Kaplinsky. All Rights Reserved.
+ *  Copyright (C) 2000-2004 Constantin Kaplinsky. All Rights Reserved.
  *  Copyright (C) 2000 Tridia Corporation. All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge. All Rights Reserved.
  *
@@ -129,9 +129,9 @@ typedef struct _rfbPixelFormat {
 
 typedef struct _rfbCapabilityInfo {
 
-    CARD32 code;				/* numeric identifier */
+    CARD32 code;		/* numeric identifier */
     CARD8 vendorSignature[4];	/* vendor identification */
-    CARD8 nameSignature[8];		/* abbreviated option name */
+    CARD8 nameSignature[8];	/* abbreviated option name */
 
 } rfbCapabilityInfo;
 
@@ -276,6 +276,7 @@ typedef struct _rfbAuthenticationCapsMsg {
 #define rfbAuthUnixLogin 129
 #define rfbAuthExternal 130
 
+#define sig_rfbAuthNone "NOAUTH__"
 #define sig_rfbAuthVNC "VNCAUTH_"
 #define sig_rfbAuthUnixLogin "ULGNAUTH"
 #define sig_rfbAuthExternal "XTRNAUTH"
@@ -344,7 +345,7 @@ typedef struct _rfbInteractionCapsMsg {
     CARD16 nServerMessageTypes;
     CARD16 nClientMessageTypes;
     CARD16 nEncodingTypes;
-    CARD16 pad;	/* reserved, must be 0 */
+    CARD16 pad;			/* reserved, must be 0 */
     /* followed by nServerMessageTypes * rfbCapabilityInfo structures */
     /* followed by nClientMessageTypes * rfbCapabilityInfo structures */
 } rfbInteractionCapsMsg;
@@ -528,7 +529,7 @@ typedef struct _rfbFramebufferUpdateMsg {
 
 typedef struct _rfbFramebufferUpdateRectHeader {
     rfbRectangle r;
-    CARD32 encoding;	/* one of the encoding types rfbEncoding... */
+    CARD32 encoding;		/* one of the encoding types rfbEncoding... */
 } rfbFramebufferUpdateRectHeader;
 
 #define sz_rfbFramebufferUpdateRectHeader (sz_rfbRectangle + 4)
@@ -1130,7 +1131,7 @@ typedef struct _rfbClientCutTextMsg {
 typedef struct _rfbFileListRequestMsg {
     CARD8 type;
     CARD8 flags;
-	CARD16 dirNameSize;
+    CARD16 dirNameSize;
     /* Followed by char Dirname[dirNameSize] */
 } rfbFileListRequestMsg;
 
@@ -1142,9 +1143,9 @@ typedef struct _rfbFileListRequestMsg {
 
 typedef struct _rfbFileDownloadRequestMsg {
     CARD8 type;
-	CARD8 compressedLevel;
+    CARD8 compressedLevel;
     CARD16 fNameSize;
-	CARD32 position;
+    CARD32 position;
     /* Followed by char Filename[fNameSize] */
 } rfbFileDownloadRequestMsg;
 
@@ -1156,9 +1157,9 @@ typedef struct _rfbFileDownloadRequestMsg {
 
 typedef struct _rfbFileUploadRequestMsg {
     CARD8 type;
-	CARD8 compressedLevel;
+    CARD8 compressedLevel;
     CARD16 fNameSize;
-	CARD32 position;
+    CARD32 position;
     /* Followed by char Filename[fNameSize] */
 } rfbFileUploadRequestMsg;
 
@@ -1185,9 +1186,9 @@ typedef struct _rfbFileUploadDataMsg {
 
 typedef struct _rfbFileDownloadCancelMsg {
     CARD8 type;
-	CARD8 unused;
-	CARD16 reasonLen;
-	/* Followed by reason[reasonLen] */
+    CARD8 unused;
+    CARD16 reasonLen;
+    /* Followed by reason[reasonLen] */
 } rfbFileDownloadCancelMsg;
 
 #define sz_rfbFileDownloadCancelMsg 4
@@ -1198,9 +1199,9 @@ typedef struct _rfbFileDownloadCancelMsg {
 
 typedef struct _rfbFileUploadFailedMsg {
     CARD8 type;
-	CARD8 unused;
-	CARD16 reasonLen;
-	/* Followed by reason[reasonLen] */
+    CARD8 unused;
+    CARD16 reasonLen;
+    /* Followed by reason[reasonLen] */
 } rfbFileUploadFailedMsg;
 
 #define sz_rfbFileUploadFailedMsg 4
@@ -1211,10 +1212,10 @@ typedef struct _rfbFileUploadFailedMsg {
 
 typedef struct _rfbFileCreateDirRequestMsg {
     CARD8 type;
-	CARD8 unused;
-	CARD16 dNameLen;
-	CARD32 dModTime;
-	/* Followed by dName[dNameLen] */
+    CARD8 unused;
+    CARD16 dNameLen;
+    CARD32 dModTime;
+    /* Followed by dName[dNameLen] */
 } rfbFileCreateDirRequestMsg;
 
 #define sz_rfbFileCreateDirRequestMsg 8
@@ -1238,5 +1239,5 @@ typedef union _rfbClientToServerMsg {
     rfbFileUploadDataMsg fud;
     rfbFileDownloadCancelMsg fdc;
     rfbFileUploadFailedMsg fuf;
-	rfbFileCreateDirRequestMsg fcdr;
+    rfbFileCreateDirRequestMsg fcdr;
 } rfbClientToServerMsg;
