@@ -39,10 +39,12 @@
 static void usage(char *argv[]);
 static char *getenv_safe(char *name, size_t maxlen);
 static void mkdir_and_check(char *dirname, int be_strict);
+static int read_password(char *result);
 static int ask_password(char *result);
 
 int main(int argc, char *argv[])
 {
+  int read_from_stdin = 0;
   int make_directory = 0;
   int check_strictly = 0;
   char passwd1[9];
@@ -57,6 +59,7 @@ int main(int argc, char *argv[])
 
     sprintf(passwdDir, "%s/.vnc", getenv_safe("HOME", 240));
     sprintf(passwdFile, "%s/passwd", passwdDir);
+    read_from_stdin = 0;
     make_directory = 1;
     check_strictly = 0;
 
@@ -65,10 +68,17 @@ int main(int argc, char *argv[])
     if (strcmp(argv[1], "-t") == 0) {
       sprintf(passwdDir, "/tmp/%s-vnc", getenv_safe("USER", 32));
       sprintf(passwdFile, "%s/passwd", passwdDir);
+      read_from_stdin = 0;
       make_directory = 1;
       check_strictly = 1;
+    } else if (strcmp(argv[1], "-f") == 0) {
+      strcpy(passwdFile, "-");
+      read_from_stdin = 1;
+      make_directory = 0;
+      check_strictly = 0;
     } else {
       strcpy(passwdFile, argv[1]);
+      read_from_stdin = 0;
       make_directory = 0;
       check_strictly = 0;
     }
@@ -82,17 +92,34 @@ int main(int argc, char *argv[])
     mkdir_and_check(passwdDir, check_strictly);
   }
 
-  /* Ask the primary (full-control) password. */
-  if (!ask_password(passwd1))
-    exit(1);
-
-  /* Optionally ask the second (view-only) password. */
-  /* FIXME: Is it correct to read from stdin here? */
   passwd2_ptr = NULL;
-  fprintf(stderr, "Would you like to enter a view-only password (y/n)? ");
-  if (fgets(yesno, 2, stdin) != NULL && strchr("Yy", yesno[0]) != NULL) {
-    if (ask_password(passwd2))
+
+  if (read_from_stdin) {
+
+    /* Read one or two passwords from stdin */
+    if (!read_password(passwd1)) {
+      fprintf(stderr, "Could not read password\n");
+      exit(1);
+    }
+    if (read_password(passwd2)) {
       passwd2_ptr = passwd2;
+    }
+
+  } else {
+
+    /* Ask the primary (full-control) password. */
+    if (!ask_password(passwd1)) {
+      exit(1);
+    }
+    /* Optionally, ask the second (view-only) password. */
+    /* FIXME: Is it correct to read from stdin here? */
+    fprintf(stderr, "Would you like to enter a view-only password (y/n)? ");
+    if (fgets(yesno, 2, stdin) != NULL && strchr("Yy", yesno[0]) != NULL) {
+      if (ask_password(passwd2)) {
+        passwd2_ptr = passwd2;
+      }
+    }
+
   }
 
   /* Actually write the passwords. */
@@ -172,6 +199,40 @@ static void mkdir_and_check(char *dirname, int be_strict)
     fprintf(stderr, "Error: bad access modes on %s\n", dirname);
     exit(1);
   }
+}
+
+/*
+ * Read a password from stdin. The password is terminated either by an
+ * end of line, or by the end of stdin data. Return 1 on success, 0 on
+ * error. On success, the password will be stored in the specified
+ * 9-byte buffer.
+ */
+
+static int read_password(char *result)
+{
+  char passwd[256];
+  char *ptr;
+
+  /* Try to read the password. */
+  if (fgets(passwd, 256, stdin) == NULL)
+    return 0;
+
+  /* Remove the newline if present. */
+  ptr = strchr(passwd, '\n');
+  if (ptr != NULL)
+    *ptr = '\0';
+
+  /* Truncate if necessary. */
+  if (strlen(passwd) > 8) {
+    memset(passwd + 8, 0, strlen(passwd) - 8);
+    fprintf(stderr, "Warning: password truncated to the length of 8.\n");
+  }
+
+  /* Save the password and zero our copies. */
+  strcpy(result, passwd);
+  memset(passwd, 0, strlen(passwd));
+
+  return 1;
 }
 
 /*

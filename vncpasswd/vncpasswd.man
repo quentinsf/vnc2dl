@@ -10,7 +10,7 @@
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH vncpasswd 1 "January 2003" "" "TightVNC"
+.TH vncpasswd 1 "March 2003" "" "TightVNC"
 .SH NAME
 vncpasswd \- set passwords for VNC server
 .SH SYNOPSIS
@@ -19,6 +19,9 @@ vncpasswd \- set passwords for VNC server
 .br
 .B vncpasswd
 .IR \-t
+.br
+.B vncpasswd
+.IR \-f
 .br
 .SH DESCRIPTION
 The \fBvncpasswd\fR utility should be used to create and change
@@ -38,10 +41,11 @@ The password file name defaults to \fB$HOME/.vnc/passwd\fR unless the
 below). The \fB$HOME/.vnc/\fR directory will be created if it does not
 exist.
 
-Each password has to be longer than five characters. Only the first
-eight characters are significant. If the primary password is too
-short, the program will abort. If the view-only password is too short,
-then only the primary password will be saved.
+Each password has to be longer than five characters (unless the
+\fB\-f\fR command-line option was used, see its description below). 
+Only the first eight characters are significant. If the primary
+password is too short, the program will abort. If the view-only
+password is too short, then only the primary password will be saved.
 
 Unless a file name was provided in the command-line explicitly, this
 utility may perform certain sanity checks to prevent writing a
@@ -59,6 +63,13 @@ Write passwords into \fB/tmp/$USER-vnc/passwd\fR, creating the
 permissions on that directory (the mode must be 700). This option can
 help to improve security when your home partition may be shared via
 network (e.g. when using NFS).
+.TP
+\fB\-f\fR
+Filter mode. Read plain-text passwords from stdin, write encrypted
+versions to stdout. One or two passwords (full-control and view-only)
+can be supplied in the input stream, newline terminates a password. 
+Note that in the filter mode, short or even empty passwords will be
+silently accepted.
 .SH SEE ALSO
 \fBvncserver\fR(1), \fBXvnc\fR(1), \fBvncviewer\fR(1),
 \fBvncconnect\fR(1)

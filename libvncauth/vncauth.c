@@ -65,6 +65,8 @@ vncEncryptAndStorePasswd(char *passwd, char *fname)
  * successful, 0 if the file could not be written (note that the original
  * vncEncryptAndStorePasswd() function returns inverse values).  The
  * passwdViewOnly pointer may be NULL.
+ *
+ * NOTE: The file name of "-" denotes stdout.
  */
 
 int
@@ -77,11 +79,15 @@ vncEncryptAndStorePasswd2(char *passwd, char *passwdViewOnly, char *fname)
 	0,0,0,0,0,0,0,0
     };
 
-    fp = fopen(fname,"w");
-    if (fp == NULL)
+    if (strcmp(fname, "-") != 0) {
+      fp = fopen(fname, "w");
+      if (fp == NULL) {
 	return 0;
-
-    chmod(fname, S_IRUSR|S_IWUSR);
+      }
+      chmod(fname, S_IRUSR|S_IWUSR);
+    } else {
+      fp = stdout;
+    }
 
     strncpy(encryptedPasswd, passwd, 8);
     if (passwdViewOnly != NULL)
@@ -98,7 +104,9 @@ vncEncryptAndStorePasswd2(char *passwd, char *passwdViewOnly, char *fname)
     bytesToWrite = (passwdViewOnly == NULL) ? 8 : 16;
     bytesWrote = fwrite(encryptedPasswd, 1, bytesToWrite, fp);
   
-    fclose(fp);
+    if (fp != stdout) {
+      fclose(fp);
+    }
     return (bytesWrote == bytesToWrite);
 }
 
