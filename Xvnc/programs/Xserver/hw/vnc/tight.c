@@ -51,7 +51,7 @@ typedef struct TIGHT_CONF_s {
 
 static TIGHT_CONF tightConf[10] = {
     {  1024,   64,   6, 65536, 0, 0, 0, 0,   0,   0,   4 },
-    {  2048,  128,   6, 65536, 1, 1, 1, 0,   0,   0,   8 },
+    {  2048,  128,   6, 65536, 1, 1, 1, 0,   0,   0,  12 },
     {  6144,  256,   8, 65536, 3, 3, 2, 0,   0,   0,  24 },
     { 10240, 1024,  12, 65536, 5, 5, 3, 0,   0,   0,  32 },
     { 16384, 2048,  12, 65536, 6, 6, 4, 0,   0,   0,  32 },
@@ -102,6 +102,7 @@ static int *prevRowBuf = NULL;
 
 static int SendSubrect(rfbClientPtr cl, int x, int y, int w, int h);
 static BOOL SendSolidRect(rfbClientPtr cl, int w, int h);
+static BOOL SendMonoRect(rfbClientPtr cl, int w, int h);
 static BOOL SendIndexedRect(rfbClientPtr cl, int w, int h);
 static BOOL SendFullColorRect(rfbClientPtr cl, int w, int h);
 static BOOL SendGradientRect(rfbClientPtr cl, int w, int h);
@@ -273,10 +274,6 @@ SendSubrect(cl, x, y, w, h)
     }
 
     switch (paletteNumColors) {
-    case 1:
-        /* Solid rectangle */
-        success = SendSolidRect(cl, w, h);
-        break;
     case 0:
         /* Truecolor image */
         if (!rfbTightDisableGradient && DetectStillImage(&cl->format, w, h)) {
@@ -284,6 +281,14 @@ SendSubrect(cl, x, y, w, h)
         } else {
             success = SendFullColorRect(cl, w, h);
         }
+        break;
+    case 1:
+        /* Solid rectangle */
+        success = SendSolidRect(cl, w, h);
+        break;
+    case 2:
+        /* Two-color rectangle */
+        success = SendMonoRect(cl, w, h);
         break;
     default:
         /* Up to 256 different colors */
@@ -325,75 +330,54 @@ SendSolidRect(cl, w, h)
 }
 
 static BOOL
-SendIndexedRect(cl, w, h)
+SendMonoRect(cl, w, h)
     rfbClientPtr cl;
     int w, h;
 {
-    int streamId, entryLen, dataLen;
+    int paletteLen, dataLen;
     int x, y, i, width_bytes;
 
-    if ( ublen + 6 + paletteNumColors * cl->format.bitsPerPixel / 8 >
-         UPDATE_BUF_SIZE ) {
+    if ( ublen + 6 + 2 * cl->format.bitsPerPixel / 8 > UPDATE_BUF_SIZE ) {
 	if (!rfbSendUpdateBuf(cl))
 	    return FALSE;
     }
 
     /* Prepare tight encoding header. */
-    if (paletteNumColors == 2) {
-        streamId = 1;
-        dataLen = (w + 7) / 8;
-        dataLen *= h;
-    } else {
-        streamId = 2;
-        dataLen = w * h;
-    }
+    dataLen = (w + 7) / 8;
+    dataLen *= h;
 
-    updateBuf[ublen++] = (streamId | rfbTightExplicitFilter) << 4;
+    updateBuf[ublen++] = (1 | rfbTightExplicitFilter) << 4;
     updateBuf[ublen++] = rfbTightFilterPalette;
-    updateBuf[ublen++] = (char)(paletteNumColors - 1);
+    updateBuf[ublen++] = 1;
 
     /* Prepare palette, convert image. */
     switch (cl->format.bitsPerPixel) {
 
     case 32:
-        if (paletteNumColors == 2) {
-            ((CARD32 *)tightAfterBuf)[0] = monoBackground;
-            ((CARD32 *)tightAfterBuf)[1] = monoForeground;
-            EncodeMonoRect32((CARD8 *)tightBeforeBuf, w, h);
-        } else {
-            for (i = 0; i < paletteNumColors; i++) {
-                ((CARD32 *)tightAfterBuf)[i] =
-                    palette.entry[i].listNode->rgb;
-            }
-            EncodeIndexedRect32((CARD8 *)tightBeforeBuf, w * h);
-        }
+        EncodeMonoRect32((CARD8 *)tightBeforeBuf, w, h);
+
+        ((CARD32 *)tightAfterBuf)[0] = monoBackground;
+        ((CARD32 *)tightAfterBuf)[1] = monoForeground;
         if (usePixelFormat24) {
             Pack24(tightAfterBuf, &cl->format, paletteNumColors);
-            entryLen = 3;
+            paletteLen = 6;
         } else
-            entryLen = 4;
+            paletteLen = 8;
 
-        memcpy(&updateBuf[ublen], tightAfterBuf, paletteNumColors * entryLen);
-        ublen += paletteNumColors * entryLen;
-        cl->rfbBytesSent[rfbEncodingTight] += paletteNumColors * entryLen + 3;
+        memcpy(&updateBuf[ublen], tightAfterBuf, paletteLen);
+        ublen += paletteLen;
+        cl->rfbBytesSent[rfbEncodingTight] += 3 + paletteLen;
         break;
 
     case 16:
-        if (paletteNumColors == 2) {
-            ((CARD16 *)tightAfterBuf)[0] = (CARD16)monoBackground;
-            ((CARD16 *)tightAfterBuf)[1] = (CARD16)monoForeground;
-            EncodeMonoRect16((CARD8 *)tightBeforeBuf, w, h);
-        } else {
-            for (i = 0; i < paletteNumColors; i++) {
-                ((CARD16 *)tightAfterBuf)[i] =
-                    (CARD16)palette.entry[i].listNode->rgb;
-            }
-            EncodeIndexedRect16((CARD8 *)tightBeforeBuf, w * h);
-        }
+        EncodeMonoRect16((CARD8 *)tightBeforeBuf, w, h);
 
-        memcpy(&updateBuf[ublen], tightAfterBuf, paletteNumColors * 2);
-        ublen += paletteNumColors * 2;
-        cl->rfbBytesSent[rfbEncodingTight] += paletteNumColors * 2 + 3;
+        ((CARD16 *)tightAfterBuf)[0] = (CARD16)monoBackground;
+        ((CARD16 *)tightAfterBuf)[1] = (CARD16)monoForeground;
+
+        memcpy(&updateBuf[ublen], tightAfterBuf, 4);
+        ublen += 4;
+        cl->rfbBytesSent[rfbEncodingTight] += 7;
         break;
 
     default:
@@ -404,10 +388,74 @@ SendIndexedRect(cl, w, h)
         cl->rfbBytesSent[rfbEncodingTight] += 5;
     }
 
-    return CompressData(cl, streamId, dataLen,
-                        ((paletteNumColors == 2) ?
-                         tightConf[compressLevel].monoZlibLevel :
-                         tightConf[compressLevel].idxZlibLevel),
+    return CompressData(cl, 1, dataLen,
+                        tightConf[compressLevel].monoZlibLevel,
+                        Z_DEFAULT_STRATEGY);
+}
+
+static BOOL
+SendIndexedRect(cl, w, h)
+    rfbClientPtr cl;
+    int w, h;
+{
+    int entryLen;
+    int x, y, i, width_bytes;
+
+    if ( ublen + 6 + paletteNumColors * cl->format.bitsPerPixel / 8 >
+         UPDATE_BUF_SIZE ) {
+	if (!rfbSendUpdateBuf(cl))
+	    return FALSE;
+    }
+
+    /* Prepare tight encoding header. */
+    updateBuf[ublen++] = (2 | rfbTightExplicitFilter) << 4;
+    updateBuf[ublen++] = rfbTightFilterPalette;
+    updateBuf[ublen++] = (char)(paletteNumColors - 1);
+
+    /* Prepare palette, convert image. */
+    switch (cl->format.bitsPerPixel) {
+
+    case 32:
+        EncodeIndexedRect32((CARD8 *)tightBeforeBuf, w * h);
+
+        for (i = 0; i < paletteNumColors; i++) {
+            ((CARD32 *)tightAfterBuf)[i] =
+                palette.entry[i].listNode->rgb;
+        }
+        if (usePixelFormat24) {
+            Pack24(tightAfterBuf, &cl->format, paletteNumColors);
+            entryLen = 3;
+        } else
+            entryLen = 4;
+
+        memcpy(&updateBuf[ublen], tightAfterBuf, paletteNumColors * entryLen);
+        ublen += paletteNumColors * entryLen;
+        cl->rfbBytesSent[rfbEncodingTight] += 3 + paletteNumColors * entryLen;
+        break;
+
+    case 16:
+        EncodeIndexedRect16((CARD8 *)tightBeforeBuf, w * h);
+
+        for (i = 0; i < paletteNumColors; i++) {
+            ((CARD16 *)tightAfterBuf)[i] =
+                (CARD16)palette.entry[i].listNode->rgb;
+        }
+
+        memcpy(&updateBuf[ublen], tightAfterBuf, paletteNumColors * 2);
+        ublen += paletteNumColors * 2;
+        cl->rfbBytesSent[rfbEncodingTight] += 3 + paletteNumColors * 2;
+        break;
+
+    default:
+        EncodeMonoRect8((CARD8 *)tightBeforeBuf, w, h);
+
+        updateBuf[ublen++] = (char)monoBackground;
+        updateBuf[ublen++] = (char)monoForeground;
+        cl->rfbBytesSent[rfbEncodingTight] += 5;
+    }
+
+    return CompressData(cl, 2, w * h,
+                        tightConf[compressLevel].idxZlibLevel,
                         Z_DEFAULT_STRATEGY);
 }
 
