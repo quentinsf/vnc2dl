@@ -222,7 +222,7 @@ flashDisplay(Display *d, char *user)
   Window w1, w2, w3, w4;
   XSetWindowAttributes attr;
 
-  XBell(d, 100);
+  XBell(d, 0);
 
   XForceScreenSaver(d, ScreenSaverReset);
 
