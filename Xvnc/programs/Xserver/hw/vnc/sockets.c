@@ -47,6 +47,16 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#ifndef USE_LIBWRAP
+#define USE_LIBWRAP 0
+#endif
+#if USE_LIBWRAP
+#include <syslog.h>
+#include <tcpd.h>
+int allow_severity = LOG_INFO;
+int deny_severity = LOG_WARNING;
+#endif
+
 #include "rfb.h"
 
 
@@ -191,6 +201,17 @@ rfbCheckFds()
 	}
 
 	fprintf(stderr,"\n");
+
+#if USE_LIBWRAP
+        if (!hosts_ctl("Xvnc", STRING_UNKNOWN, inet_ntoa(addr.sin_addr),
+                       STRING_UNKNOWN)) {
+          rfbLog("Rejected connection from client %s\n",
+                 inet_ntoa(addr.sin_addr));
+          close(sock);
+          return;
+        }
+#endif
+
 	rfbLog("Got connection from client %s\n", inet_ntoa(addr.sin_addr));
 
 	AddEnabledDevice(sock);

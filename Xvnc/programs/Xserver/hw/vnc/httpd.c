@@ -32,6 +32,13 @@
 #include <errno.h>
 #include <pwd.h>
 
+#ifndef USE_LIBWRAP
+#define USE_LIBWRAP 0
+#endif
+#if USE_LIBWRAP
+#include <tcpd.h>
+#endif
+
 #include "rfb.h"
 
 #define NOT_FOUND_STR "HTTP/1.0 404 Not found\n\n" \
@@ -136,6 +143,17 @@ httpCheckFds()
 	    rfbLogPerror("httpCheckFds: accept");
 	    return;
 	}
+
+#if USE_LIBWRAP
+	if (!hosts_ctl("Xvnc", STRING_UNKNOWN, inet_ntoa(addr.sin_addr),
+		       STRING_UNKNOWN)) {
+	    rfbLog("Rejected connection from client %s\n",
+		   inet_ntoa(addr.sin_addr));
+	    close(httpSock);
+	    httpSock = -1;
+	    return;
+	}
+#endif
 
 	flags = fcntl (httpSock, F_GETFL);
 
