@@ -542,9 +542,8 @@ PaletteFind(rgb)
     CARD32 rgb;
 {
     COLOR_LIST *pnode;
-    CARD8 *crgb = (CARD8 *)&rgb;
 
-    pnode = palette.hash[(int)(crgb[0]+crgb[1]+crgb[2]+crgb[3]) & 0xFF];
+    pnode = palette.hash[(int)((rgb >> 8) + rgb & 0xFF)];
 
     while (pnode != NULL) {
         if (pnode->rgb == rgb)
@@ -562,9 +561,8 @@ PaletteInsert(rgb, numPixels)
     COLOR_LIST *pnode;
     COLOR_LIST *prev_pnode = NULL;
     int hash_key, idx, new_idx, count;
-    CARD8 *crgb = (CARD8 *)&rgb;
 
-    hash_key = (int)(crgb[0]+crgb[1]+crgb[2]+crgb[3]) & 0xFF;
+    hash_key = (int)((rgb >> 8) + rgb & 0xFF);
     pnode = palette.hash[hash_key];
 
     while (pnode != NULL) {
