@@ -164,12 +164,15 @@ FullScreenOn()
 
   XtVaSetValues(popup, XtNoverrideRedirect, True, NULL);
 
-  /* Finally try to get the input focus and grab the keyboard. */
+  /* Try to get the input focus. */
 
   XSetInputFocus(dpy, DefaultRootWindow(dpy), RevertToPointerRoot,
 		 CurrentTime);
 
-  if (XtGrabKeyboard(desktop, True, GrabModeAsync,
+  /* Optionally, grab the keyboard. */
+
+  if (appData.grabKeyboard &&
+      XtGrabKeyboard(desktop, True, GrabModeAsync,
 		     GrabModeAsync, CurrentTime) != GrabSuccess) {
     fprintf(stderr, "XtGrabKeyboard() failed.\n");
   }
@@ -199,7 +202,8 @@ FullScreenOff()
 
   appData.fullScreen = False;
 
-  XtUngrabKeyboard(desktop, CurrentTime);
+  if (appData.grabKeyboard)
+    XtUngrabKeyboard(desktop, CurrentTime);
 
   XtUnmapWidget(toplevel);
 

@@ -206,6 +206,9 @@ static XtResource appDataResourceList[] = {
 
   {"useRemoteCursor", "UseRemoteCursor", XtRBool, sizeof(Bool),
    XtOffsetOf(AppData, useRemoteCursor), XtRImmediate, (XtPointer) True},
+
+  {"grabKeyboard", "GrabKeyboard", XtRBool, sizeof(Bool),
+   XtOffsetOf(AppData, grabKeyboard), XtRImmediate, (XtPointer) False},
 };
 
 

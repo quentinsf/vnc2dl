@@ -76,7 +76,8 @@ server.
 Start in full\-screen mode. Please be aware that operating in
 full\-screen mode may confuse X window managers. Typically, such
 conflicts cause incorrect handling of input focus or make the viewer
-window disappear mysteriously.
+window disappear mysteriously. See the grabKeyboard setting in the
+RESOURCES section below for a method to solve input focus problem.
 .TP
 \fB\-noraiseonbeep\fR
 By default, the viewer shows and raises its window on remote beep
@@ -224,6 +225,10 @@ Equivalent of \fB\-viewonly\fR option. Default false.
 .TP
 .B fullScreen
 Equivalent of \fB\-fullscreen\fR option. Default false.
+.TP
+.B grabKeyboard
+Grab keyboard in full-screen mode. This can help to solve problems
+with losing keyboard focus. Default false.
 .TP
 .B raiseOnBeep
 Equivalent of \fB\-noraiseonbeep\fR option, when set to false. Default

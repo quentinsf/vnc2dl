@@ -20,6 +20,13 @@ Vncviewer.translations:\
 
 
 !
+! Uncomment to grab the keyboard in full-screen mode.
+!
+
+! Vncviewer.grabKeyboard: True
+
+
+!
 ! Background around a small desktop in full-screen mode.
 !
 

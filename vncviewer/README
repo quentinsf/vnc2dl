@@ -86,6 +86,11 @@ The application resources are:
 
     Full screen mode.  Default false.
 
+  grabKeyboard
+
+    Grab keyboard in full screen mode. This can help to solve problems with
+    losing keyboard focus.  Default false.
+
   raiseOnBeep (option -noraiseonbeep)
 
     Raise viewer window on remote beep (bell) event.
