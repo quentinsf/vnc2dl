@@ -322,7 +322,7 @@ CreateDotCursor()
   Cursor cursor;
   Pixmap src, msk;
   static char srcBits[] = { 0, 14,14,14, 0 };
-  static char mskBits[] = { 31,31,31,31,31 };
+  static char mskBits[] = { 14,31,31,31,14 };
   XColor fg, bg;
 
   src = XCreateBitmapFromData(dpy, DefaultRootWindow(dpy), srcBits, 5, 5);
