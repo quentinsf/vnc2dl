@@ -220,6 +220,8 @@ SendSolidRect(cl, w, h)
     memcpy (&updateBuf[ublen], tightBeforeBuf, len);
     ublen += len;
 
+    cl->rfbBytesSent[rfbEncodingTight] += len + 1;
+
     return TRUE;
 }
 
@@ -270,6 +272,7 @@ SendIndexedRect(cl, w, h)
 
         memcpy(&updateBuf[ublen], tightAfterBuf, paletteNumColors * entryLen);
         ublen += paletteNumColors * entryLen;
+        cl->rfbBytesSent[rfbEncodingTight] += paletteNumColors * entryLen + 3;
 
         EncodeIndexedRect32((CARD8 *)tightBeforeBuf, w, h);
         break;
@@ -281,6 +284,7 @@ SendIndexedRect(cl, w, h)
         }
         memcpy(&updateBuf[ublen], tightAfterBuf, paletteNumColors * 2);
         ublen += paletteNumColors * 2;
+        cl->rfbBytesSent[rfbEncodingTight] += paletteNumColors * 2 + 3;
 
         EncodeIndexedRect16((CARD8 *)tightBeforeBuf, w, h);
         break;
@@ -288,6 +292,7 @@ SendIndexedRect(cl, w, h)
     default:
         memcpy (&updateBuf[ublen], palette8.pixelValue, paletteNumColors);
         ublen += paletteNumColors;
+        cl->rfbBytesSent[rfbEncodingTight] += paletteNumColors + 3;
 
         EncodeIndexedRect8((CARD8 *)tightBeforeBuf, w, h);
     }
@@ -308,6 +313,7 @@ SendFullColorRect(cl, w, h)
     }
 
     updateBuf[ublen++] = 0x00;  /* stream id = 0, no flushing, no filter */
+    cl->rfbBytesSent[rfbEncodingTight]++;
 
     if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
          cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
@@ -355,15 +361,18 @@ CompressData(cl, streamId, dataLen)
     }
 
     compressedLen = (size_t)(tightAfterBufSize - pz->avail_out);
+    cl->rfbBytesSent[rfbEncodingTight] += compressedLen + 1;
 
     /* Prepare compressed data size for sending. */
     updateBuf[ublen++] = compressedLen & 0x7F;
     if (compressedLen > 0x7F) {
         updateBuf[ublen-1] |= 0x80;
         updateBuf[ublen++] = compressedLen >> 7 & 0x7F;
+        cl->rfbBytesSent[rfbEncodingTight]++;
         if (compressedLen > 0x3FFF) {
             updateBuf[ublen-1] |= 0x80;
             updateBuf[ublen++] = compressedLen >> 14 & 0xFF;
+            cl->rfbBytesSent[rfbEncodingTight]++;
         }
     }
 
