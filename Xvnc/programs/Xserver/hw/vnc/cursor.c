@@ -103,6 +103,12 @@ rfbSendCursorShape(cl, pScreen)
 
     /* If there is no cursor, send update with empty cursor data. */
 
+    if ( pCursor->bits->width == 1 &&
+	 pCursor->bits->height == 1 &&
+	 pCursor->bits->mask[0] == 0 ) {
+	pCursor = NULL;
+    }
+
     if (pCursor == NULL) {
 	if (ublen + sz_rfbFramebufferUpdateRectHeader > UPDATE_BUF_SIZE ) {
 	    if (!rfbSendUpdateBuf(cl))
