@@ -1,5 +1,5 @@
 /*
- * rfbserver.c - deal with server-side of the RFB protocol.
+ * cursor.c - support for cursor shape updates.
  */
 
 /*
