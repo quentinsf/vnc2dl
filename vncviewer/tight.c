@@ -42,9 +42,7 @@
 
 /* Type declarations */
 
-#if BPP == 8
-typedef CARDBPP (*transPtrBPP)(CARD8);
-#else
+#if BPP != 8
 typedef CARDBPP (*transPtrBPP)(CARD8, CARD8, CARD8);
 #endif
 
@@ -58,9 +56,7 @@ static Bool HandleTightDataBPP (int compressedLen, int stream_id,
 static void FilterCopyBPP (char *rgb, CARDBPP *clientData, int w, int h);
 static void FilterHdiffBPP (char *rgb, CARDBPP *clientData, int w, int h);
 
-#if BPP == 8
-static CARDBPP TransFnBPP (CARD8 pixel);
-#else
+#if BPP != 8
 static CARDBPP TransFnBPP (CARD8 r, CARD8 g, CARD8 b);
 #endif
 
@@ -77,7 +73,6 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
   int stream_id;
   int compressedLen;
   int err;
-  CARD8 b1 = 0, b2 = 0, b3 = 0;
 
   if (!ReadFromRFBServer((char *)&comp_ctl, 1))
     return False;
@@ -131,19 +126,9 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
   /*        (currently none of filters needs parameters).     */
 
   /* Read the length (1..3 bytes) of compressed data following. */
-  if (!ReadFromRFBServer((char *)&b1, 1))
+  compressedLen = ReadCompactLen();
+  if (compressedLen < 0)
     return False;
-  compressedLen = (int)b1 & 0x7F;
-  if (b1 & 0x80) {
-    if (!ReadFromRFBServer((char *)&b2, 1))
-      return False;
-    compressedLen |= ((int)b2 & 0x7F) << 7;
-    if (b2 & 0x80) {
-      if (!ReadFromRFBServer((char *)&b3, 1))
-        return False;
-      compressedLen |= ((int)b3 & 0xFF) << 14;
-    }
-  }
 
   /* Now let's initialize compression stream if needed. */
   stream_id = comp_ctl & 0x03;
@@ -259,7 +244,7 @@ FilterCopyBPP (char *rgb, CARDBPP *clientData, int w, int h)
 
   for (y = 0; y < h; y++) {
     for (x = 0; x < w; x++)
-      clientData[y*w] = TransFnBPP(rgb[y*w+x]);
+      clientData[y*w] = rgb[y*w+x];
   }
 }
 
@@ -269,13 +254,13 @@ FilterHdiffBPP (char *rgb, CARDBPP *clientData, int w, int h)
   int x, y;
 
   if (w && h) {
-    clientData[0] = TransFnBPP(rgb[0]);
+    clientData[0] = rgb[0];
     for (x = 1; x < w; x++)
-      clientData[x] = TransFnBPP(rgb[x] - rgb[x-1]);
+      clientData[x] = rgb[x] - rgb[x-1];
     for (y = 1; y < h; y++) {
-      clientData[y*w] = TransFnBPP(rgb[y*w] - rgb[y*w-1]);
+      clientData[y*w] = rgb[y*w] - rgb[y*w-1];
       for (x = 1; x < w; x++)
-        clientData[y*w] = TransFnBPP(rgb[y*w+x] - rgb[y*w+x-1]);
+        clientData[y*w] = rgb[y*w+x] - rgb[y*w+x-1];
     }
   }
 }
@@ -324,24 +309,18 @@ FilterHdiffBPP (char *rgb, CARDBPP *clientData, int w, int h)
 
 /*----------------------------------------------------------------------------
  *
- * Functions to translate between pixel formats.
+ * Functions to translate RGB sample into local pixel format.
  *
  */
 
-#if BPP == 8
-
-static CARDBPP
-TransFnBPP (CARD8 pixel)
-{
-  return (CARDBPP) 0;
-}
-
-#else
+#if BPP != 8
 
 static CARDBPP
 TransFnBPP (CARD8 r, CARD8 g, CARD8 b)
 {
-  return (CARDBPP) 0;
+  return (((CARDBPP)r & myFormat.redMax) << myFormat.redShift |
+          ((CARDBPP)g & myFormat.greenMax) << myFormat.greenShift |
+          ((CARDBPP)b & myFormat.blueMax) << myFormat.blueShift);
 }
 
 #endif

@@ -28,6 +28,8 @@
 #include <vncauth.h>
 #include <zlib.h>
 
+static long ReadCompactLen (void);
+
 static Bool HandleRRE8(int rx, int ry, int rw, int rh);
 static Bool HandleRRE16(int rx, int ry, int rw, int rh);
 static Bool HandleRRE32(int rx, int ry, int rw, int rh);
@@ -60,7 +62,7 @@ static char buffer[BUFFER_SIZE];
 
 
 /*
- * Part of the ``tight'' encoding implementation.
+ * Variables for the ``tight'' encoding implementation.
  */
 
 /* Compression streams for zlib library */
@@ -76,7 +78,6 @@ static char *rgbBuffer = NULL;
 static int rgbBufferSize = 0;
 static char *rawBuffer = NULL;
 static int rawBufferSize = 0;
-
 
 /*
  * ConnectToRFBServer.
@@ -299,6 +300,8 @@ SetFormatAndEncodings()
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
       } else if (strncasecmp(encStr,"copyrect",encStrLen) == 0) {
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
+      } else if (strncasecmp(encStr,"tight",encStrLen) == 0) {
+	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
       } else if (strncasecmp(encStr,"hextile",encStrLen) == 0) {
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
       } else if (strncasecmp(encStr,"corre",encStrLen) == 0) {
@@ -612,6 +615,25 @@ HandleRFBServerMessage()
 	break;
       }
 
+      case rfbEncodingTight:
+      {
+	switch (myFormat.bitsPerPixel) {
+	case 8:
+	  if (!HandleTight8(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+	    return False;
+	  break;
+	case 16:
+	  if (!HandleTight16(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+	    return False;
+	  break;
+	case 32:
+	  if (!HandleTight32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+	    return False;
+	  break;
+	}
+	break;
+      }
+
       default:
 	fprintf(stderr,"Unknown rect encoding %d\n",
 		(int)rect.encoding);
@@ -736,3 +758,26 @@ PrintPixelFormat(format)
     }
   }
 }
+
+static long
+ReadCompactLen (void)
+{
+  long len;
+  CARD8 b1 = 0, b2 = 0, b3 = 0;
+
+  if (!ReadFromRFBServer((char *)&b1, 1))
+    return -1;
+  len = (int)b1 & 0x7F;
+  if (b1 & 0x80) {
+    if (!ReadFromRFBServer((char *)&b2, 1))
+      return -1;
+    len |= ((int)b2 & 0x7F) << 7;
+    if (b2 & 0x80) {
+      if (!ReadFromRFBServer((char *)&b3, 1))
+        return -1;
+      len |= ((int)b3 & 0xFF) << 14;
+    }
+  }
+  return len;
+}
+
