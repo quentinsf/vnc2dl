@@ -24,7 +24,7 @@
  * This file shouldn't be compiled directly. It is included multiple
  * times by rfbproto.c, each time with a different definition of the
  * macro BPP. For each value of BPP, this file defines a function
- * which handles an zlib encoded rectangle with BPP bits per pixel.
+ * which handles a tight-encoded rectangle with BPP bits per pixel.
  *
  */
 
