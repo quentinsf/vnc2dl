@@ -48,14 +48,22 @@
 #ifndef RGB_TO_PIXEL
 
 #define RGB_TO_PIXEL(bpp,r,g,b)						\
-  ((CARD##bpp)(r) & myFormat.redMax) << myFormat.redShift |		\
-  ((CARD##bpp)(g) & myFormat.greenMax) << myFormat.greenShift |		\
-  ((CARD##bpp)(b) & myFormat.blueMax) << myFormat.blueShift;
+  (((CARD##bpp)(r) & myFormat.redMax) << myFormat.redShift |		\
+   ((CARD##bpp)(g) & myFormat.greenMax) << myFormat.greenShift |	\
+   ((CARD##bpp)(b) & myFormat.blueMax) << myFormat.blueShift)
+
+#define RGB24_TO_PIXEL(bpp,r,g,b)                                       \
+   ((((CARD##bpp)(r) & 0xFF) * myFormat.redMax + 127) / 255             \
+    << myFormat.redShift |                                              \
+    (((CARD##bpp)(g) & 0xFF) * myFormat.greenMax + 127) / 255           \
+    << myFormat.greenShift |                                            \
+    (((CARD##bpp)(b) & 0xFF) * myFormat.blueMax + 127) / 255            \
+    << myFormat.blueShift)
 
 #define RGB24_TO_PIXEL32(r,g,b)						\
-  ((CARD32)(r) & 0xFF) << myFormat.redShift |				\
-  ((CARD32)(g) & 0xFF) << myFormat.greenShift |				\
-  ((CARD32)(b) & 0xFF) << myFormat.blueShift;
+  (((CARD32)(r) & 0xFF) << myFormat.redShift |				\
+   ((CARD32)(g) & 0xFF) << myFormat.greenShift |			\
+   ((CARD32)(b) & 0xFF) << myFormat.blueShift)
 
 #endif
 
@@ -583,7 +591,7 @@ DecompressJpegRectBPP(int x, int y, int w, int h)
     pixelPtr = (CARDBPP *)&buffer[BUFFER_SIZE / 2];
     for (dx = 0; dx < w; dx++) {
       *pixelPtr++ =
-	RGB_TO_PIXEL(BPP, buffer[dx*3], buffer[dx*3+1], buffer[dx*3+2]);
+	RGB24_TO_PIXEL(BPP, buffer[dx*3], buffer[dx*3+1], buffer[dx*3+2]);
     }
     CopyDataToScreen(&buffer[BUFFER_SIZE / 2], x, y + dy, w, 1);
     dy++;
