@@ -96,11 +96,11 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
     int x, y, w, h;
 {
     int maxBeforeSize, maxAfterSize;
+    int subrectMaxWidth, subrectMaxHeight;
     int dx, dy;
     int rw, rh;
 
-    maxBeforeSize = (TIGHT_MAX_RECT_HEIGHT * TIGHT_MAX_RECT_WIDTH *
-                     (cl->format.bitsPerPixel / 8));
+    maxBeforeSize = TIGHT_MAX_RECT_SIZE * (cl->format.bitsPerPixel / 8);
     maxAfterSize = maxBeforeSize + (maxBeforeSize + 99) / 100 + 12;
 
     if (tightBeforeBufSize < maxBeforeSize) {
@@ -121,14 +121,14 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
                                              tightAfterBufSize);
     }
 
+    if (w > 2048 || w * h > TIGHT_MAX_RECT_SIZE) {
+        subrectMaxWidth = (w > 2048) ? 2048 : w;
+        subrectMaxHeight = TIGHT_MAX_RECT_SIZE / subrectMaxWidth;
 
-    if ((w > 8 && h > 8 && w * h > 16384) || w > 2048 || h > 2048) {
-        for (dy = 0; dy < h; dy += TIGHT_MAX_RECT_HEIGHT) {
-            for (dx = 0; dx < w; dx += TIGHT_MAX_RECT_WIDTH) {
-                rw = (dx + TIGHT_MAX_RECT_WIDTH < w) ?
-                    TIGHT_MAX_RECT_WIDTH : w - dx;
-                rh = (dy + TIGHT_MAX_RECT_HEIGHT < h) ?
-                    TIGHT_MAX_RECT_HEIGHT : h - dy;
+        for (dy = 0; dy < h; dy += subrectMaxHeight) {
+            for (dx = 0; dx < w; dx += 2048) {
+                rw = (dx + 2048 < w) ? 2048 : w - dx;
+                rh = (dy + subrectMaxHeight < h) ? subrectMaxHeight : h - dy;
                 if (!SendSubrect(cl, x+dx, y+dy, rw, rh))
                     return FALSE;
             }
