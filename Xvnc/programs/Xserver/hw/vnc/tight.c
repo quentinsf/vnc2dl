@@ -974,7 +974,7 @@ FillPalette##bpp(count)                                                 \
                                                                         \
     c0 = data[0];                                                       \
     for (i = 1; i < count && data[i] == c0; i++);                       \
-    if (i == count) {                                                   \
+    if (i >= count) {                                                   \
         paletteNumColors = 1;   /* Solid rectangle */                   \
         return;                                                         \
     }                                                                   \
@@ -996,7 +996,7 @@ FillPalette##bpp(count)                                                 \
         } else                                                          \
             break;                                                      \
     }                                                                   \
-    if (i == count) {                                                   \
+    if (i >= count) {                                                   \
         if (n0 > n1) {                                                  \
             monoBackground = (CARD32)c0;                                \
             monoForeground = (CARD32)c1;                                \
@@ -1034,8 +1034,8 @@ DEFINE_FILL_PALETTE_FUNCTION(32)
  * Functions to operate with palette structures.
  */
 
-#define HASH_FUNC16(rgb) ((int)((rgb >> 8) + rgb & 0xFF))
-#define HASH_FUNC32(rgb) ((int)((rgb >> 16) + (rgb >> 8) & 0xFF))
+#define HASH_FUNC16(rgb) ((int)(((rgb >> 8) + rgb) & 0xFF))
+#define HASH_FUNC32(rgb) ((int)(((rgb >> 16) + (rgb >> 8)) & 0xFF))
 
 static void
 PaletteReset(void)
@@ -1629,7 +1629,7 @@ SendJpegRect(cl, x, y, w, h, quality)
         jpeg_finish_compress(&cinfo);
 
     jpeg_destroy_compress(&cinfo);
-    free(srcBuf);
+    xfree((char *)srcBuf);
 
     if (jpegError)
         return SendFullColorRect(cl, w, h);
