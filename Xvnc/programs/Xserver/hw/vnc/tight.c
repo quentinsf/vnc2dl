@@ -62,7 +62,7 @@ static TIGHT_CONF tightConf[10] = {
     { 65536, 2048,  32,  8192, 9, 9, 9, 6, 200, 500,  96 }
 };
 
-static compressLevel;
+static int compressLevel;
 
 /* Stuff dealing with palettes. */
 
@@ -334,8 +334,8 @@ SendMonoRect(cl, w, h)
     rfbClientPtr cl;
     int w, h;
 {
+    int streamId = 1;
     int paletteLen, dataLen;
-    int x, y, i, width_bytes;
 
     if ( ublen + 6 + 2 * cl->format.bitsPerPixel / 8 > UPDATE_BUF_SIZE ) {
 	if (!rfbSendUpdateBuf(cl))
@@ -346,7 +346,7 @@ SendMonoRect(cl, w, h)
     dataLen = (w + 7) / 8;
     dataLen *= h;
 
-    updateBuf[ublen++] = (1 | rfbTightExplicitFilter) << 4;
+    updateBuf[ublen++] = (streamId | rfbTightExplicitFilter) << 4;
     updateBuf[ublen++] = rfbTightFilterPalette;
     updateBuf[ublen++] = 1;
 
@@ -359,7 +359,7 @@ SendMonoRect(cl, w, h)
         ((CARD32 *)tightAfterBuf)[0] = monoBackground;
         ((CARD32 *)tightAfterBuf)[1] = monoForeground;
         if (usePixelFormat24) {
-            Pack24(tightAfterBuf, &cl->format, paletteNumColors);
+            Pack24(tightAfterBuf, &cl->format, 2);
             paletteLen = 6;
         } else
             paletteLen = 8;
@@ -388,7 +388,7 @@ SendMonoRect(cl, w, h)
         cl->rfbBytesSent[rfbEncodingTight] += 5;
     }
 
-    return CompressData(cl, 1, dataLen,
+    return CompressData(cl, streamId, dataLen,
                         tightConf[compressLevel].monoZlibLevel,
                         Z_DEFAULT_STRATEGY);
 }
@@ -398,8 +398,8 @@ SendIndexedRect(cl, w, h)
     rfbClientPtr cl;
     int w, h;
 {
-    int entryLen;
-    int x, y, i, width_bytes;
+    int streamId = 2;
+    int i, entryLen;
 
     if ( ublen + 6 + paletteNumColors * cl->format.bitsPerPixel / 8 >
          UPDATE_BUF_SIZE ) {
@@ -408,7 +408,7 @@ SendIndexedRect(cl, w, h)
     }
 
     /* Prepare tight encoding header. */
-    updateBuf[ublen++] = (2 | rfbTightExplicitFilter) << 4;
+    updateBuf[ublen++] = (streamId | rfbTightExplicitFilter) << 4;
     updateBuf[ublen++] = rfbTightFilterPalette;
     updateBuf[ublen++] = (char)(paletteNumColors - 1);
 
@@ -447,14 +447,10 @@ SendIndexedRect(cl, w, h)
         break;
 
     default:
-        EncodeMonoRect8((CARD8 *)tightBeforeBuf, w, h);
-
-        updateBuf[ublen++] = (char)monoBackground;
-        updateBuf[ublen++] = (char)monoForeground;
-        cl->rfbBytesSent[rfbEncodingTight] += 5;
+        return FALSE;           /* Should never happen. */
     }
 
-    return CompressData(cl, 2, w * h,
+    return CompressData(cl, streamId, w * h,
                         tightConf[compressLevel].idxZlibLevel,
                         Z_DEFAULT_STRATEGY);
 }
@@ -464,6 +460,7 @@ SendFullColorRect(cl, w, h)
     rfbClientPtr cl;
     int w, h;
 {
+    int streamId = 0;
     int len;
 
     if (ublen + TIGHT_MIN_TO_COMPRESS + 1 > UPDATE_BUF_SIZE) {
@@ -480,7 +477,7 @@ SendFullColorRect(cl, w, h)
     } else
         len = cl->format.bitsPerPixel / 8;
 
-    return CompressData(cl, 0, w * h * len,
+    return CompressData(cl, streamId, w * h * len,
                         tightConf[compressLevel].rawZlibLevel,
                         Z_DEFAULT_STRATEGY);
 }
@@ -490,6 +487,7 @@ SendGradientRect(cl, w, h)
     rfbClientPtr cl;
     int w, h;
 {
+    int streamId = 3;
     int len;
 
     if (cl->format.bitsPerPixel == 8)
@@ -503,7 +501,7 @@ SendGradientRect(cl, w, h)
     if (prevRowBuf == NULL)
         prevRowBuf = (int *)xalloc(2048 * 3 * sizeof(int));
 
-    updateBuf[ublen++] = (3 | rfbTightExplicitFilter) << 4;
+    updateBuf[ublen++] = (streamId | rfbTightExplicitFilter) << 4;
     updateBuf[ublen++] = rfbTightFilterGradient;
     cl->rfbBytesSent[rfbEncodingTight] += 2;
 
@@ -518,7 +516,7 @@ SendGradientRect(cl, w, h)
         len = 2;
     }
 
-    return CompressData(cl, 3, w * h * len,
+    return CompressData(cl, streamId, w * h * len,
                         tightConf[compressLevel].gradientZlibLevel,
                         Z_FILTERED);
 }
