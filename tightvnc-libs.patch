@@ -1,0 +1,42 @@
+diff -urN vnc_unixsrc.bk/Imakefile vnc_unixsrc/Imakefile
+--- vnc_unixsrc.bk/Imakefile	Fri Oct 27 03:19:19 2000
++++ vnc_unixsrc/Imakefile	Mon Nov 26 18:25:31 2001
+@@ -4,6 +4,10 @@
+ SUBDIRS = libvncauth vncviewer vncpasswd vncconnect
+ 
+ World:
++	@echo Building libraries...
++	( cd lib/jpeg-6b/ ; ./configure ; make ; make test )
++	( cd lib/zlib-1.1.3/ ; ./configure ; make test )
++
+ 	make Makefiles
+ 	make depend
+ 	make all
+diff -urN vnc_unixsrc.bk/Xvnc/config/cf/vnclibs.def vnc_unixsrc/Xvnc/config/cf/vnclibs.def
+--- vnc_unixsrc.bk/Xvnc/config/cf/vnclibs.def	Tue Jan 30 04:24:14 2001
++++ vnc_unixsrc/Xvnc/config/cf/vnclibs.def	Mon Nov 26 18:26:04 2001
+@@ -5,5 +5,5 @@
+  * and programs/Xserver/hw/vnc whenever you change this file.
+  */
+ 
+-VNCLIBS = $(TOP)/../libvncauth/libvncauth.a /usr/lib/libjpeg.a
+-VNCCPPFLAGS = -I$(TOP)/../include
++VNCLIBS = $(TOP)/../libvncauth/libvncauth.a $(TOP)/../lib/zlib-1.1.3/libz.a $(TOP)/../lib/jpeg-6b/libjpeg.a
++VNCCPPFLAGS = -I$(TOP)/../include -I$(TOP)/../lib/zlib-1.1.3 -I$(TOP)/../lib/jpeg-6b
+diff -urN vnc_unixsrc.bk/vncviewer/Imakefile vnc_unixsrc/vncviewer/Imakefile
+--- vnc_unixsrc.bk/vncviewer/Imakefile	Tue Nov 13 18:31:34 2001
++++ vnc_unixsrc/vncviewer/Imakefile	Mon Nov 26 18:25:31 2001
+@@ -13,10 +13,10 @@
+ DEFINES = -DMITSHM
+ #endif
+ 
+-INCLUDES = -I../include -I. -I/usr/include
++INCLUDES = -I../include -I../lib/zlib-1.1.3 -I../lib/jpeg-6b -I. -I/usr/include
+ VNCAUTH_LIB = ../libvncauth/libvncauth.a
+-ZLIB_LIB = /usr/lib/libz.a
+-JPEG_LIB = /usr/lib/libjpeg.a
++ZLIB_LIB = ../lib/zlib-1.1.3/libz.a
++JPEG_LIB = ../lib/jpeg-6b/libjpeg.a
+ 
+ DEPLIBS = XawClientDepLibs $(VNCAUTH_LIB) $(ZLIB_LIB) $(JPEG_LIB)
+ LOCAL_LIBRARIES = XawClientLibs $(VNCAUTH_LIB) $(ZLIB_LIB) $(JPEG_LIB)
