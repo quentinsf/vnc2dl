@@ -123,9 +123,6 @@ rfbSendCursorShape(cl, pScreen)
 	cl->rfbCursorBytesSent += sz_rfbFramebufferUpdateRectHeader;
 	cl->rfbCursorUpdatesSent++;
 
-	if (!rfbSendUpdateBuf(cl))
-	    return FALSE;
-
 	return TRUE;
     }
 
@@ -222,13 +219,10 @@ rfbSendCursorShape(cl, pScreen)
 	}
     }
 
-    /* Send everything we have prepared in the updateBuf[]. */
+    /* Update statistics. */
 
     cl->rfbCursorBytesSent += (ublen - saved_ublen);
     cl->rfbCursorUpdatesSent++;
-
-    if (!rfbSendUpdateBuf(cl))
-	return FALSE;
 
     return TRUE;
 }
