@@ -289,6 +289,8 @@ typedef struct {
 #define rfbEncodingRRE 2
 #define rfbEncodingCoRRE 4
 #define rfbEncodingHextile 5
+#define rfbEncodingZlib 6
+#define rfbEncodingTight 7
 
 
 
@@ -435,6 +437,18 @@ typedef struct {
 #define rfbHextileExtractY(byte) ((byte) & 0xf)
 #define rfbHextileExtractW(byte) (((byte) >> 4) + 1)
 #define rfbHextileExtractH(byte) (((byte) & 0xf) + 1)
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ * ``Tight'' Encoding.  Sorry, not documented yet.
+ */
+
+/* FIXME: either remove this or add other constants */
+#define rfbTightFill  0x08
+
+/* Filters (predictors) to improve compression efficiency */
+#define rfbTightFilterCopy   0x00
+#define rfbTightFilterHdiff  0x01
 
 
 /*-----------------------------------------------------------------------------
