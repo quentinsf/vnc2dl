@@ -25,45 +25,85 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-//#include <sys/wait.h>
-//#include <sys/time.h>
-//#include <sys/utsname.h>
 #include <vncviewer.h>
 
+/*
+ * "Hostname:display" pair in the command line will be substituted by
+ * this fake argument when tunneling is used.
+ */
+static char lastArgv[32];
 
+
+static void processTunnelArgs (char **remoteHost, int *remotePort,
+                               int localPort, int *pargc, char **argv,
+                               int tunnelArgIndex);
 static char *getCmdPattern (void);
 static Bool fillCmdPattern (char *result, char *pattern, char *remoteHost,
                             char *remotePort, char *localPort);
 static Bool runCommand (char *cmd);
 
+
 Bool
-createTunnel(int *argc, char **argv, int tunnelArgIndex)
+createTunnel(int *pargc, char **argv, int tunnelArgIndex)
 {
   char *pattern;
   char cmd[1024];
-  int port;
+  int localPort, remotePort;
   char localPortStr[8];
   char remotePortStr[8];
+  char *remoteHost;
 
   pattern = getCmdPattern();
   if (!pattern)
     return False;
 
-  port = FindFreeTcpPort();
-  if (port == 0)
+  localPort = FindFreeTcpPort();
+  if (localPort == 0)
     return False;
 
-  sprintf (localPortStr, "%hu", (unsigned short)port);
-  sprintf (remotePortStr, "%hu", (unsigned short)5901);
+  processTunnelArgs (&remoteHost, &remotePort, localPort,
+                     pargc, argv, tunnelArgIndex);
 
-  if (!fillCmdPattern(cmd, pattern, "ce.cctpu.edu.ru",
-                      remotePortStr, localPortStr))
+  sprintf (localPortStr, "%hu", (unsigned short)localPort);
+  sprintf (remotePortStr, "%hu", (unsigned short)remotePort);
+
+  if (!fillCmdPattern(cmd, pattern, remoteHost, remotePortStr, localPortStr))
     return False;
 
   if (!runCommand(cmd))
     return False;
 
   return True;
+}
+
+static void
+processTunnelArgs (char **remoteHost, int *remotePort, int localPort,
+                   int *pargc, char **argv, int tunnelArgIndex)
+{
+  char *pdisplay;
+  int port;
+
+  if (tunnelArgIndex >= *pargc - 1)
+    usage();
+
+  pdisplay = strchr(argv[*pargc - 1], ':');
+  if (pdisplay == NULL || pdisplay == argv[*pargc - 1])
+    usage();
+
+  *pdisplay++ = '\0';
+  if (strspn(pdisplay, "0123456789") != strlen(pdisplay))
+    usage();
+
+  *remotePort = atoi(pdisplay);
+  if (*remotePort < 100)
+    *remotePort += SERVER_PORT_OFFSET;
+
+  sprintf(lastArgv, "localhost:%hu", (unsigned short)localPort);
+
+  *remoteHost = argv[*pargc - 1];
+  argv[*pargc - 1] = lastArgv;
+
+  removeArgs(pargc, argv, tunnelArgIndex, 1);
 }
 
 static char *
@@ -76,7 +116,8 @@ getCmdPattern (void)
   if (pattern == NULL) {
     if ( stat(DEFAULT_SSH_CMD, &st) != 0 ||
          !(S_ISREG(st.st_mode) || S_ISLNK(st.st_mode)) ) {
-      fprintf(stderr, "DEBUG: missing %s binary.\n", DEFAULT_SSH_CMD);
+      fprintf(stderr, "%s: Cannot establish SSH tunnel: missing %s binary.\n",
+              programName, DEFAULT_SSH_CMD);
       return NULL;
     }
     pattern = DEFAULT_TUNNEL_CMD;
@@ -121,18 +162,17 @@ fillCmdPattern (char *result, char *pattern, char *remoteHost,
   }
 
   if (pattern[i]) {
-    fprintf(stderr, "DEBUG: Tunneling command too long.\n");
+    fprintf(stderr, "%s: Tunneling command is too long.\n", programName);
     return False;
   }
 
   if (!H_found || !R_found || !L_found) {
-    fprintf(stderr, "DEBUG: %H, %R or %L absent in tunneling command.\n");
+    fprintf(stderr, "%s: %%H, %%R or %%L absent in tunneling command.\n",
+            programName);
     return False;
   }
 
   result[j] = '\0';
-
-  fprintf(stderr, "DEBUG: Tunneling command is:\n\"%s\"\n");
   return True;
 }
 
@@ -140,8 +180,10 @@ static Bool
 runCommand (char *cmd)
 {
   if (system(cmd) != 0) {
-    fprintf(stderr, "DEBUG: Tunneling command failed.\n");
+    fprintf(stderr, "%s: Tunneling command failed: %s.\n",
+            programName, cmd);
     return False;
   }
+  return True;
 }
 

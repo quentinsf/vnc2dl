@@ -105,6 +105,8 @@ extern int listenPort, flashPort;
 extern XrmOptionDescRec cmdLineOptions[];
 extern int numCmdLineOptions;
 
+extern void removeArgs(int *argc, char** argv, int idx, int nargs);
+extern void usage(void);
 extern void GetArgsAndResources(int argc, char **argv);
 
 /* colour.c */

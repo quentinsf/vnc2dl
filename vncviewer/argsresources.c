@@ -238,16 +238,31 @@ static XtActionsRec actions[] = {
 
 
 /*
+ * removeArgs() is used to remove some of command line arguments.
+ */
+
+void
+removeArgs(int *argc, char** argv, int idx, int nargs)
+{
+  int i;
+  if ((idx+nargs) > *argc) return;
+  for (i = idx+nargs; i < *argc; i++) {
+    argv[i-nargs] = argv[i];
+  }
+  *argc -= nargs;
+}
+
+/*
  * usage() prints out the usage message.
  */
 
 void
-usage()
+usage(void)
 {
   fprintf(stderr,"\n"
-	  "VNC viewer version 3.3.3r1\n"
+	  "VNC viewer version 3.3.3r1 with SSH tunneling support\n"
 	  "\n"
-	  "usage: %s [<options>] <host>:<display#>\n"
+	  "usage: %s [<options>] [<host>:]<display#>\n"
 	  "       %s [<options>] -listen [<display#>]\n"
 	  "       %s [<options>] -tunnel <host>:<display#>\n"
 	  "\n"
