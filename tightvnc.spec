@@ -1,6 +1,6 @@
 Summary:   A remote display system.
 Name:      tightvnc
-Version:   1.2.7
+Version:   1.2.8
 Release:   1
 URL:       http://www.tightvnc.com/
 Source0:   tightvnc-%{version}_unixsrc.tar.bz2
@@ -11,7 +11,6 @@ Obsoletes: vnc
 BuildRoot: %{_tmppath}/%{name}-%{version}-root
 BuildPrereq: /usr/bin/perl tcp_wrappers
 BuildRequires: zlib-devel libjpeg-devel
-Prereq:    /sbin/chkconfig /sbin/service
 ExclusiveArch: i386 alpha sparc ppc s390 s390x
 
 %description
@@ -27,7 +26,7 @@ Summary: TightVNC server
 Obsoletes: vnc-server
 Requires: XFree86 bash >= 2.0
 Group: User Interface/X
-Prereq: /sbin/chkconfig /etc/init.d
+Prereq: /sbin/chkconfig /sbin/service /etc/init.d
 
 %description server
 The VNC system allows you to access the same desktop from a wide
@@ -135,6 +134,11 @@ fi
 %{_mandir}/man1/vncpasswd.1*
 
 %changelog
+* Wed Jan 29 2003 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
+- TightVNC 1.2.8 update.
+- Dependencies on /sbin/chkconfig and /sbin/service has been removed
+  for the viewer part.
+
 * Thu Nov 14 2002 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
 - TightVNC 1.2.7 update.
 

@@ -1,4 +1,5 @@
 /*
+ *  Copyright (C) 2002-2003 Constantin Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -290,7 +291,7 @@ void
 usage(void)
 {
   fprintf(stderr,
-	  "TightVNC viewer version 1.2.7\n"
+	  "TightVNC viewer version 1.2.8\n"
 	  "\n"
 	  "Usage: %s [<OPTIONS>] [<HOST>][:<DISPLAY#>]\n"
 	  "       %s [<OPTIONS>] [<HOST>][::<PORT#>]\n"
