@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2001 Constantin Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2001 Const Kaplinsky.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by

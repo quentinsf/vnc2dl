@@ -291,7 +291,7 @@ usage(void)
 	  "        -truecolour\n"
 	  "        -depth <depth>\n"
 	  "        -compresslevel <compress-value> (0-9)\n"
-	  "        -quality <quality-value> (0-9)\n"
+	  "        -quality <image-quality-value> (0-9)\n"
 	  "        -nocursorshape\n"
 	  "\n", programName, programName, programName);
   exit(1);
