@@ -202,7 +202,10 @@ static XtResource appDataResourceList[] = {
    XtOffsetOf(AppData, compressLevel), XtRImmediate, (XtPointer) -1},
 
   {"qualityLevel", "QualityLevel", XtRInt, sizeof(int),
-   XtOffsetOf(AppData, qualityLevel), XtRImmediate, (XtPointer) -1},
+   XtOffsetOf(AppData, qualityLevel), XtRImmediate, (XtPointer) 6},
+
+  {"enableJPEG", "EnableJPEG", XtRBool, sizeof(Bool),
+   XtOffsetOf(AppData, enableJPEG), XtRImmediate, (XtPointer) True},
 
   {"useRemoteCursor", "UseRemoteCursor", XtRBool, sizeof(Bool),
    XtOffsetOf(AppData, useRemoteCursor), XtRImmediate, (XtPointer) True},
@@ -232,6 +235,7 @@ XrmOptionDescRec cmdLineOptions[] = {
   {"-depth",         "*requestedDepth",     XrmoptionSepArg, 0},
   {"-compresslevel", "*compressLevel",      XrmoptionSepArg, 0},
   {"-quality",       "*qualityLevel",       XrmoptionSepArg, 0},
+  {"-nojpeg",        "*enableJPEG",         XrmoptionNoArg,  "False"},
   {"-nocursorshape", "*useRemoteCursor",    XrmoptionNoArg,  "False"},
 };
 
@@ -280,7 +284,7 @@ void
 usage(void)
 {
   fprintf(stderr,
-	  "TightVNC viewer version 1.2.6 (based on VNC 3.3.3r2)\n"
+	  "TightVNC viewer version 1.2.6\n"
 	  "\n"
 	  "Usage: %s [<OPTIONS>] [<HOST>][:<DISPLAY#>]\n"
 	  "       %s [<OPTIONS>] -listen [<DISPLAY#>]\n"
@@ -301,9 +305,11 @@ usage(void)
 	  "        -depth <DEPTH>\n"
 	  "        -compresslevel <COMPRESS-VALUE> (0..9: 0-fast, 9-best)\n"
 	  "        -quality <JPEG-QUALITY-VALUE> (0..9: 0-low, 9-high)\n"
+	  "        -nojpeg\n"
 	  "        -nocursorshape\n"
 	  "\n"
-	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233."
+	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233.\n"
+	  "See the manual page for more information."
 	  "\n", programName, programName, programName);
   exit(1);
 }

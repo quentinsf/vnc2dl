@@ -121,7 +121,11 @@ The application resources are:
 
     Image quality level for JPEG compression in Tight encoding in the
     range 0..9 where 0 is worst image quality and best compression,
-    and 9 is good image quality and worse compression.
+    and 9 is good image quality and worse compression. Default 6.
+
+  enableJPEG (option -nojpeg)
+
+    Request JPEG compression in Tight encoding. Default true.
 
   useRemoteCursor (option -nocursorshape)
 

@@ -347,7 +347,7 @@ SetFormatAndEncodings()
 	requestLastRectEncoding = True;
 	if (appData.compressLevel >= 0 && appData.compressLevel <= 9)
 	  requestCompressLevel = True;
-	if (appData.qualityLevel >= 0 && appData.qualityLevel <= 9)
+	if (appData.enableJPEG)
 	  requestQualityLevel = True;
       } else if (strncasecmp(encStr,"hextile",encStrLen) == 0) {
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
@@ -372,6 +372,8 @@ SetFormatAndEncodings()
     }
 
     if (se->nEncodings < MAX_ENCODINGS && requestQualityLevel) {
+      if (appData.qualityLevel < 0 || appData.qualityLevel > 9)
+        appData.qualityLevel = 5;
       encs[se->nEncodings++] = Swap32IfLE(appData.qualityLevel +
 					  rfbEncodingQualityLevel0);
     }
@@ -417,7 +419,9 @@ SetFormatAndEncodings()
       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCompressLevel1);
     }
 
-    if (appData.qualityLevel >= 0 && appData.qualityLevel <= 9) {
+    if (appData.enableJPEG) {
+      if (appData.qualityLevel < 0 || appData.qualityLevel > 9)
+	appData.qualityLevel = 5;
       encs[se->nEncodings++] = Swap32IfLE(appData.qualityLevel +
 					  rfbEncodingQualityLevel0);
     }
