@@ -1,4 +1,4 @@
-<!-- index.vnc - default html page for Java VNC viewer applet.  On any file
+<!-- zlib.vnc - zlib html page for Java VNC viewer applet.  On any file
      ending in .vnc, the HTTP server embedded in Xvnc will substitute the
      following variables when preceded by a dollar: USER, DESKTOP, DISPLAY,
      APPLETWIDTH, APPLETHEIGHT, WIDTH, HEIGHT, PORT.  Use two dollar signs
@@ -11,6 +11,7 @@ $USER's $DESKTOP desktop ($DISPLAY)
 <APPLET CODE=vncviewer.class ARCHIVE=vncviewer.jar
         WIDTH=$APPLETWIDTH HEIGHT=$APPLETHEIGHT>
 <param name=PORT value=$PORT>
+<param name=ENCODING value=Zlib>
 </APPLET>
 <A href="http://www.tightvnc.com/">www.TightVNC.com</A>
 </HTML>
