@@ -609,7 +609,11 @@ PaletteFind(rgb)
 {
     COLOR_LIST *pnode;
 
-    pnode = palette.hash[(int)((rgb >> 8) + rgb & 0xFF)];
+    if (rgb & 0xFF000000) {
+        pnode = palette.hash[(int)((rgb >> 24) + (rgb >> 16) & 0xFF)];
+    } else {
+        pnode = palette.hash[(int)((rgb >> 8) + rgb & 0xFF)];
+    }
 
     while (pnode != NULL) {
         if (pnode->rgb == rgb)
@@ -628,7 +632,11 @@ PaletteInsert(rgb, numPixels)
     COLOR_LIST *prev_pnode = NULL;
     int hash_key, idx, new_idx, count;
 
-    hash_key = (int)((rgb >> 8) + rgb & 0xFF);
+    if (rgb & 0xFF000000) {
+        hash_key = (int)((rgb >> 24) + (rgb >> 16) & 0xFF);
+    } else {
+        hash_key = (int)((rgb >> 8) + rgb & 0xFF);
+    }
     pnode = palette.hash[hash_key];
 
     while (pnode != NULL) {
