@@ -1,3 +1,4 @@
+XCOMM (FIXME) Use internal copy of zlib library?
 
 #ifdef SunArchitecture
 CC = gcc
@@ -12,11 +13,12 @@ XCOMM seems to cause problems on Digital Unix.
 DEFINES = -DMITSHM
 #endif
 
-INCLUDES = -I../include -I.
+INCLUDES = -I../include -I. -I/usr/include
 VNCAUTH_LIB = ../libvncauth/libvncauth.a
+ZLIB_LIB = /usr/lib/libz.a
 
-DEPLIBS = XawClientDepLibs $(VNCAUTH_LIB)
-LOCAL_LIBRARIES = XawClientLibs $(VNCAUTH_LIB)
+DEPLIBS = XawClientDepLibs $(VNCAUTH_LIB) $(ZLIB_LIB)
+LOCAL_LIBRARIES = XawClientLibs $(VNCAUTH_LIB) $(ZLIB_LIB)
 
 SRCS = \
   argsresources.c \

@@ -60,6 +60,25 @@ static char buffer[BUFFER_SIZE];
 
 
 /*
+ * Part of the ``tight'' encoding implementation.
+ */
+
+/* Compression streams for zlib library */
+static z_stream zlibStream[4];
+static Bool zlibStreamActive[4] = {
+  False, False, False, False
+};
+
+/* DEBUG -- use BUFFER_SIZE instead. */
+#define DEBUG_BUFFER_SIZE 1024
+
+static char *rgbBuffer = NULL;
+static int rgbBufferSize = 0;
+static char *rawBuffer = NULL;
+static int rawBufferSize = 0;
+
+
+/*
  * ConnectToRFBServer.
  */
 
