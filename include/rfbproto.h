@@ -505,6 +505,21 @@ typedef struct {
 #define sz_rfbXCursorColors 6
 
 
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+ * RichCursor encoding. This is a special encoding used to transmit cursor
+ * shapes from server to clients. It is similar to the XCursor encoding but
+ * uses client pixel format instead of two RGB colors to represent cursor
+ * image. For this encoding, coordinates in rfbFramebufferUpdateRectHeader
+ * structure hold hotspot position (r.x, r.y) and cursor size (r.w, r.h).
+ * After header, two pixmaps follow: first one with cursor image in current
+ * client pixel format (like in raw encoding), second with transparency data
+ * (1 bit per pixel, exactly the same format as used for transparency bitmap
+ * in the XCursor encoding). If (w * h == 0), cursor should be hidden (or
+ * default local cursor should be set by the client).
+ */
+
+
 /*-----------------------------------------------------------------------------
  * SetColourMapEntries - these messages are only sent if the pixel
  * format uses a "colour map" (i.e. trueColour false) and the client has not
