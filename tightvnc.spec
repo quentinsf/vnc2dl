@@ -1,6 +1,6 @@
 Summary:   A remote display system.
 Name:      tightvnc
-Version:   1.3dev3
+Version:   1.3dev4
 Release:   1
 URL:       http://www.tightvnc.com/
 Source0:   tightvnc-%{version}_unixsrc.tar.bz2
@@ -134,6 +134,9 @@ fi
 %{_mandir}/man1/vncpasswd.1*
 
 %changelog
+* Thu Mar 04 2004 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
+- TightVNC 1.3dev4 update.
+
 * Fri Feb 27 2004 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
 - TightVNC 1.3dev3 update.
 
