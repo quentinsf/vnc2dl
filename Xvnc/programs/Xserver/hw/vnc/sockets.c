@@ -472,7 +472,7 @@ ListenOnTCPPort(port)
 
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = interface;
+    addr.sin_addr.s_addr = interface.s_addr;
 
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 	return -1;
@@ -539,7 +539,7 @@ ListenOnUDPPort(port)
 
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = interface;
+    addr.sin_addr.s_addr = interface.s_addr;
 
     if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 	return -1;

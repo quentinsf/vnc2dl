@@ -304,7 +304,7 @@ extern rfbScreenInfo rfbScreen;
 extern int rfbGCIndex;
 
 extern int inetdSock;
-extern unsigned long interface;
+extern struct in_addr interface;
 
 extern int rfbBitsPerPixel(int depth);
 extern void rfbLog(char *format, ...);
