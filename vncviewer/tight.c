@@ -43,6 +43,20 @@
 #define FilterPaletteBPP CONCAT2E(FilterPalette,BPP)
 #define FilterGradientBPP CONCAT2E(FilterGradient,BPP)
 
+#ifndef RGB_TO_PIXEL
+
+#define RGB_TO_PIXEL(bpp,r,g,b)                                              \
+  ((CARD##bpp)(r) & myFormat.redMax) << myFormat.redShift |                  \
+  ((CARD##bpp)(g) & myFormat.greenMax) << myFormat.greenShift |              \
+  ((CARD##bpp)(b) & myFormat.blueMax) << myFormat.blueShift;
+
+#define RGB24_TO_PIXEL32(r,g,b)                                              \
+  ((CARD32)(r) & 0xFF) << myFormat.redShift |                                \
+  ((CARD32)(g) & 0xFF) << myFormat.greenShift |                              \
+  ((CARD32)(b) & 0xFF) << myFormat.blueShift;
+
+#endif
+
 /* Type declarations */
 
 typedef void (*filterPtrBPP)(int, CARDBPP *);
@@ -88,8 +102,20 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
 
   /* Handle solid rectangles. */
   if (comp_ctl == rfbTightFill) {
+#if BPP == 32
+    if (myFormat.depth == 24 && myFormat.redMax == 0xFF &&
+        myFormat.greenMax == 0xFF && myFormat.blueMax == 0xFF) {
+      if (!ReadFromRFBServer(buffer, 3))
+        return False;
+      fill_colour = RGB24_TO_PIXEL32(buffer[1], buffer[2], buffer[3]);
+    } else {
+      if (!ReadFromRFBServer((char*)&fill_colour, sizeof(fill_colour)))
+        return False;
+    }
+#else
     if (!ReadFromRFBServer((char*)&fill_colour, sizeof(fill_colour)))
       return False;
+#endif
     gcv.foreground = fill_colour;
     XChangeGC(dpy, gc, GCForeground, &gcv);
     XFillRectangle(dpy, desktopWin, gc, rx, ry, rw, rh);
@@ -210,20 +236,6 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
  * Filter stuff.
  *
  */
-
-#ifndef RGB_TO_PIXEL
-
-#define RGB_TO_PIXEL(bpp,r,g,b)                                              \
-  ((CARD##bpp)(r) & myFormat.redMax) << myFormat.redShift |                  \
-  ((CARD##bpp)(g) & myFormat.greenMax) << myFormat.greenShift |              \
-  ((CARD##bpp)(b) & myFormat.blueMax) << myFormat.blueShift;
-
-#define RGB24_TO_PIXEL32(r,g,b)                                              \
-  ((CARD32)(r) & 0xFF) << myFormat.redShift |                                \
-  ((CARD32)(g) & 0xFF) << myFormat.greenShift |                              \
-  ((CARD32)(b) & 0xFF) << myFormat.blueShift;
-
-#endif
 
 /*
    The following variables are defined in rfbproto.c:
