@@ -567,6 +567,14 @@ XCOMM $XFree86: xc/config/cf/Imake.cf,v 3.34.2.3 1997/07/27 02:41:02 dawes Exp $
 #  define Mc68020Architecture
 #  undef mc68000
 # endif /* mc68000 */
+# ifdef __s390__
+#  define s390Architecture
+#  undef __s390__
+# endif /* __s390__ */
+# ifdef __s390x__
+#  define s390xArchitecture
+#  undef __s390x__
+# endif /* __s390x__ */
 # ifdef powerpc
 #  define PowerPCArchitecture
 #  undef powerpc

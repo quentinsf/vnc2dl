@@ -336,6 +336,11 @@ SOFTWARE.
 
 #endif /* luna */
 
+#if ((defined(__s390__) || defined(__s390x__)) && defined(linux))
+#define IMAGE_BYTE_ORDER   MSBFirst
+#define BITMAP_BIT_ORDER   MSBFirst
+#endif /* (__s390__ || __s390x__) && linux */
+    
 #if (defined(i386) && (defined(SVR4) || defined(SYSV) || (defined(sun) && defined(SVR4))) || defined(__bsdi__) || (defined(__NetBSD__) && defined(__i386__)) || (defined(__OpenBSD__) && defined(__i386__)) || defined(__FreeBSD__) || defined(MACH386) || (defined(linux) && !defined(__mc68000__)) || (defined(AMOEBA) && defined(i80386)) || defined(MINIX) || defined(__EMX__) || (defined(Lynx) && defined(__i386__)))
 
 #ifndef IMAGE_BYTE_ORDER

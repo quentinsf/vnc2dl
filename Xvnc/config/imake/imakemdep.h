@@ -475,6 +475,12 @@ char *cpp_argv[ARGUMENTS] = {
 	"-traditional",
 # endif
 #endif
+#ifdef __s390__
+    "-D__s390__",
+#endif
+#ifdef __s390x__
+    "-D__s390x__",
+#endif
 #ifdef Oki
 	"-DOki",
 #endif

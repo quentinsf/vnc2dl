@@ -42,7 +42,8 @@ XCOMM platform:  $XFree86: xc/config/cf/linux.cf,v 3.57.2.12 1998/03/01 01:57:10
 #ifndef DefaultLinuxCLibMajorVersion
 #if defined(AlphaArchitecture) || defined(PowerPCArchitecture) || \
     defined(SparcArchitecture) || defined(ArmArchitecure) || \
-    defined(i386Architecture)
+    defined(i386Architecture) || defined(s390Architecture) || \
+    defined(s390xArchitecture)
 #define DefaultLinuxCLibMajorVersion	6
 #else
 #define DefaultLinuxCLibMajorVersion	5
@@ -266,6 +267,20 @@ XCOMM binutils:	(LinuxBinUtilsMajorVersion)
 #define ServerOSDefines		XFree86ServerOSDefines -DDDXTIME -DPART_NET
 #define ServerExtraDefines	-DGCCUSESGAS XFree86ServerDefines
 #endif /* Mc68020Architecture */
+
+#ifdef s390Architecture
+#define OptimzedCDebugFlags     -O2
+#define LinuxMachineDefines     -D__s390__
+#define ServerOSDefines     XFree86ServerOSDefines -DDDXTIME -DPART_NET
+#define ServerExtraDefines  -DGCCUSESGAS XFree86ServerDefines
+#endif /* s390Architecture */
+
+#ifdef s390xArchitecture
+#define OptimzedCDebugFlags     -O2
+#define LinuxMachineDefines     -D__s390x__
+#define ServerOSDefines     XFree86ServerOSDefines -DDDXTIME -DPART_NET
+#define ServerExtraDefines  -DGCCUSESGAS XFree86ServerDefines
+#endif /* s390xArchitecture */
 
 #ifdef PowerPCArchitecture
 #define DefaultCCOptions        -fsigned-char
