@@ -69,6 +69,7 @@ static int SendSubrect(rfbClientPtr cl, int x, int y, int w, int h);
 static BOOL SendSolidRect(rfbClientPtr cl, int w, int h);
 static BOOL SendIndexedRect(rfbClientPtr cl, int w, int h);
 static BOOL SendFullColorRect(rfbClientPtr cl, int w, int h);
+static BOOL SendGradientRect(rfbClientPtr cl, int w, int h);
 static BOOL CompressData(rfbClientPtr cl, int streamId, int dataLen);
 
 static void FillPalette8(rfbClientPtr cl, int w, int h);
@@ -84,6 +85,15 @@ static void Pack24(char *buf, rfbPixelFormat *format, int count);
 static void EncodeIndexedRect8(CARD8 *buf, int w, int h);
 static void EncodeIndexedRect16(CARD8 *buf, int w, int h);
 static void EncodeIndexedRect32(CARD8 *buf, int w, int h);
+
+static void ApplyFilterGradient24(char *buf, rfbPixelFormat *format,
+                                  int w, int h);
+static void ApplyFilterGradient8(CARD8 *buf, rfbPixelFormat *format,
+                                  int w, int h);
+static void ApplyFilterGradient16(CARD16 *buf, rfbPixelFormat *format,
+                                  int w, int h);
+static void ApplyFilterGradient32(CARD32 *buf, rfbPixelFormat *format,
+                                  int w, int h);
 
 
 /*
@@ -318,7 +328,7 @@ SendFullColorRect(cl, w, h)
 {
     int len;
 
-    if ( ublen + TIGHT_MIN_TO_COMPRESS + 1 > UPDATE_BUF_SIZE ) {
+    if (ublen + TIGHT_MIN_TO_COMPRESS + 1 > UPDATE_BUF_SIZE) {
 	if (!rfbSendUpdateBuf(cl))
 	    return FALSE;
     }
@@ -334,6 +344,45 @@ SendFullColorRect(cl, w, h)
         len = cl->format.bitsPerPixel / 8;
 
     return CompressData(cl, 0, w * h * len);
+}
+
+static BOOL
+SendGradientRect(cl, w, h)
+    rfbClientPtr cl;
+    int w, h;
+{
+    int len;
+
+    if (ublen + TIGHT_MIN_TO_COMPRESS + 2 > UPDATE_BUF_SIZE) {
+	if (!rfbSendUpdateBuf(cl))
+	    return FALSE;
+    }
+
+    updateBuf[ublen++] = (3 | rfbTightExplicitFilter) << 4;
+    updateBuf[ublen++] = rfbTightFilterGradient;
+    cl->rfbBytesSent[rfbEncodingTight] += 2;
+
+    if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
+         cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
+        ApplyFilterGradient24(tightBeforeBuf, &cl->format, w, h);
+        len = 3;
+    } else {
+        switch (cl->format.bitsPerPixel) {
+        case 32:
+            ApplyFilterGradient32((CARD32 *)tightBeforeBuf, &cl->format, w, h);
+            len = 4;
+            break;
+        case 16:
+            ApplyFilterGradient16((CARD16 *)tightBeforeBuf, &cl->format, w, h);
+            len = 2;
+            break;
+        default:
+            ApplyFilterGradient8((CARD8 *)tightBeforeBuf, &cl->format, w, h);
+            len = 1;
+        }
+    }
+
+    return CompressData(cl, 3, w * h * len);
 }
 
 static BOOL
@@ -682,4 +731,121 @@ EncodeIndexedRect##bpp(buf, w, h)                                       \
 DEFINE_IDX_ENCODE_FUNCTION(8)
 DEFINE_IDX_ENCODE_FUNCTION(16)
 DEFINE_IDX_ENCODE_FUNCTION(32)
+
+
+/*
+ * ``Gradient'' filter for 24-bit color samples.
+ * Should be called only when redMax, greenMax and blueMax are 256.
+ */
+
+static void ApplyFilterGradient24(buf, format, w, h)
+    char *buf;
+    rfbPixelFormat *format;
+    int w, h;
+{
+    CARD32 *buf32;
+    CARD32 pix32;
+    int prevRow[2048*3];        /* FIXME: Allocate this dynamically. */
+    int *prevRowPtr;
+    int shiftBits[3];
+    int pixHere[3], pixUpper[3], pixLeft[3], pixUpperLeft[3];
+    int prediction;
+    int x, y, c;
+
+    buf32 = (CARD32 *)buf;
+    memset (prevRow, 0, w * 3 * sizeof(int));
+
+    shiftBits[0] = format->redShift;
+    shiftBits[1] = format->greenShift;
+    shiftBits[2] = format->blueShift;
+
+    for (y = 0; y < h; y++) {
+        for (c = 0; c < 3; c++) {
+            pixUpper[c] = 0;
+            pixHere[c] = 0;
+        }
+        prevRowPtr = prevRow;
+        for (x = 0; x < w; x++) {
+            pix32 = *buf32++;
+            for (c = 0; c < 3; c++) {
+                pixUpperLeft[c] = pixUpper[c];
+                pixLeft[c] = pixHere[c];
+                pixUpper[c] = *prevRowPtr;
+                pixHere[c] = (int)(pix32 >> shiftBits[c] & 0xFF);
+                *prevRowPtr++ = pixHere[c];
+
+                prediction = pixLeft[c] + pixUpper[c] - pixUpperLeft[c];
+                if (prediction < 0) {
+                    prediction = 0;
+                } else if (prediction > 0xFF) {
+                    prediction = 0xFF;
+                }
+                *buf++ = (char)(pixHere[c] - prediction);
+            }
+        }
+    }
+}
+
+
+/*
+ * ``Gradient'' filter for other color depths.
+ */
+
+#define DEFINE_GRADIENT_FILTER_FUNCTION(bpp)                             \
+                                                                         \
+static void ApplyFilterGradient##bpp(buf, format, w, h)                  \
+    CARD##bpp *buf;                                                      \
+    rfbPixelFormat *format;                                              \
+    int w, h;                                                            \
+{                                                                        \
+    CARD##bpp pix, diff;                                                 \
+    int prevRow[2048*3];        /* FIXME: Allocate this dynamically. */  \
+    int *prevRowPtr;                                                     \
+    int maxColor[3], shiftBits[3];                                       \
+    int pixHere[3], pixUpper[3], pixLeft[3], pixUpperLeft[3];            \
+    int prediction;                                                      \
+    int x, y, c;                                                         \
+                                                                         \
+    memset (prevRow, 0, w * 3 * sizeof(int));                            \
+                                                                         \
+    maxColor[0] = format->redMax;                                        \
+    maxColor[1] = format->greenMax;                                      \
+    maxColor[2] = format->blueMax;                                       \
+    shiftBits[0] = format->redShift;                                     \
+    shiftBits[1] = format->greenShift;                                   \
+    shiftBits[2] = format->blueShift;                                    \
+                                                                         \
+    for (y = 0; y < h; y++) {                                            \
+        for (c = 0; c < 3; c++) {                                        \
+            pixUpper[c] = 0;                                             \
+            pixHere[c] = 0;                                              \
+        }                                                                \
+        prevRowPtr = prevRow;                                            \
+        for (x = 0; x < w; x++) {                                        \
+            pix = *buf;                                                  \
+            diff = 0;                                                    \
+            for (c = 0; c < 3; c++) {                                    \
+                pixUpperLeft[c] = pixUpper[c];                           \
+                pixLeft[c] = pixHere[c];                                 \
+                pixUpper[c] = *prevRowPtr;                               \
+                pixHere[c] = (int)(pix >> shiftBits[c] & maxColor[c]);   \
+                *prevRowPtr++ = pixHere[c];                              \
+                                                                         \
+                prediction = pixLeft[c] + pixUpper[c] - pixUpperLeft[c]; \
+                if (prediction < 0) {                                    \
+                    prediction = 0;                                      \
+                } else if (prediction > maxColor[c]) {                   \
+                    prediction = maxColor[c];                            \
+                }                                                        \
+                diff |= ((pixHere[c] - prediction) & maxColor[c])        \
+                    << shiftBits[c];                                     \
+            }                                                            \
+            *buf++ = diff;                                               \
+        }                                                                \
+    }                                                                    \
+}
+
+DEFINE_GRADIENT_FILTER_FUNCTION(8)
+DEFINE_GRADIENT_FILTER_FUNCTION(16)
+DEFINE_GRADIENT_FILTER_FUNCTION(32)
 
