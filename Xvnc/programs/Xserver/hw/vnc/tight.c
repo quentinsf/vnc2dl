@@ -104,8 +104,11 @@ static int *prevRowBuf = NULL;
 
 /* Prototypes for static functions. */
 
-static Bool FindBestSolidArea (int x, int y, int w, int h,
+static void FindBestSolidArea (int x, int y, int w, int h,
                                CARD32 colorValue, int *w_ptr, int *h_ptr);
+static void ExtendSolidArea   (int x, int y, int w, int h,
+                               CARD32 colorValue,
+                               int *x_ptr, int *y_ptr, int *w_ptr, int *h_ptr);
 static Bool CheckSolidTile    (int x, int y, int w, int h,
                                CARD32 *colorPtr, Bool needSameColor);
 static Bool CheckSolidTile8   (int x, int y, int w, int h,
@@ -115,15 +118,15 @@ static Bool CheckSolidTile16  (int x, int y, int w, int h,
 static Bool CheckSolidTile32  (int x, int y, int w, int h,
                                CARD32 *colorPtr, Bool needSameColor);
 
-static Bool SendRectSimple  (rfbClientPtr cl, int x, int y, int w, int h);
-static Bool SendSubrect     (rfbClientPtr cl, int x, int y, int w, int h);
-static Bool SendTightHeader (rfbClientPtr cl, int x, int y, int w, int h);
+static Bool SendRectSimple    (rfbClientPtr cl, int x, int y, int w, int h);
+static Bool SendSubrect       (rfbClientPtr cl, int x, int y, int w, int h);
+static Bool SendTightHeader   (rfbClientPtr cl, int x, int y, int w, int h);
 
-static Bool SendSolidRect(rfbClientPtr cl);
-static Bool SendMonoRect(rfbClientPtr cl, int w, int h);
-static Bool SendIndexedRect(rfbClientPtr cl, int w, int h);
-static Bool SendFullColorRect(rfbClientPtr cl, int w, int h);
-static Bool SendGradientRect(rfbClientPtr cl, int w, int h);
+static Bool SendSolidRect     (rfbClientPtr cl);
+static Bool SendMonoRect      (rfbClientPtr cl, int w, int h);
+static Bool SendIndexedRect   (rfbClientPtr cl, int w, int h);
+static Bool SendFullColorRect (rfbClientPtr cl, int w, int h);
+static Bool SendGradientRect  (rfbClientPtr cl, int w, int h);
 
 static Bool CompressData(rfbClientPtr cl, int streamId, int dataLen,
                          int zlibLevel, int zlibStrategy);
@@ -173,9 +176,7 @@ static void JpegSetDstManager(j_compress_ptr cinfo);
 
 #define MIN_SPLIT_RECT_SIZE     4096
 #define MIN_SOLID_SUBRECT_SIZE  2048
-/*
-#define MIN_SOLID_SUBRECT_SIDE    16
-*/
+#define MAX_SPLIT_TILE_SIZE       16
 
 int
 rfbNumCodedRectsTight(cl, x, y, w, h)
@@ -210,7 +211,7 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
 {
     CARD32 colorValue;
     int dx, dy, dw, dh;
-    int w_best, h_best;
+    int x_best, y_best, w_best, h_best;
     char *fbptr;
 
     if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
@@ -236,10 +237,16 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
 
     /* Try to find large solid-color areas and send them separately. */
 
-    for (dy = y; dy < y + h; dy += 16) {
-        dh = (dy + 16 <= y + h) ? 16 : y + h - dy;
-        for (dx = x; dx < x + w; dx += 16) {
-            dw = (dx + 16 <= x + w) ? 16 : x + w - dx;
+    for (dy = y; dy < y + h; dy += MAX_SPLIT_TILE_SIZE) {
+
+        dh = (dy + MAX_SPLIT_TILE_SIZE <= y + h) ?
+            MAX_SPLIT_TILE_SIZE : (y + h - dy);
+
+        for (dx = x; dx < x + w; dx += MAX_SPLIT_TILE_SIZE) {
+
+            dw = (dx + MAX_SPLIT_TILE_SIZE <= x + w) ?
+                MAX_SPLIT_TILE_SIZE : (x + w - dx);
+
             if (CheckSolidTile(dx, dy, dw, dh, &colorValue, FALSE)) {
 
                 /* Get dimensions of solid-color area. */
@@ -247,34 +254,37 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
                 FindBestSolidArea(dx, dy, w - (dx - x), h - (dy - y),
 				  colorValue, &w_best, &h_best);
 
-                /* Make sure a solid rectangle is large enough. */
+                /* Make sure a solid rectangle is large enough
+                   (or the whole rectangle is of the same color). */
 
-#ifdef MIN_SOLID_SUBRECT_SIDE
-                if ( w_best < MIN_SOLID_SUBRECT_SIDE ||
-                     h_best < MIN_SOLID_SUBRECT_SIDE ||
+                if ( w_best * h_best != w * h &&
                      w_best * h_best < MIN_SOLID_SUBRECT_SIZE )
                     continue;
-#else
-                if (w_best * h_best < MIN_SOLID_SUBRECT_SIZE)
-                    continue;
-#endif
+
+                /* Try to extend solid rectangle to maximum size. */
+
+                x_best = dx; y_best = dy;
+                ExtendSolidArea(x, y, w, h, colorValue,
+                                &x_best, &y_best, &w_best, &h_best);
 
                 /* Send rectangles at top and left to solid-color area. */
 
-                if ( dy != y && !SendRectSimple(cl, x, y, w, dy-y) )
+                if ( y_best != y &&
+                     !SendRectSimple(cl, x, y, w, y_best-y) )
                     return FALSE;
-                if ( dx != x &&
-                     !rfbSendRectEncodingTight(cl, x, dy, dx-x, h_best) )
+                if ( x_best != x &&
+                     !rfbSendRectEncodingTight(cl, x, y_best,
+                                               x_best-x, h_best) )
                     return FALSE;
 
                 /* Send solid-color rectangle. */
 
-                if (!SendTightHeader(cl, dx, dy, w_best, h_best))
+                if (!SendTightHeader(cl, x_best, y_best, w_best, h_best))
                     return FALSE;
 
                 fbptr = (rfbScreen.pfbMemory +
-                         (rfbScreen.paddedWidthInBytes * dy) +
-                         (dx * (rfbScreen.bitsPerPixel / 8)));
+                         (rfbScreen.paddedWidthInBytes * y_best) +
+                         (x_best * (rfbScreen.bitsPerPixel / 8)));
 
                 (*cl->translateFn)(cl->translateLookupTable, &rfbServerFormat,
                                    &cl->format, fbptr, tightBeforeBuf,
@@ -285,20 +295,22 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
 
                 /* Send remaining rectangles (at right and bottom). */
 
-                if ( dx + w_best != x + w &&
-                     !rfbSendRectEncodingTight(cl, dx+w_best, dy,
-                                               w-(dx-x)-w_best, h_best) )
+                if ( x_best + w_best != x + w &&
+                     !rfbSendRectEncodingTight(cl, x_best+w_best, y_best,
+                                               w-(x_best-x)-w_best, h_best) )
                     return FALSE;
-                if ( dy + h_best != y + h &&
-                     !rfbSendRectEncodingTight(cl, x, dy+h_best,
-                                               w, h-(dy-y)-h_best) )
+                if ( y_best + h_best != y + h &&
+                     !rfbSendRectEncodingTight(cl, x, y_best+h_best,
+                                               w, h-(y_best-y)-h_best) )
                     return FALSE;
 
-                /* Return after all recursive calls done. */
+                /* Return after all recursive calls are done. */
 
                 return TRUE;
             }
+
         }
+
     }
 
     /* No suitable solid-color rectangles found. */
@@ -306,7 +318,7 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
     return SendRectSimple(cl, x, y, w, h);
 }
 
-static Bool
+static void
 FindBestSolidArea(x, y, w, h, colorValue, w_ptr, h_ptr)
     int x, y, w, h;
     CARD32 colorValue;
@@ -318,17 +330,24 @@ FindBestSolidArea(x, y, w, h, colorValue, w_ptr, h_ptr)
 
     w_prev = w;
 
-    for (dy = y; dy < y + h; dy += 16) {
-        dh = (dy + 16 <= y + h) ? 16 : y + h - dy;
-        dw = (w_prev > 16) ? 16 : w_prev;
+    for (dy = y; dy < y + h; dy += MAX_SPLIT_TILE_SIZE) {
+
+        dh = (dy + MAX_SPLIT_TILE_SIZE <= y + h) ?
+            MAX_SPLIT_TILE_SIZE : (y + h - dy);
+        dw = (w_prev > MAX_SPLIT_TILE_SIZE) ?
+            MAX_SPLIT_TILE_SIZE : w_prev;
+
         if (!CheckSolidTile(x, dy, dw, dh, &colorValue, TRUE))
             break;
+
         for (dx = x + dw; dx < x + w_prev;) {
-            dw = (dx + 16 <= x + w_prev) ? 16 : x + w_prev - dx;
+            dw = (dx + MAX_SPLIT_TILE_SIZE <= x + w_prev) ?
+                MAX_SPLIT_TILE_SIZE : (x + w_prev - dx);
             if (!CheckSolidTile(dx, dy, dw, dh, &colorValue, TRUE))
                 break;
 	    dx += dw;
         }
+
         w_prev = dx - x;
         if (w_prev * (dy + dh - y) > w_best * h_best) {
             w_best = w_prev;
@@ -338,6 +357,43 @@ FindBestSolidArea(x, y, w, h, colorValue, w_ptr, h_ptr)
 
     *w_ptr = w_best;
     *h_ptr = h_best;
+}
+
+static void
+ExtendSolidArea(x, y, w, h, colorValue, x_ptr, y_ptr, w_ptr, h_ptr)
+    int x, y, w, h;
+    CARD32 colorValue;
+    int *x_ptr, *y_ptr, *w_ptr, *h_ptr;
+{
+    int cx, cy;
+
+    /* Try to extend the area upwards. */
+    for ( cy = *y_ptr - 1;
+          cy >= y && CheckSolidTile(*x_ptr, cy, *w_ptr, 1, &colorValue, TRUE);
+          cy-- );
+    *h_ptr += *y_ptr - (cy + 1);
+    *y_ptr = cy + 1;
+
+    /* ... downwards. */
+    for ( cy = *y_ptr + *h_ptr;
+          cy < y + h &&
+              CheckSolidTile(*x_ptr, cy, *w_ptr, 1, &colorValue, TRUE);
+          cy++ );
+    *h_ptr += cy - (*y_ptr + *h_ptr);
+
+    /* ... to the left. */
+    for ( cx = *x_ptr - 1;
+          cx >= x && CheckSolidTile(cx, *y_ptr, 1, *h_ptr, &colorValue, TRUE);
+          cx-- );
+    *w_ptr += *x_ptr - (cx + 1);
+    *x_ptr = cx + 1;
+
+    /* ... to the right. */
+    for ( cx = *x_ptr + *w_ptr;
+          cx < x + w &&
+              CheckSolidTile(cx, *y_ptr, 1, *h_ptr, &colorValue, TRUE);
+          cx++ );
+    *w_ptr += cx - (*x_ptr + *w_ptr);
 }
 
 static Bool
