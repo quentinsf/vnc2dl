@@ -273,27 +273,28 @@ void
 usage(void)
 {
   fprintf(stderr,
-	  "TightVNC viewer version 1.2 (based on VNC 3.3.3r2)\n"
+	  "TightVNC viewer version 1.2.1 (based on VNC 3.3.3r2)\n"
 	  "\n"
-	  "Usage: %s [<options>] [<host>]:<display#>\n"
-	  "       %s [<options>] -listen [<display#>]\n"
-	  "       %s [<options>] -tunnel <host>:<display#>\n"
+	  "Usage: %s [<OPTIONS>] [<HOST>]:<DISPLAY#>\n"
+	  "       %s [<OPTIONS>] -listen [<DISPLAY#>]\n"
+	  "       %s [<OPTIONS>] -tunnel <HOST>:<DISPLAY#>\n"
+	  "       %s [<OPTIONS>] -via <GATEWAY> [<HOST>]:<DISPLAY#>\n"
 	  "\n"
-	  "<options> are standard Xt options, or:\n"
+	  "<OPTIONS> are standard Xt options, or:\n"
 	  "        -shared (set by default)\n"
 	  "        -noshared\n"
 	  "        -viewonly\n"
 	  "        -fullscreen\n"
-	  "        -passwd <passwd-file>\n"
-	  "        -encodings <encoding-list> (e.g. \"tight copyrect\")\n"
+	  "        -passwd <PASSWD-FILENAME>\n"
+	  "        -encodings <ENCODING-LIST> (e.g. \"tight copyrect\")\n"
 	  "        -bgr233\n"
 	  "        -owncmap\n"
 	  "        -truecolour\n"
-	  "        -depth <depth>\n"
-	  "        -compresslevel <compress-value> (0..9: 0-least, 9-best)\n"
-	  "        -quality <jpeg-quality-value> (0..9: 0-least, 9-best)\n"
+	  "        -depth <DEPTH>\n"
+	  "        -compresslevel <COMPRESS-VALUE> (0..9: 0-fast, 9-best)\n"
+	  "        -quality <JPEG-QUALITY-VALUE> (0..9: 0-low, 9-high)\n"
 	  "        -nocursorshape\n"
-	  "\n", programName, programName, programName);
+	  "\n", programName, programName, programName, programName);
   exit(1);
 }
 

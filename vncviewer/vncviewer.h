@@ -56,8 +56,10 @@ extern int endianTest;
 #define SERVER_PORT_OFFSET 5900
 
 #define DEFAULT_SSH_CMD "/usr/bin/ssh"
-#define DEFAULT_TUNNEL_CMD
+#define DEFAULT_TUNNEL_CMD  \
   (DEFAULT_SSH_CMD " -f -L %L:localhost:%R %H sleep 20")
+#define DEFAULT_VIA_CMD     \
+  (DEFAULT_SSH_CMD " -f -L %L:%H:%R %G sleep 20")
 
 
 /* argsresources.c */

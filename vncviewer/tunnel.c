@@ -27,21 +27,28 @@
 #include <sys/stat.h>
 #include <vncviewer.h>
 
-/* True if there was -tunnel option in the command line. */
+/* True if there was -tunnel or -via option in the command line. */
 Bool tunnelSpecified = False;
+
+/* True if it was -tunnel, not -via option. */
+static Bool tunnelOption = False;
 
 /* "Hostname:display" pair in the command line will be substituted
    by this fake argument when tunneling is used. */
 static char lastArgv[32];
 
 
-static void processTunnelArgs (char **remoteHost, int *remotePort,
-			       int localPort, int *pargc, char **argv,
-			       int tunnelArgIndex);
-static char *getCmdPattern (void);
-static Bool fillCmdPattern (char *result, char *pattern, char *remoteHost,
-			    char *remotePort, char *localPort);
-static Bool runCommand (char *cmd);
+static void processTunnelArgs(char **remoteHost,
+			      int *remotePort, int localPort,
+			      int *pargc, char **argv, int tunnelArgIndex);
+static void processViaArgs(char **gatewayHost, char **remoteHost,
+			   int *remotePort, int localPort,
+			   int *pargc, char **argv, int tunnelArgIndex);
+static char *getCmdPattern(void);
+static Bool fillCmdPattern(char *result, char *pattern,
+			   char *gatewayHost, char *remoteHost,
+			   char *remotePort, char *localPort);
+static Bool runCommand(char *cmd);
 
 
 Bool
@@ -52,9 +59,12 @@ createTunnel(int *pargc, char **argv, int tunnelArgIndex)
   int localPort, remotePort;
   char localPortStr[8];
   char remotePortStr[8];
-  char *remoteHost;
+  char *gatewayHost = "";
+  char *remoteHost = "localhost";
 
   tunnelSpecified = True;
+  if (strcmp(argv[tunnelArgIndex], "-tunnel") == 0)
+    tunnelOption = True;
 
   pattern = getCmdPattern();
   if (!pattern)
@@ -64,13 +74,19 @@ createTunnel(int *pargc, char **argv, int tunnelArgIndex)
   if (localPort == 0)
     return False;
 
-  processTunnelArgs (&remoteHost, &remotePort, localPort,
-		     pargc, argv, tunnelArgIndex);
+  if (tunnelOption) {
+    processTunnelArgs(&remoteHost, &remotePort, localPort,
+		      pargc, argv, tunnelArgIndex);
+  } else {
+    processViaArgs(&gatewayHost, &remoteHost, &remotePort, localPort,
+		   pargc, argv, tunnelArgIndex);
+  }
 
-  sprintf (localPortStr, "%hu", (unsigned short)localPort);
-  sprintf (remotePortStr, "%hu", (unsigned short)remotePort);
+  sprintf(localPortStr, "%d", localPort);
+  sprintf(remotePortStr, "%d", remotePort);
 
-  if (!fillCmdPattern(cmd, pattern, remoteHost, remotePortStr, localPortStr))
+  if (!fillCmdPattern(cmd, pattern, gatewayHost, remoteHost,
+		      remotePortStr, localPortStr))
     return False;
 
   if (!runCommand(cmd))
@@ -80,8 +96,8 @@ createTunnel(int *pargc, char **argv, int tunnelArgIndex)
 }
 
 static void
-processTunnelArgs (char **remoteHost, int *remotePort, int localPort,
-		   int *pargc, char **argv, int tunnelArgIndex)
+processTunnelArgs(char **remoteHost, int *remotePort, int localPort,
+		  int *pargc, char **argv, int tunnelArgIndex)
 {
   char *pdisplay;
   int port;
@@ -94,14 +110,14 @@ processTunnelArgs (char **remoteHost, int *remotePort, int localPort,
     usage();
 
   *pdisplay++ = '\0';
-  if (strspn(pdisplay, "0123456789") != strlen(pdisplay))
+  if (strspn(pdisplay, "-0123456789") != strlen(pdisplay))
     usage();
 
   *remotePort = atoi(pdisplay);
   if (*remotePort < 100)
     *remotePort += SERVER_PORT_OFFSET;
 
-  sprintf(lastArgv, "localhost:%hu", (unsigned short)localPort);
+  sprintf(lastArgv, "localhost:%d", localPort);
 
   *remoteHost = argv[*pargc - 1];
   argv[*pargc - 1] = lastArgv;
@@ -109,13 +125,48 @@ processTunnelArgs (char **remoteHost, int *remotePort, int localPort,
   removeArgs(pargc, argv, tunnelArgIndex, 1);
 }
 
+static void
+processViaArgs(char **gatewayHost, char **remoteHost,
+	       int *remotePort, int localPort,
+	       int *pargc, char **argv, int tunnelArgIndex)
+{
+  char *pdisplay;
+  int port;
+
+  if (tunnelArgIndex >= *pargc - 2)
+    usage();
+
+  pdisplay = strchr(argv[*pargc - 1], ':');
+  if (pdisplay == NULL)
+    usage();
+
+  *pdisplay++ = '\0';
+  if (strspn(pdisplay, "-0123456789") != strlen(pdisplay))
+    usage();
+
+  *remotePort = atoi(pdisplay);
+  if (*remotePort < 100)
+    *remotePort += SERVER_PORT_OFFSET;
+
+  sprintf(lastArgv, "localhost:%d", localPort);
+
+  *gatewayHost = argv[tunnelArgIndex + 1];
+
+  if (pdisplay != &argv[*pargc - 1][1])
+    *remoteHost = argv[*pargc - 1];
+
+  argv[*pargc - 1] = lastArgv;
+
+  removeArgs(pargc, argv, tunnelArgIndex, 2);
+}
+
 static char *
-getCmdPattern (void)
+getCmdPattern(void)
 {
   struct stat st;
   char *pattern;
 
-  pattern = getenv("VNC_TUNNEL_CMD");
+  pattern = getenv((tunnelOption) ? "VNC_TUNNEL_CMD" : "VNC_VIA_CMD");
   if (pattern == NULL) {
     if ( stat(DEFAULT_SSH_CMD, &st) != 0 ||
 	 !(S_ISREG(st.st_mode) || S_ISLNK(st.st_mode)) ) {
@@ -123,7 +174,7 @@ getCmdPattern (void)
 	      programName, DEFAULT_SSH_CMD);
       return NULL;
     }
-    pattern = DEFAULT_TUNNEL_CMD;
+    pattern = (tunnelOption) ? DEFAULT_TUNNEL_CMD : DEFAULT_VIA_CMD;
   }
 
   return pattern;
@@ -132,11 +183,12 @@ getCmdPattern (void)
 /* Note: in fillCmdPattern() result points to a 1024-byte buffer */
 
 static Bool
-fillCmdPattern (char *result, char *pattern, char *remoteHost,
-		char *remotePort, char *localPort)
+fillCmdPattern(char *result, char *pattern,
+	       char *gatewayHost, char *remoteHost,
+	       char *remotePort, char *localPort)
 {
   int i, j;
-  Bool H_found = False, R_found = False, L_found = False;
+  Bool H_found = False, G_found = False, R_found = False, L_found = False;
 
   for (i=0, j=0; pattern[i] && j<1023; i++, j++) {
     if (pattern[i] == '%') {
@@ -145,6 +197,11 @@ fillCmdPattern (char *result, char *pattern, char *remoteHost,
 	strncpy(&result[j], remoteHost, 1024 - j);
 	j += strlen(remoteHost) - 1;
 	H_found = True;
+	continue;
+      case 'G':
+	strncpy(&result[j], gatewayHost, 1024 - j);
+	j += strlen(gatewayHost) - 1;
+	G_found = True;
 	continue;
       case 'R':
 	strncpy(&result[j], remotePort, 1024 - j);
@@ -174,13 +231,18 @@ fillCmdPattern (char *result, char *pattern, char *remoteHost,
 	    programName);
     return False;
   }
+  if (!tunnelOption && !G_found) {
+    fprintf(stderr, "%s: %%G pattern absent in tunneling command.\n",
+	    programName);
+    return False;
+  }
 
   result[j] = '\0';
   return True;
 }
 
 static Bool
-runCommand (char *cmd)
+runCommand(char *cmd)
 {
   if (system(cmd) != 0) {
     fprintf(stderr, "%s: Tunneling command failed: %s.\n",
