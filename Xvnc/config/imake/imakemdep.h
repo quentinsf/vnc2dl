@@ -471,6 +471,9 @@ char *cpp_argv[ARGUMENTS] = {
 # ifdef __i386__
 	"-D__i386__",
 # endif
+# ifdef __s390__
+	"-D__s390__",
+# endif
 # ifdef __GNUC__
 	"-traditional",
 # endif
