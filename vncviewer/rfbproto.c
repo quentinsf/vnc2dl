@@ -328,6 +328,7 @@ SetFormatAndEncodings()
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRRE);
+    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
   }
 
   len = sz_rfbSetEncodingsMsg + se->nEncodings * 4;
