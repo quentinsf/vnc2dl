@@ -46,9 +46,9 @@ typedef struct PALETTE_s {
 } PALETTE;
 
 typedef struct PALETTE8_s {
-    CARD8 pixelValue[256];
-    int numPixels[256];
-    int colorIdx[256];
+    CARD8 pixelValue[2];
+    int numPixels[2];
+    CARD8 colorIdx[256];
 } PALETTE8;
 
 
@@ -91,13 +91,6 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
     int maxBeforeSize, maxAfterSize;
     int dx, dy;
     int rw, rh;
-
-    if ( cl->format.bitsPerPixel != 8 &&
-         cl->format.bitsPerPixel != 16 &&
-         cl->format.bitsPerPixel != 32 ) {
-        rfbLog("rfbSendRectEncodingTight: bpp %d?\n", cl->format.bitsPerPixel);
-        return FALSE;
-    }
 
     maxBeforeSize = (TIGHT_MAX_RECT_HEIGHT * TIGHT_MAX_RECT_WIDTH *
                      (cl->format.bitsPerPixel / 8));
@@ -407,11 +400,8 @@ FillPalette(cl, w, h)
     default:                    /* bpp == 8 */
         PaletteReset8();
         for (i = 0; i <= w * h; i++) {
-            n = PaletteInsert8 (data8[i]);
-            if (n == 0 || n > 2) {
-                paletteNumColors = 0;
+            if (!PaletteInsert8 (data8[i]))
                 return;
-            }
         }
         break;
     }
@@ -516,36 +506,30 @@ PaletteReset8(void)
 
     paletteNumColors = 0;
     for (i = 0; i < 256; i++)
-        palette8.colorIdx[i] = -1;
+        palette8.colorIdx[i] = 0xFF;
 }
 
 static int
 PaletteInsert8(CARD8 value)
 {
-    int idx, new_idx, count;
-    CARD8 other_value;
+    int idx;
 
     idx = palette8.colorIdx[value];
-    if (idx != -1) {
+    if (idx != 0xFF) {
         /* Such palette entry already exists. */
-        new_idx = idx;
-        count = palette8.numPixels[idx];
-        if (new_idx && count == palette8.numPixels[new_idx-1]) {
-            do {
-                new_idx--;
-            } while (new_idx && count == palette8.numPixels[new_idx-1]);
+        palette8.numPixels[idx]++;
+        if (idx && palette8.numPixels[1] > palette8.numPixels[0]) {
             /* Preserve sort order */
-            other_value = palette8.pixelValue[new_idx];
-            palette8.colorIdx[value] = new_idx;
-            palette8.colorIdx[other_value] = idx;
-            palette8.pixelValue[new_idx] = value;
-            palette8.pixelValue[idx] = other_value;
+            palette8.numPixels[0]++;
+            palette8.numPixels[1]--;
+            palette8.pixelValue[1] = palette8.pixelValue[0];
+            palette8.pixelValue[0] = value;
+            palette8.colorIdx[value] = 0;
+            palette8.colorIdx[palette8.pixelValue[1]] = 1;
         }
-        palette8.numPixels[new_idx]++;
         return paletteNumColors;
     }
-
-    if (paletteNumColors == 256) {
+    if (paletteNumColors == 2) {
         paletteNumColors = 0;
         return 0;
     }
