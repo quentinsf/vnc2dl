@@ -73,7 +73,7 @@ static Bool prevRichCursorSet = False;
 static Pixmap rcSavedArea;
 static CARD8 *rcSource, *rcMask;
 static int rcHotX, rcHotY, rcWidth, rcHeight;
-static int rcCursorX, rcCursorY;
+static int rcCursorX = 0, rcCursorY = 0;
 static int rcLockX, rcLockY, rcLockWidth, rcLockHeight;
 static Bool rcCursorHidden, rcLockSet;
 
@@ -385,7 +385,7 @@ static void SoftCursorDraw(void)
 
   bytesPerPixel = myFormat.bitsPerPixel / 8;
 
-  /* FIXME: Implementation may be inefficient. */
+  /* FIXME: Speed optimization is possible. */
   for (y = 0; y < rcHeight; y++) {
     y0 = rcCursorY - rcHotY + y;
     if (y0 >= 0 && y0 < si.framebufferHeight) {
