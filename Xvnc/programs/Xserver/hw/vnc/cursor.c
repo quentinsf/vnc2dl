@@ -121,8 +121,8 @@ rfbSendCursorShape(cl, pScreen)
 	       sz_rfbFramebufferUpdateRectHeader);
 	ublen += sz_rfbFramebufferUpdateRectHeader;
 
-	cl->rfbCursorBytesSent += sz_rfbFramebufferUpdateRectHeader;
-	cl->rfbCursorUpdatesSent++;
+	cl->rfbCursorShapeBytesSent += sz_rfbFramebufferUpdateRectHeader;
+	cl->rfbCursorShapeUpdatesSent++;
 
 	return TRUE;
     }
@@ -222,12 +222,53 @@ rfbSendCursorShape(cl, pScreen)
 
     /* Update statistics. */
 
-    cl->rfbCursorBytesSent += (ublen - saved_ublen);
-    cl->rfbCursorUpdatesSent++;
+    cl->rfbCursorShapeBytesSent += (ublen - saved_ublen);
+    cl->rfbCursorShapeUpdatesSent++;
 
     return TRUE;
 }
 
+
+/*
+ * Send cursor position (PointerPos pseudo-encoding).
+ */
+
+Bool
+rfbSendCursorPos(cl, pScreen)
+    rfbClientPtr cl;
+    ScreenPtr pScreen;
+{
+    rfbFramebufferUpdateRectHeader rect;
+    int x, y;
+
+    if (ublen + sz_rfbFramebufferUpdateRectHeader > UPDATE_BUF_SIZE) {
+	if (!rfbSendUpdateBuf(cl))
+	    return FALSE;
+    }
+
+    rfbSpriteGetCursorPos(pScreen, &x, &y);
+
+    rect.encoding = Swap32IfLE(rfbEncodingPointerPos);
+    rect.r.x = Swap16IfLE((CARD16)x);
+    rect.r.y = Swap16IfLE((CARD16)y);
+    rect.r.w = 0;
+    rect.r.h = 0;
+
+    memcpy(&updateBuf[ublen], (char *)&rect,
+	   sz_rfbFramebufferUpdateRectHeader);
+    ublen += sz_rfbFramebufferUpdateRectHeader;
+
+    cl->rfbCursorPosBytesSent += sz_rfbFramebufferUpdateRectHeader;
+    cl->rfbCursorPosUpdatesSent++;
+
+    if (!rfbSendUpdateBuf(cl))
+	return FALSE;
+
+    cl->cursorX = x;
+    cl->cursorY = y;
+
+    return TRUE;
+}
 
 /*
  * Code to convert cursor source bitmap to the desired pixel format.

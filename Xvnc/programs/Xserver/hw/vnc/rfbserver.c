@@ -3,7 +3,7 @@
  */
 
 /*
- *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2000-2002 Constantin Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 2000 Tridia Corporation.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
@@ -174,6 +174,7 @@ rfbNewClient(sock)
         cl->zsActive[i] = FALSE;
 
     cl->enableCursorShapeUpdates = FALSE;
+    cl->enableCursorPosUpdates = FALSE;
     cl->enableLastRectEncoding = FALSE;
 
     cl->next = rfbClientHead;
@@ -545,6 +546,7 @@ rfbProcessClientNormalMessage(cl)
 	cl->preferredEncoding = -1;
 	cl->useCopyRect = FALSE;
 	cl->enableCursorShapeUpdates = FALSE;
+	cl->enableCursorPosUpdates = FALSE;
 	cl->enableLastRectEncoding = FALSE;
 	cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
 	cl->tightQualityLevel = -1;
@@ -621,6 +623,16 @@ rfbProcessClientNormalMessage(cl)
 		    cl->cursorWasChanged = TRUE;
 		}
 		break;
+	    case rfbEncodingPointerPos:
+		if (!cl->enableCursorPosUpdates) {
+		    rfbLog("Enabling cursor position updates for client %s\n",
+			   cl->host);
+		    cl->enableCursorPosUpdates = TRUE;
+		    cl->cursorWasMoved = TRUE;
+		    cl->cursorX = -1;
+		    cl->cursorY = -1;
+		}
+	        break;
 	    case rfbEncodingLastRect:
 		if (!cl->enableLastRectEncoding) {
 		    rfbLog("Enabling LastRect protocol extension for client "
@@ -649,6 +661,12 @@ rfbProcessClientNormalMessage(cl)
 
 	if (cl->preferredEncoding == -1) {
 	    cl->preferredEncoding = rfbEncodingRaw;
+	}
+
+	if (cl->enableCursorPosUpdates && !cl->enableCursorShapeUpdates) {
+	    rfbLog("Disabling cursor position updates for client %s\n",
+		   cl->host);
+	    cl->enableCursorPosUpdates = FALSE;
 	}
 
 	return;
@@ -759,8 +777,9 @@ rfbProcessClientNormalMessage(cl)
 	    pointerClient = cl;
 
 	if (!rfbViewOnly) {
-	    PtrAddEvent(msg.pe.buttonMask,
-			Swap16IfLE(msg.pe.x), Swap16IfLE(msg.pe.y), cl);
+	    cl->cursorX = (int)Swap16IfLE(msg.pe.x);
+            cl->cursorY = (int)Swap16IfLE(msg.pe.y);
+	    PtrAddEvent(msg.pe.buttonMask, cl->cursorX, cl->cursorY, cl);
 	}
 	return;
 
@@ -821,6 +840,7 @@ rfbSendFramebufferUpdate(cl)
     RegionRec updateRegion, updateCopyRegion;
     int dx, dy;
     Bool sendCursorShape = FALSE;
+    Bool sendCursorPos = FALSE;
 
     /*
      * If this client understands cursor shape updates, cursor should be
@@ -836,6 +856,13 @@ rfbSendFramebufferUpdate(cl)
 	if (!rfbScreen.cursorIsDrawn)
 	    rfbSpriteRestoreCursor(pScreen);
     }
+
+    /*
+     * Do we plan to send cursor position update?
+     */
+
+    if (cl->enableCursorPosUpdates && cl->cursorWasMoved)
+	sendCursorPos = TRUE;
 
     /*
      * The modifiedRegion may overlap the destination copyRegion.  We remove
@@ -859,7 +886,8 @@ rfbSendFramebufferUpdate(cl)
     REGION_INTERSECT(pScreen, &updateRegion, &cl->requestedRegion,
 		     &updateRegion);
 
-    if (!REGION_NOTEMPTY(pScreen,&updateRegion) && !sendCursorShape) {
+    if ( !REGION_NOTEMPTY(pScreen,&updateRegion) &&
+	 !sendCursorShape && !sendCursorPos ) {
 	REGION_UNINIT(pScreen,&updateRegion);
 	return TRUE;
     }
@@ -957,8 +985,9 @@ rfbSendFramebufferUpdate(cl)
 
     fu->type = rfbFramebufferUpdate;
     if (nUpdateRegionRects != 0xFFFF) {
-	fu->nRects = Swap16IfLE(REGION_NUM_RECTS(&updateCopyRegion)
-				+ nUpdateRegionRects + !!sendCursorShape);
+	fu->nRects = Swap16IfLE(REGION_NUM_RECTS(&updateCopyRegion) +
+				nUpdateRegionRects +
+				!!sendCursorShape + !!sendCursorPos);
     } else {
 	fu->nRects = 0xFFFF;
     }
@@ -968,6 +997,12 @@ rfbSendFramebufferUpdate(cl)
 	cl->cursorWasChanged = FALSE;
 	if (!rfbSendCursorShape(cl, pScreen))
 	    return FALSE;
+    }
+
+    if (sendCursorPos) {
+	cl->cursorWasMoved = FALSE;
+	if (!rfbSendCursorPos(cl, pScreen))
+ 	    return FALSE;
     }
 
     if (REGION_NOTEMPTY(pScreen,&updateCopyRegion)) {

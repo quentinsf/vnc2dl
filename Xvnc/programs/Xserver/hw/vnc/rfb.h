@@ -207,8 +207,10 @@ typedef struct rfbClientRec {
     int rfbRectanglesSent[MAX_ENCODINGS];
     int rfbLastRectMarkersSent;
     int rfbLastRectBytesSent;
-    int rfbCursorBytesSent;
-    int rfbCursorUpdatesSent;
+    int rfbCursorShapeBytesSent;
+    int rfbCursorShapeUpdatesSent;
+    int rfbCursorPosBytesSent;
+    int rfbCursorPosUpdatesSent;
     int rfbFramebufferUpdateMessagesSent;
     int rfbRawBytesEquivalent;
     int rfbKeyEventsRcvd;
@@ -231,8 +233,12 @@ typedef struct rfbClientRec {
 
     Bool enableLastRectEncoding;   /* client supports LastRect encoding */
     Bool enableCursorShapeUpdates; /* client supports cursor shape updates */
+    Bool enableCursorPosUpdates;   /* client supports PointerPos updates */
     Bool useRichCursorEncoding;    /* rfbEncodingRichCursor is preferred */
     Bool cursorWasChanged;         /* cursor shape update should be sent */
+    Bool cursorWasMoved;           /* cursor position update should be sent */
+
+    int cursorX, cursorY;          /* client's cursor position */
 
     struct rfbClientRec *next;
 
@@ -247,6 +253,7 @@ typedef struct rfbClientRec {
 #define FB_UPDATE_PENDING(cl)                                           \
     ((!(cl)->enableCursorShapeUpdates && !rfbScreen.cursorIsDrawn) ||   \
      ((cl)->enableCursorShapeUpdates && (cl)->cursorWasChanged) ||      \
+     ((cl)->enableCursorPosUpdates && (cl)->cursorWasMoved) ||          \
      REGION_NOTEMPTY((pScreen),&(cl)->copyRegion) ||                    \
      REGION_NOTEMPTY((pScreen),&(cl)->modifiedRegion))
 
@@ -506,6 +513,7 @@ extern Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
 /* cursor.c */
 
 extern Bool rfbSendCursorShape(rfbClientPtr cl, ScreenPtr pScreen);
+extern Bool rfbSendCursorPos(rfbClientPtr cl, ScreenPtr pScreen);
 
 
 /* stats.c */

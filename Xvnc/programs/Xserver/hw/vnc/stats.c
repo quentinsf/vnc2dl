@@ -3,6 +3,7 @@
  */
 
 /*
+ *  Copyright (C) 2002 Constantin Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -41,8 +42,10 @@ rfbResetStats(rfbClientPtr cl)
     }
     cl->rfbLastRectMarkersSent = 0;
     cl->rfbLastRectBytesSent = 0;
-    cl->rfbCursorBytesSent = 0;
-    cl->rfbCursorUpdatesSent = 0;
+    cl->rfbCursorShapeBytesSent = 0;
+    cl->rfbCursorShapeUpdatesSent = 0;
+    cl->rfbCursorPosBytesSent = 0;
+    cl->rfbCursorPosUpdatesSent = 0;
     cl->rfbFramebufferUpdateMessagesSent = 0;
     cl->rfbRawBytesEquivalent = 0;
     cl->rfbKeyEventsRcvd = 0;
@@ -66,9 +69,12 @@ rfbPrintStats(rfbClientPtr cl)
 	totalRectanglesSent += cl->rfbRectanglesSent[i];
 	totalBytesSent += cl->rfbBytesSent[i];
     }
-    totalRectanglesSent += (cl->rfbCursorUpdatesSent +
+    totalRectanglesSent += (cl->rfbCursorShapeUpdatesSent +
+			    cl->rfbCursorPosUpdatesSent +
 			    cl->rfbLastRectMarkersSent);
-    totalBytesSent += (cl->rfbCursorBytesSent + cl->rfbLastRectBytesSent);
+    totalBytesSent += (cl->rfbCursorShapeBytesSent +
+		       cl->rfbCursorPosBytesSent +
+		       cl->rfbLastRectBytesSent);
 
     rfbLog("  framebuffer updates %d, rectangles %d, bytes %d\n",
 	    cl->rfbFramebufferUpdateMessagesSent, totalRectanglesSent,
@@ -78,9 +84,13 @@ rfbPrintStats(rfbClientPtr cl)
 	rfbLog("    LastRect markers %d, bytes %d\n",
 		cl->rfbLastRectMarkersSent, cl->rfbLastRectBytesSent);
 
-    if (cl->rfbCursorUpdatesSent != 0)
+    if (cl->rfbCursorShapeUpdatesSent != 0)
 	rfbLog("    cursor shape updates %d, bytes %d\n",
-		cl->rfbCursorUpdatesSent, cl->rfbCursorBytesSent);
+		cl->rfbCursorShapeUpdatesSent, cl->rfbCursorShapeBytesSent);
+
+    if (cl->rfbCursorPosUpdatesSent != 0)
+	rfbLog("    cursor position updates %d, bytes %d\n",
+	       cl->rfbCursorPosUpdatesSent, cl->rfbCursorPosBytesSent);
 
     for (i = 0; i < MAX_ENCODINGS; i++) {
 	if (cl->rfbRectanglesSent[i] != 0)
@@ -94,7 +104,8 @@ rfbPrintStats(rfbClientPtr cl)
 		(double)cl->rfbRawBytesEquivalent
 		/ (double)(totalBytesSent -
 			   cl->rfbBytesSent[rfbEncodingCopyRect] -
-			   cl->rfbCursorBytesSent -
+			   cl->rfbCursorShapeBytesSent -
+			   cl->rfbCursorPosBytesSent -
 			   cl->rfbLastRectBytesSent));
     }
 }

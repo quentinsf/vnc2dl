@@ -1901,6 +1901,13 @@ rfbSpriteSetCursor (pScreen, pCursor, x, y)
 
     for (cl = rfbClientHead; cl; cl = nextCl) {
 	nextCl = cl->next;
+	if (cl->enableCursorPosUpdates) {
+	    if (x == cl->cursorX && y == cl->cursorY) {
+		cl->cursorWasMoved = FALSE;
+		continue;
+	    }
+	    cl->cursorWasMoved = TRUE;
+	}
 	if (REGION_NOTEMPTY(pScreen,&cl->requestedRegion)) {
 	    /* cursorIsDrawn is guaranteed to be FALSE here, so we definitely
 	       want to send a screen update to the client, even if that's only
@@ -2016,7 +2023,7 @@ rfbSpriteComputeSaved (pScreen)
 
 
 /*
- * this function is called when cursor shape is changed
+ * this function is called when the cursor shape is being changed
  */
 
 static Bool
@@ -2051,5 +2058,23 @@ rfbSpriteGetCursorPtr (pScreen)
 	pScreen->devPrivates[rfbSpriteScreenIndex].ptr;
 
     return pScreenPriv->pCursor;
+}
+
+/*
+ * obtain current cursor position
+ */
+
+void
+rfbSpriteGetCursorPos (pScreen, px, py)
+    ScreenPtr pScreen;
+    int *px, *py;
+{
+    rfbSpriteScreenPtr pScreenPriv;
+
+    pScreenPriv = (rfbSpriteScreenPtr)
+	pScreen->devPrivates[rfbSpriteScreenIndex].ptr;
+
+    *px = pScreenPriv->x;
+    *py = pScreenPriv->y;
 }
 
