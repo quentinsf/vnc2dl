@@ -23,6 +23,7 @@ LOCAL_LIBRARIES = XawClientLibs $(VNCAUTH_LIB) $(ZLIB_LIB)
 SRCS = \
   argsresources.c \
   colour.c \
+  cursor.c \
   desktop.c \
   dialogs.c \
   fullscreen.c \

@@ -122,6 +122,11 @@ extern unsigned int visdepth, visbpp;
 
 extern void SetVisualAndCmap();
 
+/* cursor.c */
+
+extern Bool HandleXCursor(int xhot, int yhot, int width, int height);
+extern Bool HandleRuchCursor(int xhot, int yhot, int width, int height);
+
 /* desktop.c */
 
 extern Atom wmDeleteWindow;
