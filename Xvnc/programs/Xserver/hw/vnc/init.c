@@ -388,10 +388,12 @@ InitOutput(screenInfo, argc, argv)
     initOutputCalled = TRUE;
 
     rfbLog("Xvnc version %d.%d.%s\n", rfbProtocolMajorVersion,
-	   rfbProtocolMinorVersion,XVNCRELEASE);
-    rfbLog("Copyright (C) AT&T Laboratories Cambridge.\n");
+	   rfbProtocolMinorVersion, XVNCRELEASE);
+    rfbLog("Copyright (C) 1999 AT&T Laboratories Cambridge.\n");
+    rfbLog("Copyright (C) 2000-2002 Constantin Kaplinsky.\n");
     rfbLog("All Rights Reserved.\n");
     rfbLog("See http://www.uk.research.att.com/vnc for information on VNC\n");
+    rfbLog("See http://www.tightvnc.com for TightVNC-specific information\n");
     rfbLog("Desktop name '%s' (%s:%s)\n",desktopName,rfbThisHost,display);
     rfbLog("Protocol version supported %d.%d\n", rfbProtocolMajorVersion,
 	   rfbProtocolMinorVersion);
