@@ -299,7 +299,8 @@ typedef struct {
  * Special encoding numbers:
  *   0xFFFFFF00 .. 0xFFFFFF0F -- encoding-specific compression levels;
  *   0xFFFFFF10 .. 0xFFFFFF1F -- mouse cursor shape data;
- *   0xFFFFFF20 .. 0xFFFFFFEF -- not allocated yet;
+ *   0xFFFFFF20 .. 0xFFFFFF2F -- various protocol extensions;
+ *   0xFFFFFF30 .. 0xFFFFFFEF -- not allocated yet;
  *   0xFFFFFFF0 .. 0xFFFFFFFF -- cross-encoding compression levels.
  */
 
@@ -316,6 +317,8 @@ typedef struct {
 
 #define rfbEncodingXCursor         0xFFFFFF10
 #define rfbEncodingRichCursor      0xFFFFFF11
+
+#define rfbEncodingLastRect        0xFFFFFF20
 
 
 /*****************************************************************************
