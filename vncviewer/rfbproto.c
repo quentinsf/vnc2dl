@@ -557,7 +557,7 @@ HandleRFBServerMessage()
       }
 
       /* If RichCursor encoding is used, we should prevent collisions
-         between framebuffer updates and cursor drawing operations. */
+	 between framebuffer updates and cursor drawing operations. */
       SoftCursorLockArea(rect.r.x, rect.r.y, rect.r.w, rect.r.h);
 
       switch (rect.encoding) {
