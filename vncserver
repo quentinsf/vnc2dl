@@ -37,7 +37,9 @@ $depth = 8;
 $desktopName = "X";
 $vncClasses = "/usr/local/vnc/classes";
 $vncUserDir = "$ENV{HOME}/.vnc";
-$xauthorityFile = "$ENV{HOME}/.Xauthority";
+unless ($xauthorityFile = "$ENV{XAUTHORITY}") {
+  $xauthorityFile = "$ENV{HOME}/.Xauthority";
+}
 
 $defaultXStartup
     = ("#!/bin/sh\n\n".
