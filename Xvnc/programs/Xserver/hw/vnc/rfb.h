@@ -203,8 +203,8 @@ typedef struct rfbClientRec {
 
     int rfbBytesSent[MAX_ENCODINGS];
     int rfbRectanglesSent[MAX_ENCODINGS];
-    int rfbXCursorBytesSent;
-    int rfbXCursorUpdatesSent;
+    int rfbCursorBytesSent;
+    int rfbCursorUpdatesSent;
     int rfbFramebufferUpdateMessagesSent;
     int rfbRawBytesEquivalent;
     int rfbKeyEventsRcvd;
@@ -218,6 +218,7 @@ typedef struct rfbClientRec {
     int tightCompressLevel;
 
     Bool enableCursorShapeUpdates; /* client supports cursor shape updates */
+    Bool useRichCursorEncoding;    /* rfbEncodingRichCursor is preferred */
     Bool cursorWasChanged;         /* cursor shape update should be sent */
 
     struct rfbClientRec *next;
@@ -467,6 +468,11 @@ extern Bool rfbTightDisableGradient;
 
 extern int rfbNumCodedRectsTight(rfbClientPtr cl, int x,int y,int w,int h);
 extern Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
+
+
+/* cursor.c */
+
+extern Bool rfbSendCursorShape(rfbClientPtr cl, ScreenPtr pScreen);
 
 
 /* stats.c */

@@ -37,8 +37,6 @@
 #include "input.h"
 #include "mipointer.h"
 #include "sprite.h"
-#include "cursorstr.h"
-#include "servermd.h"
 
 #ifdef CORBA
 #include <vncserverctrl.h>
@@ -59,7 +57,6 @@ static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
 static void rfbProcessClientNormalMessage(rfbClientPtr cl);
 static void rfbProcessClientInitMessage(rfbClientPtr cl);
 static Bool rfbSendCopyRegion(rfbClientPtr cl, RegionPtr reg, int dx, int dy);
-static Bool rfbSendXCursorShape(rfbClientPtr cl, ScreenPtr pScreen);
 
 
 /*
@@ -581,10 +578,23 @@ rfbProcessClientNormalMessage(cl)
 		break;
 
 	    case rfbEncodingXCursor:
+		rfbLog("Enabling X-style cursor shape updates for client %s\n",
+		       cl->host);
+		if (!cl->enableCursorShapeUpdates) {
+		    cl->enableCursorShapeUpdates = TRUE;
+		    cl->useRichCursorEncoding = FALSE;
+		    cl->cursorWasChanged = TRUE;
+		}
+		break;
+
+	    case rfbEncodingRichCursor:
 		rfbLog("Enabling cursor shape updates for client %s\n",
-		    cl->host);
-		cl->enableCursorShapeUpdates = TRUE;
-		cl->cursorWasChanged = TRUE;
+		       cl->host);
+		if (!cl->enableCursorShapeUpdates) {
+		    cl->enableCursorShapeUpdates = TRUE;
+		    cl->useRichCursorEncoding = TRUE;
+		    cl->cursorWasChanged = TRUE;
+		}
 		break;
 
 	    default:
@@ -896,7 +906,7 @@ rfbSendFramebufferUpdate(cl)
 
     if (sendCursorShape) {
 	cl->cursorWasChanged = FALSE;
-	if (!rfbSendXCursorShape(cl, pScreen))
+	if (!rfbSendCursorShape(cl, pScreen))
 	    return FALSE;
     }
 
@@ -1123,103 +1133,6 @@ rfbSendRectEncodingRaw(cl, x, y, w, h)
 	    return FALSE;
 	}
     }
-}
-
-
-/*
- * Send cursor shape in X-style format.
- */
-
-static Bool
-rfbSendXCursorShape(cl, pScreen)
-    rfbClientPtr cl;
-    ScreenPtr pScreen;
-{
-    CursorPtr pCursor;
-    rfbFramebufferUpdateRectHeader rect;
-    rfbXCursorColors colors;
-    int rowBytes, pixmapRowBytes, dataBytes;
-    int i, j;
-
-    pCursor = rfbSpriteGetCursorPtr(pScreen);
-    if (pCursor == NULL) {
-	/* Send update with empty cursor data. */
-
-	rect.r.x = rect.r.y = 0;
-	rect.r.w = rect.r.h = 0;
-	rect.encoding = Swap32IfLE(rfbEncodingXCursor);
-	memcpy(&updateBuf[ublen], (char *)&rect,
-	       sz_rfbFramebufferUpdateRectHeader);
-	ublen += sz_rfbFramebufferUpdateRectHeader;
-
-	colors.foreRed = colors.foreGreen = colors.foreBlue = (CARD8)0x00;
-	colors.backRed = colors.backGreen = colors.backBlue = (CARD8)0xFF;
-	memcpy(&updateBuf[ublen], (char *)&colors, sz_rfbXCursorColors);
-	ublen += sz_rfbXCursorColors;
-
-	cl->rfbXCursorUpdatesSent++;
-	cl->rfbXCursorBytesSent += (sz_rfbFramebufferUpdateRectHeader +
-				    sz_rfbXCursorColors);
-
-	if (!rfbSendUpdateBuf(cl))
-	    return FALSE;
-
-	return TRUE;
-    }
-
-    rowBytes = (pCursor->bits->width + 7) / 8;
-    pixmapRowBytes = PixmapBytePad(pCursor->bits->width, 1);
-    dataBytes = rowBytes * pCursor->bits->height;
-
-    if ( ublen + sz_rfbFramebufferUpdateRectHeader +
-	 sz_rfbXCursorColors + 2 * dataBytes > UPDATE_BUF_SIZE ) {
-	if (!rfbSendUpdateBuf(cl))
-	    return FALSE;
-    }
-
-    if ( ublen + sz_rfbFramebufferUpdateRectHeader +
-	 sz_rfbXCursorColors + 2 * dataBytes > UPDATE_BUF_SIZE ) {
-	return FALSE;		/* FIXME. */
-    }
-
-    rect.r.x = Swap16IfLE(pCursor->bits->xhot);
-    rect.r.y = Swap16IfLE(pCursor->bits->yhot);
-    rect.r.w = Swap16IfLE(pCursor->bits->width);
-    rect.r.h = Swap16IfLE(pCursor->bits->height);
-    rect.encoding = Swap32IfLE(rfbEncodingXCursor);
-
-    memcpy(&updateBuf[ublen], (char *)&rect,sz_rfbFramebufferUpdateRectHeader);
-    ublen += sz_rfbFramebufferUpdateRectHeader;
-
-    colors.foreRed   = (char)(pCursor->foreRed >> 8);
-    colors.foreGreen = (char)(pCursor->foreGreen >> 8);
-    colors.foreBlue  = (char)(pCursor->foreBlue >> 8);
-    colors.backRed   = (char)(pCursor->backRed >> 8);
-    colors.backGreen = (char)(pCursor->backGreen >> 8);
-    colors.backBlue  = (char)(pCursor->backBlue >> 8);
-
-    memcpy(&updateBuf[ublen], (char *)&colors, sz_rfbXCursorColors);
-    ublen += sz_rfbXCursorColors;
-
-    for (i = 0; i < pCursor->bits->height; i++) {
-      for (j = 0; j < rowBytes; j++) {
-        updateBuf[ublen] =
-          ((char *)pCursor->bits->source)[i * pixmapRowBytes + j];
-        updateBuf[ublen + dataBytes] =
-          ((char *)pCursor->bits->mask)[i * pixmapRowBytes + j];
-        ublen++;
-      }
-    }
-    ublen += dataBytes;
-
-    cl->rfbXCursorUpdatesSent++;
-    cl->rfbXCursorBytesSent += (sz_rfbFramebufferUpdateRectHeader +
-				sz_rfbXCursorColors + 2 * dataBytes);
-
-    if (!rfbSendUpdateBuf(cl))
-	return FALSE;
-
-    return TRUE;
 }
 
 
