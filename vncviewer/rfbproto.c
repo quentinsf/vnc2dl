@@ -322,12 +322,16 @@ SetFormatAndEncodings()
       encStr = nextEncStr;
     } while (encStr && se->nEncodings < MAX_ENCODINGS);
 
-    if (se->nEncodings < MAX_ENCODINGS && appData.useRemoteCursor)
-	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
-
     if (se->nEncodings < MAX_ENCODINGS && requestCompressLevel) {
       encs[se->nEncodings++] = Swap32IfLE(appData.compressLevel +
 					  rfbEncodingCompressLevel0);
+    }
+
+    if (appData.useRemoteCursor) {
+      if (se->nEncodings < MAX_ENCODINGS)
+	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
+      if (se->nEncodings < MAX_ENCODINGS)
+	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
     }
   } else {
     if (SameMachine(rfbsock) && !tunnelSpecified) {
@@ -352,8 +356,10 @@ SetFormatAndEncodings()
       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCompressLevel1);
     }
 
-    if (appData.useRemoteCursor)
+    if (appData.useRemoteCursor) {
       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
+      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
+    }
   }
 
   len = sz_rfbSetEncodingsMsg + se->nEncodings * 4;
@@ -524,6 +530,12 @@ HandleRFBServerMessage()
       rect.encoding = Swap32IfLE(rect.encoding);
 
       if (rect.encoding == rfbEncodingXCursor) {
+	if (!HandleXCursor(rect.r.x, rect.r.y, rect.r.w, rect.r.h)) {
+	  return False;
+        }
+	continue;
+      }
+      if (rect.encoding == rfbEncodingRichCursor) {
 	if (!HandleXCursor(rect.r.x, rect.r.y, rect.r.w, rect.r.h)) {
 	  return False;
         }
