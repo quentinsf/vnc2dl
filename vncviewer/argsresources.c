@@ -277,7 +277,7 @@ void
 usage(void)
 {
   fprintf(stderr,
-	  "TightVNC viewer version 1.2.1 (based on VNC 3.3.3r2)\n"
+	  "TightVNC viewer version 1.2.2 (based on VNC 3.3.3r2)\n"
 	  "\n"
 	  "Usage: %s [<OPTIONS>] [<HOST>]:<DISPLAY#>\n"
 	  "       %s [<OPTIONS>] -listen [<DISPLAY#>]\n"
@@ -300,7 +300,7 @@ usage(void)
 	  "        -nocursorshape\n"
 	  "\n"
 	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233.\n"
-	  "\n", programName, programName, programName, programName);
+	  "\n", programName, programName);
   exit(1);
 }
 
