@@ -15,7 +15,12 @@ JPEG_INC = -I/usr/local/include
 INCLUDES = -I../include -I. $(ZLIB_INC) $(JPEG_INC) -I/usr/include
 VNCAUTH_LIB = ../libvncauth/libvncauth.a
 ZLIB_LIB = -L/usr/local/lib -lz
+#ifdef OSF1Architecture
+XCOMM Avoid linking with different libjpeg in /usr/shlib under Tru64.
+JPEG_LIB = /usr/local/lib/libjpeg.a
+#else
 JPEG_LIB = -L/usr/local/lib -ljpeg
+#endif
 
 DEPLIBS = XawClientDepLibs $(VNCAUTH_LIB)
 LOCAL_LIBRARIES = XawClientLibs $(VNCAUTH_LIB) $(ZLIB_LIB) $(JPEG_LIB)

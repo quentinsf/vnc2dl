@@ -66,7 +66,7 @@ SOFTWARE.
 #include <sys/resource.h>
 #endif
 
-#ifdef AIXV3
+#if defined(AIXV3) || defined(HPUX_10)
 #include <sys/resource.h>
 #endif
 
