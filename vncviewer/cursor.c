@@ -24,6 +24,9 @@
 #include <vncviewer.h>
 
 
+#define COPY_OP_SAVE     0
+#define COPY_OP_RESTORE  1
+
 /* Copied from Xvnc/lib/font/util/utilbitmap.c */
 static unsigned char _reverse_byte[0x100] = {
 	0x00, 0x80, 0x40, 0xc0, 0x20, 0xa0, 0x60, 0xe0,
@@ -72,7 +75,7 @@ static int rcHotX, rcHotY, rcWidth, rcHeight;
 static int rcCursorX, rcCursorY;
 static int rcHideCounter;
 
-static void SoftCursorCopyArea(Bool toScreen);
+static void SoftCursorCopyArea(int oper);
 static void SoftCursorDraw(void);
 static void FreeCursors(Bool setDotCursor);
 
@@ -219,7 +222,7 @@ Bool HandleRichCursor(int xhot, int yhot, int width, int height)
   rcWidth = width;
   rcHeight = height;
 
-  SoftCursorCopyArea(False);
+  SoftCursorCopyArea(COPY_OP_SAVE);
   SoftCursorDraw();
 
   rcHideCounter = 0;
@@ -244,7 +247,7 @@ void SoftCursorHide(void)
     return;
 
   if (!rcHideCounter++)
-    SoftCursorCopyArea(True);
+    SoftCursorCopyArea(COPY_OP_RESTORE);
 }
 
 void SoftCursorShow(void)
@@ -253,7 +256,7 @@ void SoftCursorShow(void)
     return;
 
   if (!--rcHideCounter) {
-    SoftCursorCopyArea(False);
+    SoftCursorCopyArea(COPY_OP_SAVE);
     SoftCursorDraw();
   }
 }
@@ -261,14 +264,14 @@ void SoftCursorShow(void)
 void SoftCursorMove(int x, int y)
 {
   if (prevRichCursorSet && !rcHideCounter) {
-    SoftCursorCopyArea(True);
+    SoftCursorCopyArea(COPY_OP_RESTORE);
   }
 
   rcCursorX = x;
   rcCursorY = y;
 
   if (prevRichCursorSet && !rcHideCounter) {
-    SoftCursorCopyArea(False);
+    SoftCursorCopyArea(COPY_OP_SAVE);
     SoftCursorDraw();
   }
 }
@@ -277,7 +280,7 @@ void SoftCursorMove(int x, int y)
  * Internal low-level functions.
  */
 
-static void SoftCursorCopyArea(Bool toScreen)
+static void SoftCursorCopyArea(int oper)
 {
   int x, y, w, h;
 
@@ -301,7 +304,7 @@ static void SoftCursorCopyArea(Bool toScreen)
     h = si.framebufferHeight - y;
   }
 
-  if (!toScreen) {
+  if (oper == COPY_OP_SAVE) {
     /* Save screen area in memory. */
 #ifdef MITSHM
     if (appData.useShm)
