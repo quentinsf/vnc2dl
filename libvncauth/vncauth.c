@@ -57,13 +57,14 @@ static unsigned char s_fixedkey[8] = {23,82,107,6,35,78,88,7};
 int
 vncEncryptAndStorePasswd(char *passwd, char *fname)
 {
-    return vncEncryptAndStorePasswd2(passwd, NULL, fname);
+    return (vncEncryptAndStorePasswd2(passwd, NULL, fname) == 0);
 }
 
 /*
  * Encrypt one or two passwords and store them in a file.  Returns 1 if
  * successful, 0 if the file could not be written (note that the original
- * vncEncryptAndStorePasswd() function returns inverse values).
+ * vncEncryptAndStorePasswd() function returns inverse values).  The
+ * passwdViewOnly pointer may be NULL.
  */
 
 int
@@ -78,7 +79,7 @@ vncEncryptAndStorePasswd2(char *passwd, char *passwdViewOnly, char *fname)
 
     fp = fopen(fname,"w");
     if (fp == NULL)
-	return 1;
+	return 0;
 
     chmod(fname, S_IRUSR|S_IWUSR);
 
@@ -98,7 +99,7 @@ vncEncryptAndStorePasswd2(char *passwd, char *passwdViewOnly, char *fname)
     bytesWrote = fwrite(encryptedPasswd, 1, bytesToWrite, fp);
   
     fclose(fp);
-    return (bytesWrote != bytesToWrite);
+    return (bytesWrote == bytesToWrite);
 }
 
 
