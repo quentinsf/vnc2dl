@@ -24,9 +24,12 @@
  *              anyway.
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include "vncauth.h"
 
@@ -36,24 +39,31 @@ static void usage(char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
+  char *home_env;
   char *passwd;
   char *passwd1;
+  char passwdDir[256];
   char passwdFile[256];
   int i;
 
   if (argc == 1) {
-      if (getenv("HOME") == NULL) {
-	  fprintf(stderr,"Error: no HOME environment variable\n");
-	  exit(1);
-      }
-      sprintf(passwdFile,"%s/.vnc/passwd",getenv("HOME"));
+    home_env = getenv("HOME");
+    if (home_env == NULL) {
+      fprintf(stderr,"Error: no HOME environment variable\n");
+      exit(1);
+    }
+    if (strlen(home_env) > 240) {
+      fprintf(stderr,"Error: HOME environment variable string too long\n");
+      exit(1);
+    }
+    sprintf(passwdDir, "%s/.vnc", home_env);
+    sprintf(passwdFile, "%s/passwd", passwdDir);
 
   } else if (argc == 2) {
-
-      strcpy(passwdFile,argv[1]);
+    strcpy(passwdFile,argv[1]);
 
   } else {
-      usage(argv);
+    usage(argv);
   }
 
   while (1) {  
@@ -78,6 +88,12 @@ int main(int argc, char *argv[]) {
     }
 
     if (strcmp(passwd1, passwd) == 0) {
+      if (mkdir (passwdDir, (S_IRWXU | S_IRGRP | S_IXGRP |
+			     S_IROTH | S_IXOTH)) == -1 &&
+	  errno != EEXIST) {
+	perror ("~/.vnc");
+	exit (1);
+      }
       if (vncEncryptAndStorePasswd(passwd, passwdFile) != 0) {
 	fprintf(stderr,"Cannot write password file %s\n",passwdFile);
 	exit(1);
