@@ -371,6 +371,12 @@ ddxProcessArgument (argc, argv, i)
 	return 1;
     }
 
+    if (strcmp(argv[i], "-version") == 0) {
+	ErrorF("Xvnc version %d.%d.%s\n", rfbProtocolMajorVersion,
+	       rfbProtocolMinorVersion, XVNCRELEASE);
+	exit(0);
+    }
+
     if (inetdSock != -1 && argv[i][0] == ':') {
 	FatalError("can't specify both -inetd and :displaynumber");
     }
@@ -919,6 +925,7 @@ ddxUseMsg()
     ErrorF("-inetd                 Xvnc is launched by inetd\n");
     ErrorF("-compatiblekbd         set META key = ALT key as in the original "
 								"VNC\n");
+    ErrorF("-version               report Xvnc version on stderr\n");
     exit(1);
 }
 
