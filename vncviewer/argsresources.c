@@ -257,6 +257,7 @@ static XtActionsRec actions[] = {
     {"ServerDialogDone", ServerDialogDone},
     {"PasswordDialogDone", PasswordDialogDone},
     {"Pause", Pause},
+    {"RunCommand", RunCommand},
     {"Quit", Quit},
 };
 

@@ -185,6 +185,8 @@ extern void ToplevelInitAfterRealization();
 extern Time TimeFromEvent(XEvent *ev);
 extern void Pause(Widget w, XEvent *event, String *params,
 		  Cardinal *num_params);
+extern void RunCommand(Widget w, XEvent *event, String *params,
+		       Cardinal *num_params);
 extern void Quit(Widget w, XEvent *event, String *params,
 		 Cardinal *num_params);
 extern void Cleanup();

@@ -307,6 +307,14 @@ These are the actions which you can use in translations:
     Quit the VNC viewer.
 
 
+  RunCommand(arg1,...)
+
+    Run a command or program. The first argument is the name of the
+    command. Additional arguments are arguments to the command. Example:
+  
+      RunCommand(emacs, /home/joe/TODO)
+
+
   Pause()
 
     Pause for a given number of milliseconds (100 by default).  This is
