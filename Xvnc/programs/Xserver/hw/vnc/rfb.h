@@ -450,9 +450,6 @@ extern Bool rfbSendRectEncodingHextile(rfbClientPtr cl, int x, int y, int w,
 
 /* tight.c */
 
-#define TIGHT_MAX_RECT_WIDTH 128
-#define TIGHT_MAX_RECT_HEIGHT 128
-
 extern Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
 
 

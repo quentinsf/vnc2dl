@@ -28,6 +28,10 @@
 #include "rfb.h"
 
 
+#define TIGHT_MAX_RECT_WIDTH 128
+#define TIGHT_MAX_RECT_HEIGHT 128
+
+
 typedef struct COLOR_LIST_s {
     struct COLOR_LIST_s *next;
     int idx;
@@ -82,6 +86,7 @@ static void EncodeIndexedRect8(CARD8 *buf, int w, int h);
 static void EncodeIndexedRect16(CARD8 *buf, int w, int h);
 static void EncodeIndexedRect32(CARD8 *buf, int w, int h);
 
+
 /*
  * Tight encoding implementation.
  */
@@ -122,8 +127,8 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
             for (dx = 0; dx < w; dx += TIGHT_MAX_RECT_WIDTH) {
                 rw = (dx + TIGHT_MAX_RECT_WIDTH < w) ?
                     TIGHT_MAX_RECT_WIDTH : w - dx;
-                rh = (dy + TIGHT_MAX_RECT_WIDTH < h) ?
-                    TIGHT_MAX_RECT_WIDTH : h - dy;
+                rh = (dy + TIGHT_MAX_RECT_HEIGHT < h) ?
+                    TIGHT_MAX_RECT_HEIGHT : h - dy;
                 if (!SendSubrect(cl, x+dx, y+dy, rw, rh))
                     return FALSE;
             }
