@@ -10,7 +10,7 @@
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH vncviewer 1 "August 2002" "" "TightVNC"
+.TH vncviewer 1 "October 2002" "" "TightVNC"
 .SH NAME
 vncviewer \- an X viewer client for VNC
 .SH SYNOPSIS
@@ -142,8 +142,6 @@ Disable cursor shape updates, protocol extensions used to handle
 remote cursor movements locally on the client side
 (TightVNC\-specific). Using cursor shape updates decreases delays with
 remote cursor movements, and can improve bandwidth usage dramatically. 
-See the BUGS section below for an example why you might want to
-disable cursor shape updates.
 .SH ENCODINGS
 The server supplies information in whatever format is desired by the
 client, in order to make the client as easy as possible to implement. 
@@ -335,13 +333,6 @@ remote TCP port number.
 .SH SEE ALSO
 \fBvncserver\fR(1), \fBXvnc\fR(1), \fBvncpasswd\fR(1),
 \fBvncconnect\fR(1), \fBssh\fR(1)
-.SH BUGS
-Current implementation of cursor shape updates does not allow a client
-to track mouse cursor position at the server side. This means that
-clients would not see mouse cursor movements if mouse was moved either
-locally on the server, or by another remote VNC client. Use the
-\fB\-nocursorshape\fR command\-line option when it's important to
-track remote cursor position in all cases.
 .SH AUTHORS
 Original VNC was developed in AT&T Laboratories Cambridge. TightVNC
 additions was implemented by Constantin Kaplinsky. Many other people
