@@ -273,7 +273,7 @@ EncodeRichCursorData8(buf, fmt, pCursor)
 	    if (screenInfo.bitmapBitOrder == LSBFirst) {
 		bitmapByte = _reverse_byte[bitmapByte];
 	    }
-	    for (b = widthPixels % 8 - 1; b >= 0 ; b--) {
+	    for (b = 7; b > 7 - widthPixels % 8; b--) {
 		*buf++ = pix[bitmapByte >> b & 1];
 	    }
 	}
@@ -328,7 +328,7 @@ EncodeRichCursorData##bpp(buf, fmt, pCursor)				 \
 	    if (screenInfo.bitmapBitOrder == LSBFirst) {		 \
 		bitmapByte = _reverse_byte[bitmapByte];			 \
 	    }								 \
-	    for (b = widthPixels % 8 - 1; b >= 0; b--) {		 \
+	    for (b = 7; b > 7 - widthPixels % 8; b--) {			 \
 		memcpy (buf, (char *)&pix[bitmapByte >> b & 1],		 \
 			sizeof(CARD##bpp));				 \
 		buf += sizeof(CARD##bpp);				 \
