@@ -94,6 +94,7 @@ rfbPrintStats(rfbClientPtr cl)
 		(double)cl->rfbRawBytesEquivalent
 		/ (double)(totalBytesSent -
 			   cl->rfbBytesSent[rfbEncodingCopyRect] -
-			   cl->rfbCursorBytesSent));
+			   cl->rfbCursorBytesSent -
+			   cl->rfbLastRectBytesSent));
     }
 }
