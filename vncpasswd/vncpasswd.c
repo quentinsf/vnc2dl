@@ -77,6 +77,10 @@ int main(int argc, char *argv[])
       make_directory = 0;
       check_strictly = 0;
     } else {
+      if (strlen(argv[1]) > 255) {
+        fprintf(stderr, "Error: file name too long\n");
+        exit(1);
+      }
       strcpy(passwdFile, argv[1]);
       read_from_stdin = 0;
       make_directory = 0;
