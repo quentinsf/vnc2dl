@@ -1204,9 +1204,9 @@ rfbSendXCursorShape(cl, pScreen)
     for (i = 0; i < pCursor->bits->height; i++) {
       for (j = 0; j < rowBytes; j++) {
         updateBuf[ublen] =
-          ((char *)pCursor->bits->mask)[i * pixmapRowBytes + j];
-        updateBuf[ublen + dataBytes] =
           ((char *)pCursor->bits->source)[i * pixmapRowBytes + j];
+        updateBuf[ublen + dataBytes] =
+          ((char *)pCursor->bits->mask)[i * pixmapRowBytes + j];
         ublen++;
       }
     }
