@@ -369,6 +369,8 @@ GetArgsAndResources(int argc, char **argv)
   } else {
     vncServerName = argv[1];
 
+    if (!isatty(0))
+      appData.passwordDialog = True;
     if (vncServerName[0] == '-')
       usage();
   }
