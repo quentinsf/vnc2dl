@@ -84,8 +84,8 @@ rfbAuthNewClient(cl)
 
 
 /*
- * In rfbSendAuthenticationCaps, we send the list of our authentication
- * capabilities to the client (protocol 3.130).
+ * In rfbAuthSendCaps, we send the list of our authentication capabilities
+ * to the client (protocol 3.130).
  */
 
 static void
@@ -176,7 +176,7 @@ rfbAuthSendChallenge(cl)
 
 
 /*
- * rfbAuthProcessClientMessage is called when the client sends its
+ * rfbAuthProcessResponse is called when the client sends its
  * authentication response.
  */
 
