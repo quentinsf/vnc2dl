@@ -739,6 +739,8 @@ static Bool CheckDisplayNumber(int n)
     struct sockaddr_in addr;
 
     sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons(6000+n);
