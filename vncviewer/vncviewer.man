@@ -10,7 +10,7 @@
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH vncviewer 1 "October 2002" "" "TightVNC"
+.TH vncviewer 1 "November 2002" "" "TightVNC"
 .SH NAME
 vncviewer \- an X viewer client for VNC
 .SH SYNOPSIS
@@ -128,14 +128,20 @@ levels when working over high\-speed LANs. It's not recommended to use
 compression level 0, reasonable choices start from the level 1.
 .TP
 \fB\-quality \fIlevel\fR
-Use the specified image quality \fIlevel\fR (0..9) for "tight"
-encoding (TightVNC\-specific). Specifying this option allows "tight"
-encoder to use lossy JPEG compression. Quality level 0 denotes bad
-image quality but very impressive compression ratios, while level 9
-offers very good image quality at lower compression ratios. Note that
+Use the specified JPEG quality \fIlevel\fR (0..9) for the "tight"
+encoding (TightVNC\-specific). Quality level 0 denotes bad image
+quality but very impressive compression ratios, while level 9 offers
+very good image quality at lower compression ratios. Note that the
 "tight" encoder uses JPEG to encode only those screen areas that look
 suitable for lossy compression, so quality level 0 does not always
 mean unacceptable image quality.
+.TP
+\fB\-nojpeg\fR
+Disable lossy JPEG compression in Tight encoding (TightVNC\-specific). 
+Disabling JPEG compression is not a good idea in typical cases, as
+that makes the Tight encoder less efficient. You might want to use
+this option if it's absolutely necessary to achieve perfect image
+quality (see also the \fB\-quality\fR option).
 .TP
 \fB\-nocursorshape\fR
 Disable cursor shape updates, protocol extensions used to handle
@@ -208,9 +214,10 @@ situations.
 Like Zlib encoding, Tight encoding uses zlib library to compress the
 pixel data, but it pre\-processes data to maximize compression ratios,
 and to minimize CPU usage on compression. Also, JPEG compression may
-be used to encode color\-rich screen areas (see description of the
-\-quality option above). Tight encoding is usually the best choice for
-low\-bandwidth network environments (e.g. slow modem connections).
+be used to encode color\-rich screen areas (see the description of
+\-quality and \-nojpeg options above). Tight encoding is usually the
+best choice for low\-bandwidth network environments (e.g. slow modem
+connections).
 .SH RESOURCES
 X resources that \fBvncviewer\fR knows about, aside from the
 normal Xt resources, are as follows:
@@ -248,6 +255,9 @@ Equivalent of \fB\-compresslevel\fR option (TightVNC\-specific).
 .TP
 .B qualityLevel
 Equivalent of \fB\-quality\fR option (TightVNC\-specific).
+.TP
+.B enableJPEG
+Equivalent of \fB\-nojpeg\fR option, when set to false. Default true.
 .TP
 .B useRemoteCursor
 Equivalent of \fB\-nocursorshape\fR option, when set to false
