@@ -223,6 +223,9 @@ static XtResource appDataResourceList[] = {
 
   {"grabKeyboard", "GrabKeyboard", XtRBool, sizeof(Bool),
    XtOffsetOf(AppData, grabKeyboard), XtRImmediate, (XtPointer) False},
+
+  {"autoPass", "AutoPass", XtRBool, sizeof(Bool),
+   XtOffsetOf(AppData, autoPass), XtRImmediate, (XtPointer) False}
 };
 
 
@@ -250,6 +253,7 @@ XrmOptionDescRec cmdLineOptions[] = {
   {"-nojpeg",        "*enableJPEG",         XrmoptionNoArg,  "False"},
   {"-nocursorshape", "*useRemoteCursor",    XrmoptionNoArg,  "False"},
   {"-x11cursor",     "*useX11Cursor",       XrmoptionNoArg,  "True"},
+  {"-autopass",      "*autoPass",           XrmoptionNoArg,  "True"}
 
 };
 
@@ -325,6 +329,7 @@ usage(void)
 	  "        -nojpeg\n"
 	  "        -nocursorshape\n"
 	  "        -x11cursor\n"
+	  "        -autopass\n"
 	  "\n"
 	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233.\n"
 	  "See the manual page for more information."

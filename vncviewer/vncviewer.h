@@ -108,6 +108,7 @@ typedef struct {
   Bool enableJPEG;
   Bool useRemoteCursor;
   Bool useX11Cursor;
+  Bool autoPass;
 
 } AppData;
 

@@ -522,6 +522,9 @@ AuthenticateVNC(void)
   CARD32 authScheme, authResult;
   CARD8 challenge[CHALLENGESIZE];
   char *passwd;
+  char  buffer[64];
+  char* cstatus;
+  int   len;
 
   fprintf(stderr, "Performing standard VNC authentication\n");
 
@@ -534,6 +537,17 @@ AuthenticateVNC(void)
       fprintf(stderr, "Cannot read valid password from file \"%s\"\n",
 	      appData.passwordFile);
       return False;
+    }
+  } else if (appData.autoPass) {
+    passwd = buffer;
+    cstatus = fgets(buffer, sizeof buffer, stdin);
+    if (cstatus == NULL)
+       buffer[0] = '\0';
+    else
+    {
+       len = strlen(buffer);
+       if (len > 0 && buffer[len - 1] == '\n')
+	  buffer[len - 1] = '\0';
     }
   } else if (appData.passwordDialog) {
     passwd = DoPasswordDialog();

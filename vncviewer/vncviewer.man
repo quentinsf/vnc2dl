@@ -164,6 +164,10 @@ Use a real X11 cursor with X-style cursor shape updates, instead of
 drawing the remote cursor on the framebuffer. This option also
 disables the dot cursor, and disables cursor position updates in
 non-fullscreen mode.
+.TP
+\fB\-autopass\fR
+Read a plain-text password from stdin. This option affects only the
+standard VNC authentication.
 .SH ENCODINGS
 The server supplies information in whatever format is desired by the
 client, in order to make the client as easy as possible to implement. 
