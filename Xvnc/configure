@@ -17,18 +17,21 @@ then
     MINOR=`uname -r`
     TEENY=0
 else
+    REV=`uname -r`
+
     if [ "$SYSNAME" = HP-UX ]
     then
-       REV=`uname -r | sed -e 's/^[^.]*\.//'`
-       MAJOR=`echo $REV | awk -F. 'NF < 1 {print "0"} {print $1}'`
-       MINOR=`echo $REV | awk -F. 'NF < 2 {print "0"} {print $2}'`
-       TEENY=0
+        REV=`echo $REV | sed -e 's/^[^.]*\.//'`
     else
-       REV=`uname -r | sed -e 's/^V//' -e 's/-.*$//'`
-       MAJOR=`echo $REV | awk -F. 'NF < 1 {print "0"} {print $1}'`
-       MINOR=`echo $REV | awk -F. 'NF < 2 {print "0"} {print $2}'`
-       TEENY=`echo $REV | awk -F. 'NF < 3 {print "0"} {print $3}'`
+        if [ "$SYSNAME" != Darwin ]
+        then
+            REV=`echo $REV | sed -e 's/^V//' -e 's/-.*$//'`
+        fi
     fi
+
+    MAJOR=`echo $REV | awk -F. 'NF < 1 {print "0"} {print $1}'`
+    MINOR=`echo $REV | awk -F. 'NF < 2 {print "0"} {print $2}'`
+    TEENY=`echo $REV | awk -F. 'NF < 3 {print "0"} {print $3}'`
 fi
 
 echo "#define OSName $SYSNAME" > config/cf/platform.def

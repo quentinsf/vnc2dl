@@ -269,6 +269,9 @@ in this Software without prior written authorization from the X Consortium.
 /* expects cpp in PATH */
 #define DEFAULT_CPP "cpp"
 #endif
+#ifdef __MACH__
+#define DEFAULT_CPP "/usr/bin/cpp"
+#endif
 
 /*
  * Step 5:  cpp_argv
