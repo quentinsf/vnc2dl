@@ -977,7 +977,7 @@ static int DetectStillImage24 (fmt, w, h)
     }
     avgError /= (pixelCount * 3 - diffStat[0]);
 
-    return (avgError < 1800);
+    return (avgError < 500);
 }
 
 #define DEFINE_DETECT_FUNCTION(bpp)                                          \
