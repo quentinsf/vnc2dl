@@ -1030,7 +1030,7 @@ rfbSendFramebufferUpdate(cl)
 
     REGION_UNINIT(pScreen,&updateRegion);
 
-    if ( cl->enableLastRectEncoding &&
+    if ( nUpdateRegionRects == 0xFFFF &&
 	 !rfbSendLastRectMarker(cl) ) {
 	return FALSE;
     }
