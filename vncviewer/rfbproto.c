@@ -105,7 +105,7 @@ static char buffer[BUFFER_SIZE];
  */
 
 /* Separate buffer for compressed data. */
-#define ZLIB_BUFFER_SIZE 4096
+#define ZLIB_BUFFER_SIZE 512
 static char zlib_buffer[ZLIB_BUFFER_SIZE];
 
 /* Four independent compression streams for zlib library. */
