@@ -34,7 +34,7 @@ There are five programs here:
 
 First you must have a reasonably recent version of X installed (this includes
 /usr/openwin on Solaris machines).  Also, TightVNC requires JPEG and zlib
-libraries either installed in the system (e.g. under /usr/local).  To build
+libraries installed in the system (e.g. under /usr/local).  To build
 everything but Xvnc, do:
 
 	% xmkmf
