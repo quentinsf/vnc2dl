@@ -928,7 +928,7 @@ char	*argv[];
 	    i = skip - 1;
 	}
 #endif
-#ifdef AIXV3
+#if defined(AIXV3) && ! defined(AIXV4)
         else if ( strcmp( argv[i], "-timeout") == 0)
         {
             if(++i < argc)
