@@ -1063,8 +1063,8 @@ DEFINE_FILL_PALETTE_FUNCTION(32)
  * Functions to operate with palette structures.
  */
 
-#define HASH_FUNC16(rgb) ((int)(((rgb >> 8) + rgb) & 0xFF))
-#define HASH_FUNC32(rgb) ((int)(((rgb >> 16) + (rgb >> 8)) & 0xFF))
+#define HASH_FUNC16(rgb) ((int)((((rgb) >> 8) + (rgb)) & 0xFF))
+#define HASH_FUNC32(rgb) ((int)((((rgb) >> 16) + ((rgb) >> 8)) & 0xFF))
 
 static void
 PaletteReset(void)
