@@ -52,11 +52,13 @@ the X consortium.  To build Xvnc, do:
 If you have trouble building Xvnc, see the Xvnc/README file for more details.
 
 If it all builds OK you should copy the programs to some directory which
-is in your PATH environment variable, such as /usr/local/bin.  You can use
-the vncinstall script to do this for you:
+is in your PATH environment variable, such as /usr/local/bin.  Also, it's
+handy to install manual pages in a directory where the man utility can find
+them.  You can use the vncinstall script to do this for you (man path is
+optional):
 
 	% cd ..
-	% ./vncinstall /usr/local/bin
+	% ./vncinstall /usr/local/bin /usr/local/man
 
 If you want to use the Java VNC viewer, you should copy the class files from
 the classes directory to some suitable installation directory such as
