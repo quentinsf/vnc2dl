@@ -344,7 +344,7 @@ CheckSolidTile##bpp(x, y, w, h, colorPtr, needSameColor)                      \
             if (colorValue != fbptr[dx])                                      \
                 return FALSE;                                                 \
         }                                                                     \
-        fbptr += rfbScreen.paddedWidthInBytes;                                \
+        fbptr = (CARD##bpp *)((CARD8 *)fbptr + rfbScreen.paddedWidthInBytes); \
     }                                                                         \
                                                                               \
     *colorPtr = (CARD32)colorValue;                                           \
