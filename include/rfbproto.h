@@ -289,8 +289,20 @@ typedef struct {
 #define rfbEncodingRRE 2
 #define rfbEncodingCoRRE 4
 #define rfbEncodingHextile 5
+#define rfbEncodingZlib 6
 #define rfbEncodingTight 7
+#define rfbEncodingZlibHex 8
 
+#define rfbEncodingCompressLevel0  (0xFFFFFF00)
+#define rfbEncodingCompressLevel1  (0xFFFFFF01)
+#define rfbEncodingCompressLevel2  (0xFFFFFF02)
+#define rfbEncodingCompressLevel3  (0xFFFFFF03)
+#define rfbEncodingCompressLevel4  (0xFFFFFF04)
+#define rfbEncodingCompressLevel5  (0xFFFFFF05)
+#define rfbEncodingCompressLevel6  (0xFFFFFF06)
+#define rfbEncodingCompressLevel7  (0xFFFFFF07)
+#define rfbEncodingCompressLevel8  (0xFFFFFF08)
+#define rfbEncodingCompressLevel9  (0xFFFFFF09)
 
 
 /*****************************************************************************

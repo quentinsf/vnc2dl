@@ -92,6 +92,10 @@ typedef struct {
   int bumpScrollTime;
   int bumpScrollPixels;
 
+  int compressLevel;
+
+  Bool disableLocalCursor;
+
 } AppData;
 
 extern AppData appData;

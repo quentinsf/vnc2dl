@@ -194,6 +194,12 @@ static XtResource appDataResourceList[] = {
 
   {"bumpScrollPixels", "BumpScrollPixels", XtRInt, sizeof(int),
    XtOffsetOf(AppData, bumpScrollPixels), XtRImmediate, (XtPointer) 20},
+
+  {"compressLevel", "CompressionLevel", XtRInt, sizeof(int),
+   XtOffsetOf(AppData, compressLevel), XtRImmediate, (XtPointer) 6},
+
+  {"disableLocalCursor", "DisableLocalCursor", XtRBool, sizeof(Bool),
+   XtOffsetOf(AppData, disableLocalCursor), XtRImmediate, (XtPointer) False},
 };
 
 
@@ -203,16 +209,18 @@ static XtResource appDataResourceList[] = {
  */
 
 XrmOptionDescRec cmdLineOptions[] = {
-  {"-shared",     "*shareDesktop",      XrmoptionNoArg,  "True"},
-  {"-viewonly",   "*viewOnly",          XrmoptionNoArg,  "True"},
-  {"-fullscreen", "*fullScreen",        XrmoptionNoArg,  "True"},
-  {"-passwd",     "*passwordFile",      XrmoptionSepArg, 0},
-  {"-encodings",  "*encodings",         XrmoptionSepArg, 0},
-  {"-bgr233",     "*useBGR233",         XrmoptionNoArg,  "True"},
-  {"-owncmap",    "*forceOwnCmap",      XrmoptionNoArg,  "True"},
-  {"-truecolor",  "*forceTrueColour",   XrmoptionNoArg,  "True"},
-  {"-truecolour", "*forceTrueColour",   XrmoptionNoArg,  "True"},
-  {"-depth",      "*requestedDepth",    XrmoptionSepArg, 0},
+  {"-shared",        "*shareDesktop",       XrmoptionNoArg,  "True"},
+  {"-viewonly",      "*viewOnly",           XrmoptionNoArg,  "True"},
+  {"-fullscreen",    "*fullScreen",         XrmoptionNoArg,  "True"},
+  {"-passwd",        "*passwordFile",       XrmoptionSepArg, 0},
+  {"-encodings",     "*encodings",          XrmoptionSepArg, 0},
+  {"-bgr233",        "*useBGR233",          XrmoptionNoArg,  "True"},
+  {"-owncmap",       "*forceOwnCmap",       XrmoptionNoArg,  "True"},
+  {"-truecolor",     "*forceTrueColour",    XrmoptionNoArg,  "True"},
+  {"-truecolour",    "*forceTrueColour",    XrmoptionNoArg,  "True"},
+  {"-depth",         "*requestedDepth",     XrmoptionSepArg, 0},
+  {"-compresslevel", "*compressLevel",      XrmoptionSepArg, 0},
+  {"-nolocalcursor", "*disableLocalCursor", XrmoptionNoArg,  "True"},
 };
 
 int numCmdLineOptions = XtNumber(cmdLineOptions);
@@ -259,24 +267,26 @@ removeArgs(int *argc, char** argv, int idx, int nargs)
 void
 usage(void)
 {
-  fprintf(stderr,"\n"
-	  "VNC viewer version 3.3.3r1 with SSH tunneling support\n"
+  fprintf(stderr,
+	  "VNC viewer version 3.3.3r1 (Tight Encoding patch 1.2)\n"
 	  "\n"
-	  "usage: %s [<options>] [<host>:]<display#>\n"
+	  "Usage: %s [<options>] [<host>:]<display#>\n"
 	  "       %s [<options>] -listen [<display#>]\n"
 	  "       %s [<options>] -tunnel <host>:<display#>\n"
 	  "\n"
 	  "<options> are standard Xt options, or:\n"
-	  "              -shared\n"
-	  "              -viewonly\n"
-	  "              -fullscreen\n"
-	  "              -passwd <passwd-file>\n"
-	  "              -encodings <encoding-list> (e.g. \"raw copyrect\")\n"
-	  "              -bgr233\n"
-	  "              -owncmap\n"
-	  "              -truecolour\n"
-	  "              -depth <depth>\n"
-	  ,programName,programName,programName);
+	  "        -shared\n"
+	  "        -viewonly\n"
+	  "        -fullscreen\n"
+	  "        -passwd <passwd-file>\n"
+	  "        -encodings <encoding-list> (e.g. \"tight copyrect\")\n"
+	  "        -bgr233\n"
+	  "        -owncmap\n"
+	  "        -truecolour\n"
+	  "        -depth <depth>\n"
+          "        -compresslevel <compress-value> (0-9)\n"
+          "        -nolocalcursor\n"
+	  "\n", programName, programName, programName);
   exit(1);
 }
 

@@ -275,6 +275,7 @@ SetFormatAndEncodings()
   rfbSetEncodingsMsg *se = (rfbSetEncodingsMsg *)buf;
   CARD32 *encs = (CARD32 *)(&buf[sz_rfbSetEncodingsMsg]);
   int len = 0;
+  Bool requestCompressLevel = False;
 
   spf.type = rfbSetPixelFormat;
   spf.format = myFormat;
@@ -306,6 +307,7 @@ SetFormatAndEncodings()
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
       } else if (strncasecmp(encStr,"tight",encStrLen) == 0) {
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
+        requestCompressLevel = True;
       } else if (strncasecmp(encStr,"hextile",encStrLen) == 0) {
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
       } else if (strncasecmp(encStr,"corre",encStrLen) == 0) {
@@ -318,6 +320,12 @@ SetFormatAndEncodings()
 
       encStr = nextEncStr;
     } while (encStr && se->nEncodings < MAX_ENCODINGS);
+
+    if (se->nEncodings < MAX_ENCODINGS && requestCompressLevel &&
+        appData.compressLevel >= 0 && appData.compressLevel <= 9) {
+      encs[se->nEncodings++] = Swap32IfLE(appData.compressLevel +
+                                          rfbEncodingCompressLevel0);
+    }
   } else {
     if (SameMachine(rfbsock)) {
       fprintf(stderr,"Same machine: preferring raw encoding\n");
@@ -325,10 +333,11 @@ SetFormatAndEncodings()
     }
 
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
+    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRRE);
-    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
+    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCompressLevel1);
   }
 
   len = sz_rfbSetEncodingsMsg + se->nEncodings * 4;

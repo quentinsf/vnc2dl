@@ -573,8 +573,15 @@ rfbProcessClientNormalMessage(cl)
 		}
 		break;
 	    default:
-		rfbLog("rfbProcessClientNormalMessage: ignoring unknown "
-		       "encoding type %d\n", (int)enc);
+		if ( enc >= (CARD32)rfbEncodingCompressLevel0 &&
+		     enc <= (CARD32)rfbEncodingCompressLevel9 ) {
+		    cl->tightCompressLevel = enc & 0x0F;
+		    rfbLog("Using compression level %d for client %s\n",
+			   cl->tightCompressLevel, cl->host);
+		} else {
+		    rfbLog("rfbProcessClientNormalMessage: ignoring unknown "
+			   "encoding %d\n", (int)enc);
+		}
 	    }
 	}
 
