@@ -1,6 +1,6 @@
 '\" t
 .\" ** The above line should force tbl to be a preprocessor **
-.\" Man page for X vncviewer
+.\" Man page for X vncconnect
 .\"
 .\" Copyright (C) 2000, 2001 Red Hat, Inc.
 .\" Copyright (C) 2001 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
