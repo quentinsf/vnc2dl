@@ -46,7 +46,7 @@ extern int endianTest;
 			     (((l) & 0x0000ff00) << 8)  | \
 			     (((l) & 0x000000ff) << 24))  : (l))
 
-#define MAX_ENCODINGS 10
+#define MAX_ENCODINGS 20
 
 #define FLASH_PORT_OFFSET 5400
 #define LISTEN_PORT_OFFSET 5500
