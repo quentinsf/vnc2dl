@@ -90,6 +90,8 @@ rfbSendCursorShape(cl, pScreen)
     int saved_ublen;
     int bitmapRowBytes, paddedRowBytes, maskBytes, dataBytes;
     int i, j;
+    CARD8 *bitmapData;
+    CARD8 bitmapByte;
 
     if (cl->useRichCursorEncoding) {
 	rect.encoding = Swap32IfLE(rfbEncodingRichCursor);
@@ -169,11 +171,15 @@ rfbSendCursorShape(cl, pScreen)
 	memcpy(&updateBuf[ublen], (char *)&colors, sz_rfbXCursorColors);
 	ublen += sz_rfbXCursorColors;
 
+	bitmapData = (CARD8 *)pCursor->bits->source;
+
 	for (i = 0; i < pCursor->bits->height; i++) {
 	    for (j = 0; j < bitmapRowBytes; j++) {
-		updateBuf[ublen++] = (char)
-		    _reverse_byte[ ((unsigned char *)pCursor->bits->source)
-				   [i * paddedRowBytes + j] ];
+		bitmapByte = bitmapData[i * paddedRowBytes + j];
+		if (screenInfo.bitmapBitOrder == LSBFirst) {
+		    bitmapByte = _reverse_byte[bitmapByte];
+		}
+		updateBuf[ublen++] = (char)bitmapByte;
 	    }
 	}
     } else {
@@ -198,11 +204,15 @@ rfbSendCursorShape(cl, pScreen)
 
     /* Prepare transparency mask. */
 
+    bitmapData = (CARD8 *)pCursor->bits->mask;
+
     for (i = 0; i < pCursor->bits->height; i++) {
 	for (j = 0; j < bitmapRowBytes; j++) {
-	    updateBuf[ublen++] = (char)
-		_reverse_byte[ ((unsigned char *)pCursor->bits->mask)
-			       [i * paddedRowBytes + j] ];
+	    bitmapByte = bitmapData[i * paddedRowBytes + j];
+	    if (screenInfo.bitmapBitOrder == LSBFirst) {
+		bitmapByte = _reverse_byte[bitmapByte];
+	    }
+	    updateBuf[ublen++] = (char)bitmapByte;
 	}
     }
 
@@ -237,6 +247,7 @@ EncodeRichCursorData8(buf, fmt, pCursor)
     int x, y, b;
     CARD8 *src;
     char pix[2];
+    CARD8 bitmapByte;
 
     pix[0] = (char)RGB48_TO_PIXEL(fmt, pCursor->backRed, pCursor->backGreen,
 				  pCursor->backBlue);
@@ -249,12 +260,22 @@ EncodeRichCursorData8(buf, fmt, pCursor)
 
     for (y = 0; y < pCursor->bits->height; y++) {
 	for (x = 0; x < widthPixels / 8; x++) {
-	    for (b = 0; b < 8; b++) {
-		*buf++ = pix[src[y*widthBytes+x] >> b & 1];
+	    bitmapByte = src[y * widthBytes + x];
+	    if (screenInfo.bitmapBitOrder == LSBFirst) {
+		bitmapByte = _reverse_byte[bitmapByte];
+	    }
+	    for (b = 7; b >= 0; b--) {
+		*buf++ = pix[bitmapByte >> b & 1];
 	    }
 	}
-	for (b = 0; b < widthPixels % 8; b++) {
-	    *buf++ = pix[src[y*widthBytes+x] >> b & 1];
+	if (widthPixels % 8) {
+	    bitmapByte = src[y * widthBytes + x];
+	    if (screenInfo.bitmapBitOrder == LSBFirst) {
+		bitmapByte = _reverse_byte[bitmapByte];
+	    }
+	    for (b = widthPixels % 8 - 1; b >= 0 ; b--) {
+		*buf++ = pix[bitmapByte >> b & 1];
+	    }
 	}
     }
 
@@ -273,6 +294,7 @@ EncodeRichCursorData##bpp(buf, fmt, pCursor)				 \
     int x, y, b;							 \
     CARD8 *src;								 \
     CARD##bpp pix[2];							 \
+    CARD8 bitmapByte;							 \
 									 \
     pix[0] = (CARD##bpp)RGB48_TO_PIXEL(fmt, pCursor->backRed,		 \
 				       pCursor->backGreen,		 \
@@ -291,16 +313,26 @@ EncodeRichCursorData##bpp(buf, fmt, pCursor)				 \
 									 \
     for (y = 0; y < pCursor->bits->height; y++) {			 \
 	for (x = 0; x < widthPixels / 8; x++) {				 \
-	    for (b = 0; b < 8; b++) {					 \
-		memcpy (buf, (char *)&pix[src[y*widthBytes+x] >> b & 1], \
+	    bitmapByte = src[y * widthBytes + x];			 \
+	    if (screenInfo.bitmapBitOrder == LSBFirst) {		 \
+		bitmapByte = _reverse_byte[bitmapByte];			 \
+	    }								 \
+	    for (b = 7; b >= 0; b--) {					 \
+		memcpy (buf, (char *)&pix[bitmapByte >> b & 1],		 \
 			sizeof(CARD##bpp));				 \
 		buf += sizeof(CARD##bpp);				 \
 	    }								 \
 	}								 \
-	for (b = 0; b < widthPixels % 8; b++) {				 \
-	    memcpy (buf, (char *)&pix[src[y*widthBytes+x] >> b & 1],	 \
-		    sizeof(CARD##bpp));					 \
-	    buf += sizeof(CARD##bpp);					 \
+	if (widthPixels % 8) {						 \
+	    bitmapByte = src[y * widthBytes + x];			 \
+	    if (screenInfo.bitmapBitOrder == LSBFirst) {		 \
+		bitmapByte = _reverse_byte[bitmapByte];			 \
+	    }								 \
+	    for (b = widthPixels % 8 - 1; b >= 0; b--) {		 \
+		memcpy (buf, (char *)&pix[bitmapByte >> b & 1],		 \
+			sizeof(CARD##bpp));				 \
+		buf += sizeof(CARD##bpp);				 \
+	    }								 \
 	}								 \
     }									 \
 									 \
