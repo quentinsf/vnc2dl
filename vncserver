@@ -446,7 +446,7 @@ sub removeSlashes
 
 sub Usage
 {
-    die("TightVNC server version 1.2.8\n".
+    die("TightVNC server version 1.3dev1\n".
 	"\n".
 	"Usage: $prog [<OPTIONS>] [:<DISPLAY#>]\n".
 	"       $prog -kill :<DISPLAY#>\n".

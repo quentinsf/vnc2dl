@@ -1,6 +1,6 @@
 Summary:   A remote display system.
 Name:      tightvnc
-Version:   1.2.8
+Version:   1.3dev1
 Release:   1
 URL:       http://www.tightvnc.com/
 Source0:   tightvnc-%{version}_unixsrc.tar.bz2
