@@ -31,9 +31,11 @@
 #include <zlib.h>
 #include <jpeglib.h>
 
+static void InitCapabilities(void);
 static Bool SetupTunneling(void);
-static Bool PerformAuthenticationNew(void);
-static Bool PerformAuthenticationOld(void);
+static int ReadSecurityType(void);
+static int SelectSecurityType(void);
+static Bool PerformAuthenticationTight(void);
 static Bool AuthenticateVNC(void);
 static Bool AuthenticateUnixLogin(void);
 static Bool ReadInteractionCaps(void);
@@ -75,11 +77,12 @@ Bool newServerCutText = False;
 
 int endianTest = 1;
 
-CapsContainer *tunnelCaps;	/* known tunneling/encryption methods */
-CapsContainer *authCaps;	/* known authentication schemes       */
-CapsContainer *serverMsgCaps;	/* known non-standard server messages */
-CapsContainer *clientMsgCaps;	/* known non-standard client messages */
-CapsContainer *encodingCaps;	/* known encodings besides Raw        */
+static Bool tightVncProtocol = False;
+static CapsContainer *tunnelCaps;    /* known tunneling/encryption methods */
+static CapsContainer *authCaps;	     /* known authentication schemes       */
+static CapsContainer *serverMsgCaps; /* known non-standard server messages */
+static CapsContainer *clientMsgCaps; /* known non-standard client messages */
+static CapsContainer *encodingCaps;  /* known encodings besides Raw        */
 
 
 /* Note that the CoRRE encoding uses this buffer and assumes it is big enough
@@ -132,7 +135,7 @@ static Bool jpegError;
  * InitCapabilities.
  */
 
-void
+static void
 InitCapabilities(void)
 {
   tunnelCaps    = CapsNewContainer();
@@ -142,9 +145,9 @@ InitCapabilities(void)
   encodingCaps  = CapsNewContainer();
 
   /* Supported authentication methods */
-  CapsAdd(authCaps, rfbVncAuth, rfbStandardVendor, sig_rfbVncAuth,
+  CapsAdd(authCaps, rfbAuthVNC, rfbStandardVendor, sig_rfbAuthVNC,
 	  "Standard VNC password authentication");
-  CapsAdd(authCaps, rfbUnixLoginAuth, rfbTightVncVendor, sig_rfbUnixLoginAuth,
+  CapsAdd(authCaps, rfbAuthUnixLogin, rfbTightVncVendor, sig_rfbAuthUnixLogin,
 	  "Login-style Unix authentication");
 
   /* Supported encoding types */
@@ -213,6 +216,7 @@ InitialiseRFBConnection(void)
   int server_major, server_minor;
   int viewer_major, viewer_minor;
   rfbClientInitMsg ci;
+  int secType;
 
   /* if the connection is immediately closed, don't report anything, so
        that pmw's monitor can make test connections */
@@ -234,10 +238,11 @@ InitialiseRFBConnection(void)
   }
 
   viewer_major = rfbProtocolMajorVersion;
-  if (server_major == 3 && server_minor >= 130) {
-    /* Protocol version 3.130 */
+  if (server_major == 3 && server_minor >= rfbProtocolMinorVersion) {
+    /* the server supports at least the standard protocol 3.7 */
     viewer_minor = rfbProtocolMinorVersion;
   } else {
+    /* any other server version, request the standard 3.3 */
     viewer_minor = rfbProtocolFallbackMinorVersion;
   }
 
@@ -249,14 +254,34 @@ InitialiseRFBConnection(void)
   if (!WriteExact(rfbsock, pv, sz_rfbProtocolVersionMsg))
     return False;
 
-  if (viewer_minor >= 130) {
-    if (!SetupTunneling())      /* setup tunneling in protocol 3.130 */
-      return False;
-    if (!PerformAuthenticationNew()) /* authentication in protocol 3.130 */
-      return False;
+  /* Read or select the security type. */
+  if (viewer_minor == rfbProtocolMinorVersion) {
+    secType = SelectSecurityType();
   } else {
-    if (!PerformAuthenticationOld()) /* authentication in protocol 3.3 */
+    secType = ReadSecurityType();
+  }
+  if (secType == rfbSecTypeInvalid)
+    return False;
+
+  switch (secType) {
+  case rfbSecTypeNone:
+    fprintf(stderr, "No authentication needed\n");
+    break;
+  case rfbSecTypeVncAuth:
+    if (!AuthenticateVNC())
       return False;
+    break;
+  case rfbSecTypeTight:
+    tightVncProtocol = True;
+    InitCapabilities();
+    if (!SetupTunneling())
+      return False;
+    if (!PerformAuthenticationTight())
+      return False;
+    break;
+  default:                      /* should never happen */
+    fprintf(stderr, "Internal error: Invalid security type\n");
+    return False;
   }
 
   ci.shared = (appData.shareDesktop ? 1 : 0);
@@ -274,6 +299,7 @@ InitialiseRFBConnection(void)
   si.format.blueMax = Swap16IfLE(si.format.blueMax);
   si.nameLength = Swap32IfLE(si.nameLength);
 
+  /* FIXME: Check arguments to malloc() calls. */
   desktopName = malloc(si.nameLength + 1);
   if (!desktopName) {
     fprintf(stderr, "Error allocating memory for desktop name, %lu bytes\n",
@@ -290,9 +316,8 @@ InitialiseRFBConnection(void)
   fprintf(stderr,"VNC server default format:\n");
   PrintPixelFormat(&si.format);
 
-  /* Only for protocol version 3.130 */
-  if (viewer_minor >= 130) {
-    /* Read interaction capabilities */
+  if (tightVncProtocol) {
+    /* Read interaction capabilities (protocol 3.7t) */
     if (!ReadInteractionCaps())
       return False;
   }
@@ -302,7 +327,103 @@ InitialiseRFBConnection(void)
 
 
 /*
- * Setup tunneling, for the protocol version 3.130.
+ * Read security type from the server (protocol version 3.3)
+ */
+
+static int
+ReadSecurityType(void)
+{
+  CARD32 secType;
+
+  /* Read the security type */
+  if (!ReadFromRFBServer((char *)&secType, sizeof(secType)))
+    return rfbSecTypeInvalid;
+
+  secType = Swap32IfLE(secType);
+
+  if (secType == rfbSecTypeInvalid) {
+    ReadConnFailedReason();
+    return rfbSecTypeInvalid;
+  }
+
+  if (secType != rfbSecTypeNone && secType != rfbSecTypeVncAuth) {
+    fprintf(stderr, "Unknown security type from RFB server: %d\n",
+            (int)secType);
+    return rfbSecTypeInvalid;
+  }
+
+  return (int)secType;
+}
+
+
+/*
+ * Select security type from the server's list (protocol version 3.7)
+ */
+
+static int
+SelectSecurityType(void)
+{
+  CARD8 nSecTypes;
+  char *secTypeNames[] = {"None", "VncAuth"};
+  CARD8 knownSecTypes[] = {rfbSecTypeNone, rfbSecTypeVncAuth};
+  int nKnownSecTypes = sizeof(knownSecTypes);
+  CARD8 *secTypes;
+  CARD8 secType = rfbSecTypeInvalid;
+  int i, j;
+
+  /* Read the list of secutiry types. */
+  if (!ReadFromRFBServer((char *)&nSecTypes, sizeof(nSecTypes)))
+    return rfbSecTypeInvalid;
+
+  if (nSecTypes == 0) {
+    ReadConnFailedReason();
+    return rfbSecTypeInvalid;
+  }
+
+  secTypes = malloc(nSecTypes);
+  if (!ReadFromRFBServer((char *)secTypes, nSecTypes))
+    return rfbSecTypeInvalid;
+
+  /* Find out if the server supports TightVNC protocol extensions */
+  for (j = 0; j < (int)nSecTypes; j++) {
+    if (secTypes[j] == rfbSecTypeTight) {
+      free(secTypes);
+      secType = rfbSecTypeTight;
+      if (!WriteExact(rfbsock, (char *)&secType, sizeof(secType)))
+        return rfbSecTypeInvalid;
+      fprintf(stderr, "Enabling TightVNC protocol extensions\n");
+      return rfbSecTypeTight;
+    }
+  }
+
+  /* Find first supported security type */
+  for (j = 0; j < (int)nSecTypes; j++) {
+    for (i = 0; i < nKnownSecTypes; i++) {
+      if (secTypes[j] == knownSecTypes[i]) {
+        secType = secTypes[j];
+        if (!WriteExact(rfbsock, (char *)&secType, sizeof(secType))) {
+          free(secTypes);
+          return rfbSecTypeInvalid;
+        }
+        fprintf(stderr, "Choosing security type %s(%d)\n",
+                secTypeNames[i], (int)secType); /* DEBUG: too much output. */
+        break;
+      }
+    }
+    if (secType != rfbSecTypeInvalid) break;
+  }
+
+  free(secTypes);
+
+  if (secType == rfbSecTypeInvalid)
+    fprintf(stderr, "Server did not offer supported security type\n");
+
+  return (int)secType;
+}
+
+
+/*
+ * Setup tunneling (protocol version 3.7t).
  */
 
 static Bool
@@ -311,18 +432,13 @@ SetupTunneling(void)
   rfbTunnelingCapsMsg caps;
   CARD32 tunnelType;
 
-  /* In the protocol version 3.130, the server informs us about supported
-     tunneling methods supported. Here we read this information. */
+  /* In the protocol version 3.7t, the server informs us about
+     supported tunneling methods. Here we read this information. */
 
   if (!ReadFromRFBServer((char *)&caps, sz_rfbTunnelingCapsMsg))
     return False;
 
-  caps.nTunnelTypes = Swap16IfLE(caps.nTunnelTypes);
-
-  if (caps.connFailed) {
-    ReadConnFailedReason();
-    return False;
-  }
+  caps.nTunnelTypes = Swap32IfLE(caps.nTunnelTypes);
 
   if (caps.nTunnelTypes) {
     if (!ReadCapabilityList(tunnelCaps, caps.nTunnelTypes))
@@ -339,28 +455,23 @@ SetupTunneling(void)
 
 
 /*
- * Negotiate authentication scheme (protocol version 3.130)
+ * Negotiate authentication scheme (protocol version 3.7t)
  */
 
 static Bool
-PerformAuthenticationNew(void)
+PerformAuthenticationTight(void)
 {
   rfbAuthenticationCapsMsg caps;
   CARD32 authScheme;
   int i;
 
-  /* In the protocol version 3.130, the server informs us about supported
-     authentication schemes supported. Here we read this information. */
+  /* In the protocol version 3.7t, the server informs us about supported
+     authentication schemes. Here we read this information. */
 
   if (!ReadFromRFBServer((char *)&caps, sz_rfbAuthenticationCapsMsg))
     return False;
 
-  caps.nAuthTypes = Swap16IfLE(caps.nAuthTypes);
-
-  if (caps.connFailed) {
-    ReadConnFailedReason();
-    return False;
-  }
+  caps.nAuthTypes = Swap32IfLE(caps.nAuthTypes);
 
   if (!caps.nAuthTypes) {
     fprintf(stderr, "No authentication needed\n");
@@ -371,8 +482,8 @@ PerformAuthenticationNew(void)
     return False;
 
   /* Prefer Unix login authentication if a user name was given. */
-  if (appData.userLogin && CapsIsEnabled(authCaps, rfbUnixLoginAuth)) {
-    authScheme = Swap32IfLE(rfbUnixLoginAuth);
+  if (appData.userLogin && CapsIsEnabled(authCaps, rfbAuthUnixLogin)) {
+    authScheme = Swap32IfLE(rfbAuthUnixLogin);
     if (!WriteExact(rfbsock, (char *)&authScheme, sizeof(authScheme)))
       return False;
     return AuthenticateUnixLogin();
@@ -381,15 +492,15 @@ PerformAuthenticationNew(void)
   /* Otherwise, try server's preferred authentication scheme. */
   for (i = 0; i < CapsNumEnabled(authCaps); i++) {
     authScheme = CapsGetByOrder(authCaps, i);
-    if (authScheme != rfbUnixLoginAuth && authScheme != rfbVncAuth)
+    if (authScheme != rfbAuthUnixLogin && authScheme != rfbAuthVNC)
       continue;                 /* unknown scheme - cannot use it */
     authScheme = Swap32IfLE(authScheme);
     if (!WriteExact(rfbsock, (char *)&authScheme, sizeof(authScheme)))
       return False;
     authScheme = Swap32IfLE(authScheme); /* convert it back */
-    if (authScheme == rfbUnixLoginAuth) {
+    if (authScheme == rfbAuthUnixLogin) {
       return AuthenticateUnixLogin();
-    } else if (authScheme == rfbVncAuth) {
+    } else if (authScheme == rfbAuthVNC) {
       return AuthenticateVNC();
     } else {
       /* Should never happen. */
@@ -400,42 +511,6 @@ PerformAuthenticationNew(void)
 
   fprintf(stderr, "No suitable authentication schemes offered by server\n");
   return False;
-}
-
-
-/*
- * Negotiate authentication scheme (protocol version 3.3)
- */
-
-static Bool
-PerformAuthenticationOld(void)
-{
-  CARD32 authScheme;
-
-  /* Read the authentication type */
-  if (!ReadFromRFBServer((char *)&authScheme, 4))
-    return False;
-
-  authScheme = Swap32IfLE(authScheme);
-
-  switch (authScheme) {
-  case rfbConnFailed:
-    ReadConnFailedReason();
-    return False;
-  case rfbNoAuth:
-    fprintf(stderr, "No authentication needed\n");
-    break;
-  case rfbVncAuth:
-    if (!AuthenticateVNC())
-      return False;
-    break;
-  default:
-    fprintf(stderr, "Unknown authentication scheme from VNC server: %d\n",
-	    (int)authScheme);
-    return False;
-  }
-
-  return True;
 }
 
 
@@ -581,7 +656,7 @@ AuthenticateUnixLogin(void)
 
 
 /*
- * In the protocol version 3.130, the server informs us about supported
+ * In the protocol version 3.7t, the server informs us about supported
  * protocol messages and encodings. Here we read this information.
  */
 

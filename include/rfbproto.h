@@ -20,7 +20,8 @@
  */
 
 /*
- * rfbproto.h - header file for the RFB protocol, versions 3.130 and 3.3
+ * rfbproto.h - header file for the RFB protocol, versions 3.3, 3.7 and 3.7t
+ * (protocol 3.7t is effectively 3.7 with TightVNC extensions enabled)
  *
  * Uses types CARD<n> for an n-bit unsigned integer, INT<n> for an n-bit signed
  * integer (for n = 8, 16 and 32).
@@ -123,7 +124,7 @@ typedef struct _rfbPixelFormat {
 
 /*-----------------------------------------------------------------------------
  * Structure used to describe protocol options such as tunneling methods,
- * authentication schemes and message types (protocol version 3.130).
+ * authentication schemes and message types (protocol version 3.7t).
  */
 
 typedef struct _rfbCapabilityInfo {
@@ -159,8 +160,8 @@ typedef struct _rfbCapabilityInfo {
  * The server always sends 12 bytes to start which identifies the latest RFB
  * protocol version number which it supports.  These bytes are interpreted
  * as a string of 12 ASCII characters in the format "RFB xxx.yyy\n" where
- * xxx and yyy are the major and minor version numbers (for version 3.5
- * this is "RFB 003.005\n").
+ * xxx and yyy are the major and minor version numbers (for version 3.7
+ * this is "RFB 003.007\n").
  *
  * The client then replies with a similar 12-byte message giving the version
  * number of the protocol which should actually be used (which may be different
@@ -180,7 +181,7 @@ typedef struct _rfbCapabilityInfo {
 
 #define rfbProtocolVersionFormat "RFB %03d.%03d\n"
 #define rfbProtocolMajorVersion 3
-#define rfbProtocolMinorVersion 130
+#define rfbProtocolMinorVersion 7
 #define rfbProtocolFallbackMinorVersion 3
 
 typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
@@ -188,23 +189,34 @@ typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
 #define sz_rfbProtocolVersionMsg 12
 
 
-/*-----------------------------------------------------------------------------
- * Negotiation of Tunneling Capabilities (protocol version 3.130)
+/*
+ * Negotiation of the security type (protocol version 3.7)
  *
  * Once the protocol version has been decided, the server either sends a list
- * of supported tunneling methods, or informs the client about an error.
- * ("Tunneling" refers to any additional layer of data transformation, e.g.
- * encryption or external compression.)
+ * of supported security types, or informs the client about an error (when the
+ * number of security types is 0).  Security type rfbSecTypeTight is used to
+ * enable TightVNC-specific protocol extensions.  The value rfbSecTypeVncAuth
+ * stands for classic VNC authentication.
  *
- * If connFailed is true, then the value nTunnelTypes does not make sense.
- * In this case the structure is followed by a string describing the reason for
- * connection failure (where a string is specified as a 32-bit length followed
- * by that many ASCII characters).  After sending such a reason string, the
- * server will close the connection.
+ * The client selects a particular security type from the list provided by the
+ * server.
+ */
+
+#define rfbSecTypeInvalid 0
+#define rfbSecTypeNone 1
+#define rfbSecTypeVncAuth 2
+#define rfbSecTypeTight 16
+
+
+/*-----------------------------------------------------------------------------
+ * Negotiation of Tunneling Capabilities (protocol version 3.7t)
  *
- * If connFailed is false, then nTunnelTypes specifies the number of following
- * rfbCapabilityInfo structures that list all supported tunneling methods in
- * the order of preference.
+ * If the chosen security type is rfbSecTypeTight, the server sends a list of
+ * supported tunneling methods ("tunneling" refers to any additional layer of
+ * data transformation, such as encryption or external compression.)
+ *
+ * nTunnelTypes specifies the number of following rfbCapabilityInfo structures
+ * that list all supported tunneling methods in the order of preference.
  *
  * NOTE: If nTunnelTypes is 0, that tells the client that no tunneling can be
  * used, and the client should not send a response requesting a tunneling
@@ -212,17 +224,14 @@ typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
  */
 
 typedef struct _rfbTunnelingCapsMsg {
-    CARD8 connFailed;
-    CARD8 pad;
-    CARD16 nTunnelTypes;
+    CARD32 nTunnelTypes;
     /* followed by nTunnelTypes * rfbCapabilityInfo structures */
 } rfbTunnelingCapsMsg;
 
 #define sz_rfbTunnelingCapsMsg 4
 
-
 /*-----------------------------------------------------------------------------
- * Tunneling Method Request (protocol version 3.130)
+ * Tunneling Method Request (protocol version 3.7t)
  *
  * If the list of tunneling capabilities sent by the server was not empty, the
  * client should reply with a 32-bit code specifying a particular tunneling
@@ -230,25 +239,17 @@ typedef struct _rfbTunnelingCapsMsg {
  */
 
 #define rfbNoTunneling 0
-
 #define sig_rfbNoTunneling "NOTUNNEL"
 
 
 /*-----------------------------------------------------------------------------
- * Negotiation of Authentication Capabilities (protocol version 3.130)
+ * Negotiation of Authentication Capabilities (protocol version 3.7t)
  *
- * After setting up tunneling, the server either sends a list of supported
- * authentication schemes, or informs the client about an error.
+ * After setting up tunneling, the server sends a list of supported
+ * authentication schemes.
  *
- * If connFailed is true, then the value nAuthTypes does not make sense.
- * In this case the structure is followed by a string describing the reason for
- * connection failure (where a string is specified as a 32-bit length followed
- * by that many ASCII characters).  After sending such a reason string, the
- * server will close the connection.
- *
- * If connFailed is false, then nAuthTypes specifies the number of following
- * rfbCapabilityInfo structures that list all supported authentication schemes
- * in the order of preference.
+ * nAuthTypes specifies the number of following rfbCapabilityInfo structures
+ * that list all supported authentication schemes in the order of preference.
  *
  * NOTE: If nAuthTypes is 0, that tells the client that no authentication is
  * necessary, and the client should not send a response requesting an
@@ -256,82 +257,39 @@ typedef struct _rfbTunnelingCapsMsg {
  */
 
 typedef struct _rfbAuthenticationCapsMsg {
-    CARD8 connFailed;
-    CARD8 pad;
-    CARD16 nAuthTypes;
+    CARD32 nAuthTypes;
     /* followed by nAuthTypes * rfbCapabilityInfo structures */
 } rfbAuthenticationCapsMsg;
 
 #define sz_rfbAuthenticationCapsMsg 4
 
 /*-----------------------------------------------------------------------------
- * The following structure can be used instead of rfbTunnelingCapsMsg or
- * rfbAuthenticationCapsMsg structures, in situations when the connFailed
- * value is true.
+ * Authentication Scheme Request (protocol version 3.7t)
+ *
+ * If the list of authentication capabilities sent by the server was not empty,
+ * the client should reply with a 32-bit code specifying a particular
+ * authentication scheme.  The following codes are supported.
  */
 
-typedef struct _rfbConnFailedMsg {
-    CARD8 connFailed;
-    CARD8 pad1;
-    CARD16 pad2;
-    CARD32 reasonLength;
-    /* followed by char[reasonLength] */
-} rfbConnFailedMsg;
+#define rfbAuthNone 1
+#define rfbAuthVNC 2
+#define rfbAuthUnixLogin 129
+#define rfbAuthExternal 130
 
-#define sz_rfbConnFailedMsg 8
+#define sig_rfbAuthVNC "VNCAUTH_"
+#define sig_rfbAuthUnixLogin "ULGNAUTH"
+#define sig_rfbAuthExternal "XTRNAUTH"
+
 
 /*-----------------------------------------------------------------------------
- * VNC Authentication (protocol version 3.3)
+ * Standard VNC Authentication (all protocol versions)
  *
- * Once the protocol version has been decided, and if that version is 3.0-3.3,
- * the server then sends a 32-bit word indicating whether any authentication
- * is needed on the connection. The value of this word determines the
- * authentication scheme in use.  For versions 3.0 of the protocol this may
- * have one of the values (0, 1, or 2) defined below.
- *
- * NOTE: In the protocol version 3.130, the authentication scheme is chosen on
- * the client side, from the list of supported schemes sent by the server.
- */
-
-#define rfbConnFailed 0
-#define rfbNoAuth 1
-#define rfbVncAuth 2
-
-#define sig_rfbVncAuth "VNCAUTH_"
-
-/*
- * rfbConnFailed:	For some reason the connection failed (e.g. the server
- *			cannot support the desired protocol version).  This is
- *			followed by a string describing the reason (where a
- *			string is specified as a 32-bit length followed by that
- *			many ASCII characters).
- *
- * rfbNoAuth:		No authentication is needed.
- *
- * rfbVncAuth:		The VNC authentication scheme is to be used.  A 16-byte
- *			challenge follows, which the client encrypts as
- *			appropriate using the password and sends the resulting
- *			16-byte response.  If the response is correct, the
- *			server sends the 32-bit word rfbVncAuthOK.  If a simple
- *			failure happens, the server sends rfbVncAuthFailed and
- *			closes the connection. If the server decides that too
- *			many failures have occurred, it sends rfbVncAuthTooMany
- *			and closes the connection.  In the latter case, the
- *			server should not allow an immediate reconnection by
- *			the client.
+ * Standard authentication result codes are defined below.
  */
 
 #define rfbVncAuthOK 0
 #define rfbVncAuthFailed 1
 #define rfbVncAuthTooMany 2
-
-
-/*-----------------------------------------------------------------------------
- * Alternate login-style Unix authentication (protocol version 3.130).
- */
-
-#define rfbUnixLoginAuth 129
-#define sig_rfbUnixLoginAuth "ULGNAUTH"
 
 
 /*-----------------------------------------------------------------------------
@@ -371,10 +329,10 @@ typedef struct _rfbServerInitMsg {
 
 
 /*-----------------------------------------------------------------------------
- * Server Interaction Capabilities Message (protocol version 3.130)
+ * Server Interaction Capabilities Message (protocol version 3.7t)
  *
- * In the protocol version 3.130, the server informs the client what message
- * types it supports in addition to ones defined in the protocol version 3.3.
+ * In the protocol version 3.7t, the server informs the client what message
+ * types it supports in addition to ones defined in the protocol version 3.7.
  * Also, the server sends the list of all supported encodings (note that it's
  * not necessary to advertise the "raw" encoding sinse it MUST be supported in
  * RFB 3.x protocols).
@@ -450,6 +408,7 @@ typedef struct _rfbInteractionCapsMsg {
 #define rfbFileUploadData 133
 #define rfbFileDownloadCancel 134
 #define rfbFileUploadFailed 135
+#define rfbFileCreateDirRequest 136
 
 /* signatures for non-standard messages */
 #define sig_rfbFileListRequest "FTC_LSRQ"
@@ -458,6 +417,7 @@ typedef struct _rfbInteractionCapsMsg {
 #define sig_rfbFileUploadData "FTC_UPDT"
 #define sig_rfbFileDownloadCancel "FTC_DNCN"
 #define sig_rfbFileUploadFailed "FTC_UPFL"
+#define sig_rfbFileCreateDirRequest "FTC_FCDR"
 
 /*****************************************************************************
  *
@@ -939,43 +899,42 @@ typedef struct _rfbServerCutTextMsg {
  * FileListData
  */
 
-typedef struct {
+typedef struct _rfbFileListDataMsg {
     CARD8 type;
-    CARD8 fnamesize;
-    CARD16 amount;
-    CARD16 num;
-    CARD16 attr;
-    CARD32 size;
-    /* Followed by Filename[fmamesize] */
+    CARD8 flags;
+    CARD16 numFiles;
+    CARD16 dataSize;
+    CARD16 compressedSize;
+    /* Followed by SizeData[numFiles] */
+    /* Followed by Filenames[compressedSize] */
 } rfbFileListDataMsg;
 
-#define sz_rfbFileListDataMsg 12
+#define sz_rfbFileListDataMsg 8
 
 /*-----------------------------------------------------------------------------
  * FileDownloadData
  */
 
-typedef struct {
+typedef struct _rfbFileDownloadDataMsg {
     CARD8 type;
-    CARD8 unused;
-    CARD16 amount;
-    CARD16 num;
-    CARD16 size;
-    /* Followed by File[size] */
+    CARD8 compressLevel;
+    CARD16 realSize;
+    CARD16 compressedSize;
+    /* Followed by File[copressedSize] */
 } rfbFileDownloadDataMsg;
 
-#define sz_rfbFileDownloadDataMsg 8
+#define sz_rfbFileDownloadDataMsg 6
 
 
 /*-----------------------------------------------------------------------------
  * FileUploadCancel
  */
 
-typedef struct {
+typedef struct _rfbFileUploadCancelMsg {
     CARD8 type;
     CARD8 unused;
-    CARD16 reasonlen;
-    /* Followed by reason[reasonsize] */
+    CARD16 reasonLen;
+    /* Followed by reason[reasonLen] */
 } rfbFileUploadCancelMsg;
 
 #define sz_rfbFileUploadCancelMsg 4
@@ -984,14 +943,14 @@ typedef struct {
  * FileDownloadFailed
  */
 
-typedef struct {
+typedef struct _rfbFileDownloadFailedMsg {
     CARD8 type;
     CARD8 unused;
-    CARD16 reasonlen;
-    /* Followed by reason[reasonsize] */
+    CARD16 reasonLen;
+    /* Followed by reason[reasonLen] */
 } rfbFileDownloadFailedMsg;
 
-#define sz_rfbFileServerCancelMsg 4
+#define sz_rfbFileDownloadFailedMsg 4
 
 /*-----------------------------------------------------------------------------
  * Union of all server->client messages.
@@ -1168,50 +1127,54 @@ typedef struct _rfbClientCutTextMsg {
  * FileListRequest
  */
 
-typedef struct {
+typedef struct _rfbFileListRequestMsg {
     CARD8 type;
-    CARD8 dnamesize;
-    /* Followed by char Dirname[dnamesize] */
+    CARD8 flags;
+	CARD16 dirNameSize;
+    /* Followed by char Dirname[dirNameSize] */
 } rfbFileListRequestMsg;
 
-#define sz_rfbFileListRequestMsg 2
+#define sz_rfbFileListRequestMsg 4
 
 /*-----------------------------------------------------------------------------
  * FileDownloadRequest
  */
 
-typedef struct {
+typedef struct _rfbFileDownloadRequestMsg {
     CARD8 type;
-    CARD8 fnamesize;
-    /* Followed by char Filename[size] */
+	CARD8 compressedLevel;
+    CARD16 fNameSize;
+	CARD32 position;
+    /* Followed by char Filename[fNameSize] */
 } rfbFileDownloadRequestMsg;
 
-#define sz_rfbFileDownloadRequestMsg 2
+#define sz_rfbFileDownloadRequestMsg 8
 
 /*-----------------------------------------------------------------------------
  * FileUploadRequest
  */
 
-typedef struct {
+typedef struct _rfbFileUploadRequestMsg {
     CARD8 type;
-    CARD8 fnamesize;
-    /* Followed by char Filename[size] */
+	CARD8 compressedLevel;
+    CARD16 fNameSize;
+	CARD32 position;
+    /* Followed by char Filename[fNameSize] */
 } rfbFileUploadRequestMsg;
 
-#define sz_rfbFileUploadRequestMsg 2
+#define sz_rfbFileUploadRequestMsg 8
 
 
 /*-----------------------------------------------------------------------------
  * FileUploadData
  */
 
-typedef struct {
+typedef struct _rfbFileUploadDataMsg {
     CARD8 type;
-    CARD8 unused;
-    CARD16 size;
-    CARD16 amount;
-    CARD16 num;
-    /* Followed by File[size]   */
+    CARD8 compressedLevel;
+    CARD16 realSize;
+    CARD16 compressedSize;
+    /* Followed by File[compressedSize]   */
 } rfbFileUploadDataMsg;
 
 #define sz_rfbFileUploadDataMsg 8
@@ -1220,23 +1183,41 @@ typedef struct {
  * FileDownloadCancel
  */
 
-typedef struct {
+typedef struct _rfbFileDownloadCancelMsg {
     CARD8 type;
+	CARD8 unused;
+	CARD16 reasonLen;
+	/* Followed by reason[reasonLen] */
 } rfbFileDownloadCancelMsg;
 
-#define sz_rfbFileDownloadCancelMsg 1
+#define sz_rfbFileDownloadCancelMsg 4
 
 /*-----------------------------------------------------------------------------
  * FileUploadFailed
  */
 
-typedef struct {
+typedef struct _rfbFileUploadFailedMsg {
     CARD8 type;
+	CARD8 unused;
+	CARD16 reasonLen;
+	/* Followed by reason[reasonLen] */
 } rfbFileUploadFailedMsg;
 
-#define sz_rfbFileUploadFailedMsg 1
+#define sz_rfbFileUploadFailedMsg 4
 
+/*-----------------------------------------------------------------------------
+ * FileCreateDirRequest
+ */
 
+typedef struct _rfbFileCreateDirRequestMsg {
+    CARD8 type;
+	CARD8 unused;
+	CARD16 dNameLen;
+	CARD32 dModTime;
+	/* Followed by dName[dNameLen] */
+} rfbFileCreateDirRequestMsg;
+
+#define sz_rfbFileCreateDirRequestMsg 8
 
 /*-----------------------------------------------------------------------------
  * Union of all client->server messages.
@@ -1256,5 +1237,6 @@ typedef union _rfbClientToServerMsg {
     rfbFileUploadRequestMsg fupr;
     rfbFileUploadDataMsg fud;
     rfbFileDownloadCancelMsg fdc;
-    rfbFileUploadFailedMsg fcc;
+    rfbFileUploadFailedMsg fuf;
+	rfbFileCreateDirRequestMsg fcdr;
 } rfbClientToServerMsg;
