@@ -28,9 +28,7 @@
 #include "rfb.h"
 
 
-#define TIGHT_MAX_RECT_WIDTH 128
-#define TIGHT_MAX_RECT_HEIGHT 128
-
+#define TIGHT_MIN_TO_COMPRESS 12
 
 typedef struct COLOR_LIST_s {
     struct COLOR_LIST_s *next;
@@ -122,7 +120,8 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
                                              tightAfterBufSize);
     }
 
-    if ((w > 2 && h > 2 && w * h > 1024) || w > 2048 || h > 2048) {
+
+    if ((w > 8 && h > 8 && w * h > 16384) || w > 2048 || h > 2048) {
         for (dy = 0; dy < h; dy += TIGHT_MAX_RECT_HEIGHT) {
             for (dx = 0; dx < w; dx += TIGHT_MAX_RECT_WIDTH) {
                 rw = (dx + TIGHT_MAX_RECT_WIDTH < w) ?
@@ -189,7 +188,7 @@ SendSubrect(cl, x, y, w, h)
         break;
     default:
         /* Up to 256 different colors */
-        if (w * h >= paletteNumColors * 2)
+        if (w * h >= paletteNumColors * 128)
             success = SendIndexedRect(cl, w, h);
         else
             success = SendFullColorRect(cl, w, h);
@@ -249,7 +248,7 @@ SendIndexedRect(cl, w, h)
         streamId = 1;
         dataLen = (w + 7) / 8;
         dataLen *= h;
-    } else if (paletteNumColors <= 16) {
+    } else if (paletteNumColors <= 32) {
         streamId = 2;
         dataLen = w * h;
     } else {
@@ -312,7 +311,7 @@ SendFullColorRect(cl, w, h)
 {
     int len;
 
-    if ( ublen + 4 > UPDATE_BUF_SIZE ) {
+    if ( ublen + TIGHT_MIN_TO_COMPRESS + 1 > UPDATE_BUF_SIZE ) {
 	if (!rfbSendUpdateBuf(cl))
 	    return FALSE;
     }
@@ -339,6 +338,13 @@ CompressData(cl, streamId, dataLen)
     int compressedLen, portionLen;
     int i;
 
+    if (dataLen < TIGHT_MIN_TO_COMPRESS) {
+        memcpy(&updateBuf[ublen], tightBeforeBuf, dataLen);
+        ublen += dataLen;
+        cl->rfbBytesSent[rfbEncodingTight] += dataLen;
+        return TRUE;
+    }
+
     pz = &cl->zsStruct[streamId];
 
     /* Initialize compression stream. */
@@ -347,7 +353,7 @@ CompressData(cl, streamId, dataLen)
         pz->zfree = Z_NULL;
         pz->opaque = Z_NULL;
 
-        if (deflateInit2 (pz, 8, Z_DEFLATED, MAX_WBITS,
+        if (deflateInit2 (pz, 9, Z_DEFLATED, MAX_WBITS,
                           MAX_MEM_LEVEL, Z_DEFAULT_STRATEGY) != Z_OK) {
             return FALSE;
         }
