@@ -368,7 +368,7 @@ SetFormatAndEncodings()
 					  rfbEncodingCompressLevel0);
     }
   } else {
-    if (SameMachine(rfbsock)) {
+    if (SameMachine(rfbsock) && !tunnelSpecified) {
       fprintf(stderr,"Same machine: preferring raw encoding\n");
       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
     }
@@ -382,7 +382,11 @@ SetFormatAndEncodings()
     if (appData.compressLevel >= 0 && appData.compressLevel <= 9) {
       encs[se->nEncodings++] = Swap32IfLE(appData.compressLevel +
 					  rfbEncodingCompressLevel0);
-    } else {
+    } else if (!tunnelSpecified) {
+      /* If -tunnel option was provided, we assume that server machine is
+	 not in the local network so we use default compression level for
+	 tight encoding instead of fast compression. Thus we are
+	 requesting level 1 compression only if tunneling is not used. */
       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCompressLevel1);
     }
 

@@ -236,6 +236,8 @@ extern Bool SameMachine(int sock);
 
 /* tunnel.c */
 
+extern Bool tunnelSpecified;
+
 extern Bool createTunnel(int *argc, char **argv, int tunnelArgIndex);
 
 /* vncviewer.c */

@@ -27,10 +27,11 @@
 #include <sys/stat.h>
 #include <vncviewer.h>
 
-/*
- * "Hostname:display" pair in the command line will be substituted by
- * this fake argument when tunneling is used.
- */
+/* True if there was -tunnel option in the command line. */
+Bool tunnelSpecified = False;
+
+/* "Hostname:display" pair in the command line will be substituted
+   by this fake argument when tunneling is used. */
 static char lastArgv[32];
 
 
@@ -52,6 +53,8 @@ createTunnel(int *pargc, char **argv, int tunnelArgIndex)
   char localPortStr[8];
   char remotePortStr[8];
   char *remoteHost;
+
+  tunnelSpecified = True;
 
   pattern = getCmdPattern();
   if (!pattern)
