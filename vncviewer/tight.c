@@ -277,8 +277,15 @@ FilterCopyBPP (int numRows, CARDBPP *dst)
 static int
 InitFilterGradientBPP (int rw, int rh)
 {
-  memset(tightPrevRow, 0, rw * 3);
-  return InitFilterCopyBPP(rw, rh);
+  int bits;
+
+  bits = InitFilterCopyBPP(rw, rh);
+  if (cutZeros)
+    memset(tightPrevRow, 0, rw * 3);
+  else
+    memset(tightPrevRow, 0, rw * 3 * sizeof(CARD16));
+
+  return bits;
 }
 
 #if BPP == 32
@@ -292,11 +299,14 @@ FilterGradient24 (int numRows, CARD32 *dst)
   int est[3];
 
   for (y = 0; y < numRows; y++) {
+
     /* First pixel in a row */
     for (c = 0; c < 3; c++) {
       pix[c] = tightPrevRow[c] + buffer[y*rectWidth*3+c];
       thisRow[c] = pix[c];
     }
+    dst[y*rectWidth] = RGB24_TO_PIXEL32(pix[0], pix[1], pix[2]);
+
     /* Remaining pixels of a row */
     for (x = 1; x < rectWidth; x++) {
       for (c = 0; c < 3; c++) {
@@ -312,6 +322,7 @@ FilterGradient24 (int numRows, CARD32 *dst)
       }
       dst[y*rectWidth+x] = RGB24_TO_PIXEL32(pix[0], pix[1], pix[2]);
     }
+
     memcpy(tightPrevRow, thisRow, rectWidth * 3);
   }
 }
