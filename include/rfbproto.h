@@ -921,7 +921,8 @@ typedef struct _rfbFileDownloadDataMsg {
     CARD8 compressLevel;
     CARD16 realSize;
     CARD16 compressedSize;
-    /* Followed by File[copressedSize] */
+    /* Followed by File[copressedSize], 
+       but if (realSize = compressedSize = 0) followed by CARD32 modTime  */
 } rfbFileDownloadDataMsg;
 
 #define sz_rfbFileDownloadDataMsg 6
@@ -1175,10 +1176,11 @@ typedef struct _rfbFileUploadDataMsg {
     CARD8 compressedLevel;
     CARD16 realSize;
     CARD16 compressedSize;
-    /* Followed by File[compressedSize]   */
+    /* Followed by File[compressedSize], 
+       but if (realSize = compressedSize = 0) followed by CARD32 modTime  */
 } rfbFileUploadDataMsg;
 
-#define sz_rfbFileUploadDataMsg 8
+#define sz_rfbFileUploadDataMsg 6
 
 /*-----------------------------------------------------------------------------
  * FileDownloadCancel
@@ -1214,11 +1216,10 @@ typedef struct _rfbFileCreateDirRequestMsg {
     CARD8 type;
     CARD8 unused;
     CARD16 dNameLen;
-    CARD32 dModTime;
     /* Followed by dName[dNameLen] */
 } rfbFileCreateDirRequestMsg;
 
-#define sz_rfbFileCreateDirRequestMsg 8
+#define sz_rfbFileCreateDirRequestMsg 4
 
 /*-----------------------------------------------------------------------------
  * Union of all client->server messages.
