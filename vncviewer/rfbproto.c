@@ -663,7 +663,7 @@ HandleRFBServerMessage()
   }
 
   case rfbBell:
-    XBell(dpy,100);
+    XBell(dpy,0);
     break;
 
   case rfbServerCutText:
@@ -768,19 +768,19 @@ static long
 ReadCompactLen (void)
 {
   long len;
-  CARD8 b1 = 0, b2 = 0, b3 = 0;
+  CARD8 b;
 
-  if (!ReadFromRFBServer((char *)&b1, 1))
+  if (!ReadFromRFBServer((char *)&b, 1))
     return -1;
-  len = (int)b1 & 0x7F;
-  if (b1 & 0x80) {
-    if (!ReadFromRFBServer((char *)&b2, 1))
+  len = (int)b & 0x7F;
+  if (b & 0x80) {
+    if (!ReadFromRFBServer((char *)&b, 1))
       return -1;
-    len |= ((int)b2 & 0x7F) << 7;
-    if (b2 & 0x80) {
-      if (!ReadFromRFBServer((char *)&b3, 1))
+    len |= ((int)b & 0x7F) << 7;
+    if (b & 0x80) {
+      if (!ReadFromRFBServer((char *)&b, 1))
         return -1;
-      len |= ((int)b3 & 0xFF) << 14;
+      len |= ((int)b & 0xFF) << 14;
     }
   }
   return len;
