@@ -118,13 +118,13 @@ depths, attempt to use the specified one (in bits per pixel); if
 successful, this depth will be requested from the VNC server.
 .TP
 \fB\-compresslevel \fIlevel\fR
-Use specified compression \fIlevel\fR (0..9) for "tight" encoding
-(TightVNC\-specific). Level 1 uses minimum of CPU time and achieves
-weak compression ratios, while level 9 offers best compression but is
-slow in terms of CPU time consumption. Use high levels with very slow
-network connections, and low levels when working over high\-speed
-LANs. It's not recommended to use compression level 0, reasonable
-choices start from the level 1.
+Use specified compression \fIlevel\fR (0..9) for "tight" and "zlib"
+encodings (TightVNC\-specific). Level 1 uses minimum of CPU time and
+achieves weak compression ratios, while level 9 offers best
+compression but is slow in terms of CPU time consumption on the server
+side. Use high levels with very slow network connections, and low
+levels when working over high\-speed LANs. It's not recommended to use
+compression level 0, reasonable choices start from the level 1.
 .TP
 \fB\-quality \fIlevel\fR
 Use the specified image quality \fIlevel\fR (0..9) for "tight"
