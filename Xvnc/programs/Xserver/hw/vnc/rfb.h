@@ -306,14 +306,33 @@ typedef struct {
 		   (((l) & 0x0000ff00) << 8)  | \
 		   ((l) << 24))
 
-
-/* init.c */
-
 static const int rfbEndianTest = 1;
 
 #define Swap16IfLE(s) (*(const char *)&rfbEndianTest ? Swap16(s) : (s))
 
 #define Swap32IfLE(l) (*(const char *)&rfbEndianTest ? Swap32(l) : (l))
+
+
+/*
+ * Macro to fill in an rfbCapabilityInfo structure (protocol 3.130).
+ * Normally, using macros is no good, but this macro saves us from
+ * writing constants twice -- it constructs signature names from codes.
+ * Note that "code_sym" argument should be a single symbol, not an expression.
+ */
+
+#define SetCapInfo(cap_ptr, code_sym, vendor)		\
+{							\
+    rfbCapabilityInfo *pcap;				\
+    pcap = (cap_ptr);					\
+    pcap->code = Swap32IfLE(code_sym);			\
+    memcpy(pcap->vendorSignature, (vendor),		\
+	   sz_rfbCapabilityInfoVendor);			\
+    memcpy(pcap->nameSignature, sig_##code_sym,		\
+	   sz_rfbCapabilityInfoName);			\
+}
+
+
+/* init.c */
 
 extern char *desktopName;
 extern char rfbThisHost[];
@@ -468,10 +487,15 @@ extern void httpCheckFds();
 /* auth.c */
 
 extern char *rfbAuthPasswdFile;
-extern Bool rfbAuthenticating;
 
-extern void rfbAuthNewClientConnection(rfbClientPtr cl);
-extern void rfbAuthProcessClientMessage(rfbClientPtr cl);
+void rfbAuthNewClient(rfbClientPtr cl);
+void rfbAuthProcessType(rfbClientPtr cl);
+void rfbAuthProcessResponse(rfbClientPtr cl);
+
+/* Functions to prevent too many successive authentication failures */
+extern Bool rfbAuthConsiderBlocking(void);
+extern void rfbAuthUnblock(void);
+extern Bool rfbAuthIsBlocked(void);
 
 
 /* rre.c */

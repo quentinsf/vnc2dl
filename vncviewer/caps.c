@@ -35,8 +35,10 @@ CapsNewContainer(void)
   CapsContainer *pcaps;
 
   pcaps = malloc(sizeof(CapsContainer));
-  if (pcaps != NULL)
-    pcaps->count = 0;
+  if (pcaps != NULL) {
+    pcaps->known_count = 0;
+    pcaps->enabled_count = 0;
+  }
 
   return pcaps;
 }
@@ -50,9 +52,9 @@ CapsDeleteContainer(CapsContainer *pcaps)
 {
   int i;
 
-  for (i = 0; i < pcaps->count; i++) {
-    if (pcaps->desc_list[i] != NULL)
-      free(pcaps->desc_list[i]);
+  for (i = 0; i < pcaps->known_count; i++) {
+    if (pcaps->descriptions[i] != NULL)
+      free(pcaps->descriptions[i]);
   }
 
   free(pcaps);
@@ -85,25 +87,25 @@ CapsAddInfo(CapsContainer *pcaps,
 
   i = CapsIndex(pcaps, capinfo->code);
   if (i == -1) {
-    if (pcaps->count >= TIGHTVNC_MAX_CAPS) {
+    if (pcaps->known_count >= TIGHTVNC_MAX_CAPS) {
       return;                   /* container full */
     }
-    i = pcaps->count++;
+    i = pcaps->known_count++;
     pcaps->known_list[i] = capinfo->code;
-    pcaps->desc_list[i] = NULL;
+    pcaps->descriptions[i] = NULL;
   }
 
-  pcaps->info_list[i] = *capinfo;
-  pcaps->enabled_list[i] = (char)False;
-  if (pcaps->desc_list[i] != NULL) {
-    free(pcaps->desc_list[i]);
+  pcaps->known_info[i] = *capinfo;
+  pcaps->enable_flags[i] = (char)False;
+  if (pcaps->descriptions[i] != NULL) {
+    free(pcaps->descriptions[i]);
   }
 
   desc_copy = NULL;
   if (desc != NULL) {
     desc_copy = strdup(desc);
   }
-  pcaps->desc_list[i] = desc_copy;
+  pcaps->descriptions[i] = desc_copy;
 }
 
 /*
@@ -115,7 +117,7 @@ CapsIndex(CapsContainer *pcaps, CARD32 code)
 {
   int i;
 
-  for (i = 0; i < pcaps->count; i++) {
+  for (i = 0; i < pcaps->known_count; i++) {
     if (pcaps->known_list[i] == code)
       return i;
   }
@@ -142,7 +144,7 @@ CapsGetInfo(CapsContainer *pcaps, CARD32 code, rfbCapabilityInfo *capinfo)
 
   i = CapsIndex(pcaps, code);
   if (i != -1) {
-    *capinfo = pcaps->info_list[i];
+    *capinfo = pcaps->known_info[i];
     return True;
   }
 
@@ -162,7 +164,7 @@ CapsGetDescription(CapsContainer *pcaps, CARD32 code)
 
   i = CapsIndex(pcaps, code);
   if (i != -1) {
-    return pcaps->desc_list[i];
+    return pcaps->descriptions[i];
   }
 
   return NULL;
@@ -184,16 +186,23 @@ CapsEnable(CapsContainer *pcaps, rfbCapabilityInfo *capinfo)
   if (i == -1)
     return False;
 
-  known = &pcaps->info_list[i];
+  known = &pcaps->known_info[i];
   if ( memcmp(known->vendorSignature, capinfo->vendorSignature,
               sz_rfbCapabilityInfoVendor) != 0 ||
        memcmp(known->nameSignature, capinfo->nameSignature,
               sz_rfbCapabilityInfoName) != 0 ) {
-    pcaps->enabled_list[i] = (char)False;
+    pcaps->enable_flags[i] = (char)False;
     return False;
   }
 
-  pcaps->enabled_list[i] = (char)True;
+  /* Cannot happen, but just in case. */
+  if (pcaps->enabled_count >= TIGHTVNC_MAX_CAPS) {
+    pcaps->enable_flags[i] = (char)False;
+    return False;
+  }
+
+  pcaps->enable_flags[i] = (char)True;
+  pcaps->enabled_list[pcaps->enabled_count++] = capinfo->code;
   return True;
 }
 
@@ -208,9 +217,29 @@ CapsIsEnabled(CapsContainer *pcaps, CARD32 code)
 
   i = CapsIndex(pcaps, code);
   if (i != -1) {
-    return (pcaps->enabled_list[i] != (char)False);
+    return (pcaps->enable_flags[i] != (char)False);
   }
 
   return False;
+}
+
+/*
+ * Return the number of enabled capabilities.
+ */
+
+int CapsNumEnabled(CapsContainer *pcaps)
+{
+  return pcaps->enabled_count;
+}
+
+/*
+ * Return the capability code at the specified index.
+ * If the index is not valid, return 0.
+ */
+
+CARD32
+CapsGetByOrder(CapsContainer *pcaps, int idx)
+{
+  return (idx < pcaps->enabled_count) ? pcaps->enabled_list[idx] : 0;
 }
 

@@ -27,12 +27,18 @@
 /* FIXME: Don't limit the number of capabilities. */
 #define TIGHTVNC_MAX_CAPS  64
 
-typedef struct _CapsContainer {
-  int count;
+typedef struct _CapsContainer
+{
+  int known_count;
   CARD32 known_list[TIGHTVNC_MAX_CAPS];
-  rfbCapabilityInfo info_list[TIGHTVNC_MAX_CAPS];
-  char *desc_list[TIGHTVNC_MAX_CAPS];
-  char enabled_list[TIGHTVNC_MAX_CAPS];
+  rfbCapabilityInfo known_info[TIGHTVNC_MAX_CAPS];
+  char *descriptions[TIGHTVNC_MAX_CAPS];
+  char enable_flags[TIGHTVNC_MAX_CAPS];
+
+  /* These are redundant, but improve the performance. */
+  int enabled_count;
+  CARD32 enabled_list[TIGHTVNC_MAX_CAPS];
+
 } CapsContainer;
 
 CapsContainer *CapsNewContainer(void);
@@ -50,6 +56,8 @@ char *CapsGetDescription(CapsContainer *pcaps, CARD32 code);
 
 Bool CapsEnable(CapsContainer *pcaps, rfbCapabilityInfo *capinfo);
 Bool CapsIsEnabled(CapsContainer *pcaps, CARD32 code);
+int CapsNumEnabled(CapsContainer *pcaps);
+CARD32 CapsGetByOrder(CapsContainer *pcaps, int idx);
 
 #endif /* _VNC_CAPSCONTAINER */
 

@@ -31,11 +31,12 @@
 #include <zlib.h>
 #include <jpeglib.h>
 
+static Bool SetupTunneling(void);
+static Bool PerformAuthenticationNew(void);
+static Bool PerformAuthenticationOld(void);
 static Bool AuthenticateVNC(void);
-static Bool ReadHandshakingCaps(void);
 static Bool ReadInteractionCaps(void);
 static Bool ReadCapabilityList(CapsContainer *caps, int count);
-static Bool SetupTunneling(void);
 
 static Bool HandleRRE8(int rx, int ry, int rw, int rh);
 static Bool HandleRRE16(int rx, int ry, int rw, int rh);
@@ -53,6 +54,7 @@ static Bool HandleTight8(int rx, int ry, int rw, int rh);
 static Bool HandleTight16(int rx, int ry, int rw, int rh);
 static Bool HandleTight32(int rx, int ry, int rw, int rh);
 
+static void ReadConnFailedReason(void);
 static long ReadCompactLen (void);
 
 static void JpegInitSource(j_decompress_ptr cinfo);
@@ -207,8 +209,6 @@ InitialiseRFBConnection(void)
   rfbProtocolVersionMsg pv;
   int server_major, server_minor;
   int viewer_major, viewer_minor;
-  CARD32 authScheme, reasonLen;
-  char *reason;
   rfbClientInitMsg ci;
 
   /* if the connection is immediately closed, don't report anything, so
@@ -246,56 +246,24 @@ InitialiseRFBConnection(void)
   if (!WriteExact(rfbsock, pv, sz_rfbProtocolVersionMsg))
     return False;
 
-  /* Only for protocol version 3.130 */
+  /* Setup tunneling, only for protocol version 3.130 */
   if (viewer_minor >= 130) {
-    /* Read handshaking capabilities, setup tunneling */
-    if (!ReadHandshakingCaps() || !SetupTunneling())
+    if (!SetupTunneling())
       return False;
-    authScheme = Swap32IfLE(rfbVncAuth);
-    /* Send our preferred authentication scheme */
-    if (!WriteExact(rfbsock, (char *)&authScheme, sizeof(authScheme)))
+    if (!PerformAuthenticationNew())
       return False;
-  }
-
-  /* Read actual authentication scheme */
-  if (!ReadFromRFBServer((char *)&authScheme, 4))
-    return False;
-
-  authScheme = Swap32IfLE(authScheme);
-
-  switch (authScheme) {
-
-  case rfbConnFailed:
-    if (!ReadFromRFBServer((char *)&reasonLen, 4)) return False;
-    reasonLen = Swap32IfLE(reasonLen);
-
-    reason = malloc(reasonLen);
-
-    if (!ReadFromRFBServer(reason, reasonLen)) return False;
-
-    fprintf(stderr,"VNC connection failed: %.*s\n",(int)reasonLen, reason);
-    return False;
-
-  case rfbNoAuth:
-    fprintf(stderr,"No authentication needed\n");
-    break;
-
-  case rfbVncAuth:
-    if (!AuthenticateVNC())
+  } else {
+    if (!PerformAuthenticationOld())
       return False;
-    break;
-
-  default:
-    fprintf(stderr,"Unknown authentication scheme from VNC server: %d\n",
-	    (int)authScheme);
-    return False;
   }
 
   ci.shared = (appData.shareDesktop ? 1 : 0);
 
-  if (!WriteExact(rfbsock, (char *)&ci, sz_rfbClientInitMsg)) return False;
+  if (!WriteExact(rfbsock, (char *)&ci, sz_rfbClientInitMsg))
+    return False;
 
-  if (!ReadFromRFBServer((char *)&si, sz_rfbServerInitMsg)) return False;
+  if (!ReadFromRFBServer((char *)&si, sz_rfbServerInitMsg))
+    return False;
 
   si.framebufferWidth = Swap16IfLE(si.framebufferWidth);
   si.framebufferHeight = Swap16IfLE(si.framebufferHeight);
@@ -332,68 +300,36 @@ InitialiseRFBConnection(void)
 
 
 /*
- * In the protocol version 3.130, the server informs us about tunneling and
- * authentication methods supported. Here we read this information.
+ * Setup tunneling, for the protocol version 3.130.
  */
 
 static Bool
-ReadHandshakingCaps(void)
+SetupTunneling(void)
 {
-  rfbHandshakingCapsMsg init_caps;
+  rfbTunnelingCapsMsg caps;
+  CARD32 tunnelType;
 
-  /* Read the counts of list items following */
-  if (!ReadFromRFBServer((char *)&init_caps, sz_rfbHandshakingCapsMsg))
+  /* In the protocol version 3.130, the server informs us about supported
+     tunneling methods supported. Here we read this information. */
+
+  if (!ReadFromRFBServer((char *)&caps, sz_rfbTunnelingCapsMsg))
     return False;
-  init_caps.nTunnelTypes = Swap16IfLE(init_caps.nTunnelTypes);
-  init_caps.nAuthenticationTypes = Swap16IfLE(init_caps.nAuthenticationTypes);
 
-  /* Read the lists of tunneling and authentication methods */
-  return (ReadCapabilityList(tunnelCaps, init_caps.nTunnelTypes) &&
-	  ReadCapabilityList(authCaps, init_caps.nAuthenticationTypes));
-}
+  caps.nTunnelTypes = Swap16IfLE(caps.nTunnelTypes);
 
-
-/*
- * In the protocol version 3.130, the server informs us about supported
- * protocol messages and encodings. Here we read this information.
- */
-
-static Bool
-ReadInteractionCaps(void)
-{
-  rfbInteractionCapsMsg intr_caps;
-
-  /* Read the counts of list items following */
-  if (!ReadFromRFBServer((char *)&intr_caps, sz_rfbInteractionCapsMsg))
+  if (caps.connFailed) {
+    ReadConnFailedReason();
     return False;
-  intr_caps.nServerMessageTypes = Swap16IfLE(intr_caps.nServerMessageTypes);
-  intr_caps.nClientMessageTypes = Swap16IfLE(intr_caps.nClientMessageTypes);
-  intr_caps.nEncodingTypes = Swap16IfLE(intr_caps.nEncodingTypes);
+  }
 
-  /* Read the lists of server- and client-initiated messages */
-  return (ReadCapabilityList(serverMsgCaps, intr_caps.nServerMessageTypes) &&
-	  ReadCapabilityList(clientMsgCaps, intr_caps.nClientMessageTypes) &&
-	  ReadCapabilityList(encodingCaps, intr_caps.nEncodingTypes));
-}
-
-
-/*
- * Read the list of rfbCapabilityInfo structures and enable corresponding
- * capabilities in the specified container. The count argument specifies how
- * many records to read from the socket.
- */
-
-static Bool
-ReadCapabilityList(CapsContainer *caps, int count)
-{
-  rfbCapabilityInfo msginfo;
-  int i;
-
-  for (i = 0; i < count; i++) {
-    if (!ReadFromRFBServer((char *)&msginfo, sz_rfbCapabilityInfo))
+  if (caps.nTunnelTypes) {
+    if (!ReadCapabilityList(tunnelCaps, caps.nTunnelTypes))
       return False;
-    msginfo.code = Swap32IfLE(msginfo.code);
-    CapsEnable(caps, &msginfo);
+
+    /* We cannot do tunneling anyway yet. */
+    tunnelType = Swap32IfLE(rfbNoTunneling);
+    if (!WriteExact(rfbsock, (char *)&tunnelType, sizeof(tunnelType)))
+      return False;
   }
 
   return True;
@@ -401,17 +337,79 @@ ReadCapabilityList(CapsContainer *caps, int count)
 
 
 /*
- * Setup tunneling, for the protocol version 3.130.
+ * Negotiate authentication scheme (protocol version 3.130)
  */
 
 static Bool
-SetupTunneling(void)
+PerformAuthenticationNew(void)
 {
-  CARD32 tunnelType;
+  rfbAuthenticationCapsMsg caps;
+  CARD32 authScheme;
 
-  /* We cannot do tunneling yet. */
-  tunnelType = Swap32IfLE(0);
-  return (WriteExact(rfbsock, (char *)&tunnelType, sizeof(tunnelType)));
+  /* In the protocol version 3.130, the server informs us about supported
+     authentication schemes supported. Here we read this information. */
+
+  if (!ReadFromRFBServer((char *)&caps, sz_rfbAuthenticationCapsMsg))
+    return False;
+
+  caps.nAuthTypes = Swap16IfLE(caps.nAuthTypes);
+
+  if (caps.connFailed) {
+    ReadConnFailedReason();
+    return False;
+  }
+
+  if (!caps.nAuthTypes) {
+    fprintf(stderr,"No authentication needed\n");
+  } else {
+    if (!ReadCapabilityList(authCaps, caps.nAuthTypes))
+      return False;
+
+    /* Request standard VNC authentication. */
+    authScheme = Swap32IfLE(rfbVncAuth);
+    if (!WriteExact(rfbsock, (char *)&authScheme, sizeof(authScheme)))
+      return False;
+    if (!AuthenticateVNC())
+      return False;
+  }
+
+  return True;
+}
+
+
+/*
+ * Negotiate authentication scheme (protocol version 3.3)
+ */
+
+static Bool
+PerformAuthenticationOld(void)
+{
+  CARD32 authScheme;
+
+  /* Read the authentication type */
+  if (!ReadFromRFBServer((char *)&authScheme, 4))
+    return False;
+
+  authScheme = Swap32IfLE(authScheme);
+
+  switch (authScheme) {
+  case rfbConnFailed:
+    ReadConnFailedReason();
+    return False;
+  case rfbNoAuth:
+    fprintf(stderr, "No authentication needed\n");
+    break;
+  case rfbVncAuth:
+    if (!AuthenticateVNC())
+      return False;
+    break;
+  default:
+    fprintf(stderr, "Unknown authentication scheme from VNC server: %d\n",
+	    (int)authScheme);
+    return False;
+  }
+
+  return True;
 }
 
 
@@ -422,7 +420,7 @@ SetupTunneling(void)
 static Bool
 AuthenticateVNC(void)
 {
-  CARD32 authResult;
+  CARD32 authScheme, authResult;
   CARD8 challenge[CHALLENGESIZE];
   char *passwd;
 
@@ -483,6 +481,53 @@ AuthenticateVNC(void)
 
   return True;
 }
+
+/*
+ * In the protocol version 3.130, the server informs us about supported
+ * protocol messages and encodings. Here we read this information.
+ */
+
+static Bool
+ReadInteractionCaps(void)
+{
+  rfbInteractionCapsMsg intr_caps;
+
+  /* Read the counts of list items following */
+  if (!ReadFromRFBServer((char *)&intr_caps, sz_rfbInteractionCapsMsg))
+    return False;
+  intr_caps.nServerMessageTypes = Swap16IfLE(intr_caps.nServerMessageTypes);
+  intr_caps.nClientMessageTypes = Swap16IfLE(intr_caps.nClientMessageTypes);
+  intr_caps.nEncodingTypes = Swap16IfLE(intr_caps.nEncodingTypes);
+
+  /* Read the lists of server- and client-initiated messages */
+  return (ReadCapabilityList(serverMsgCaps, intr_caps.nServerMessageTypes) &&
+	  ReadCapabilityList(clientMsgCaps, intr_caps.nClientMessageTypes) &&
+	  ReadCapabilityList(encodingCaps, intr_caps.nEncodingTypes));
+}
+
+
+/*
+ * Read the list of rfbCapabilityInfo structures and enable corresponding
+ * capabilities in the specified container. The count argument specifies how
+ * many records to read from the socket.
+ */
+
+static Bool
+ReadCapabilityList(CapsContainer *caps, int count)
+{
+  rfbCapabilityInfo msginfo;
+  int i;
+
+  for (i = 0; i < count; i++) {
+    if (!ReadFromRFBServer((char *)&msginfo, sz_rfbCapabilityInfo))
+      return False;
+    msginfo.code = Swap32IfLE(msginfo.code);
+    CapsEnable(caps, &msginfo);
+  }
+
+  return True;
+}
+
 
 /*
  * SetFormatAndEncodings.
@@ -1089,6 +1134,31 @@ HandleRFBServerMessage()
 #include "tight.c"
 #undef BPP
 
+/*
+ * PrintPixelFormat.
+ */
+
+static void
+ReadConnFailedReason(void)
+{
+  CARD32 reasonLen;
+  char *reason = NULL;
+
+  if (ReadFromRFBServer((char *)&reasonLen, sizeof(reasonLen))) {
+    reasonLen = Swap32IfLE(reasonLen);
+    if ((reason = malloc(reasonLen)) != NULL &&
+        ReadFromRFBServer(reason, reasonLen)) {
+      fprintf(stderr,"VNC connection failed: %.*s\n", (int)reasonLen, reason);
+      free(reason);
+      return;
+    }
+  }
+
+  fprintf(stderr, "VNC connection failed\n");
+
+  if (reason != NULL)
+    free(reason);
+}
 
 /*
  * PrintPixelFormat.

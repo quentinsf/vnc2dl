@@ -189,33 +189,108 @@ typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
 
 
 /*-----------------------------------------------------------------------------
- * Negotiation of Handshaking Capabilities
+ * Negotiation of Tunneling Capabilities (protocol version 3.130)
  *
- * Once the protocol version has been decided, the server then sends two lists
- * of supported protocol extensions. First list tells the client what tunneling
- * methods can be used, the second list provides information about supported
- * authentication schemes. Each list is an array of rfbCapabilityInfo
- * structures. Before sending the lists, the server sends two 16-bit
- * words with number of elements in each one.
+ * Once the protocol version has been decided, the server either sends a list
+ * of supported tunneling methods, or informs the client about an error.
+ * ("Tunneling" refers to any additional layer of data transformation, e.g.
+ * encryption or external compression.)
+ *
+ * If connFailed is true, then the value nTunnelTypes does not make sense.
+ * In this case the structure is followed by a string describing the reason for
+ * connection failure (where a string is specified as a 32-bit length followed
+ * by that many ASCII characters).  After sending such a reason string, the
+ * server will close the connection.
+ *
+ * If connFailed is false, then nTunnelTypes specifies the number of following
+ * rfbCapabilityInfo structures that list all supported tunneling methods in
+ * the order of preference.
+ *
+ * NOTE: If nTunnelTypes is 0, that tells the client that no tunneling can be
+ * used, and the client should not send a response requesting a tunneling
+ * method.
  */
 
-typedef struct _rfbHandshakingCapsMsg {
+typedef struct _rfbTunnelingCapsMsg {
+    CARD8 connFailed;
+    CARD8 pad;
     CARD16 nTunnelTypes;
-    CARD16 nAuthenticationTypes;
     /* followed by nTunnelTypes * rfbCapabilityInfo structures */
-    /* followed by nAuthenticationTypes * rfbCapabilityInfo structures */
-} rfbHandshakingCapsMsg;
+} rfbTunnelingCapsMsg;
 
-#define sz_rfbHandshakingCapsMsg 4
+#define sz_rfbTunnelingCapsMsg 4
 
 
 /*-----------------------------------------------------------------------------
- * Authentication (protocol versions 3.0 - 3.3).
+ * Tunneling Method Request (protocol version 3.130)
  *
- * Once the protocol version has been decided, the server then sends a 32-bit
- * word indicating whether any authentication is needed on the connection.
- * The value of this word determines the authentication scheme in use.  For
- * version 3.0 of the protocol this may have one of the following values:
+ * If the list of tunneling capabilities sent by the server was not empty, the
+ * client should reply with a 32-bit code specifying a particular tunneling
+ * method.  The following code should be used for no tunneling.
+ */
+
+#define rfbNoTunneling 0
+
+#define sig_rfbNoTunneling "NOTUNNEL"
+
+
+/*-----------------------------------------------------------------------------
+ * Negotiation of Authentication Capabilities (protocol version 3.130)
+ *
+ * After setting up tunneling, the server either sends a list of supported
+ * authentication schemes, or informs the client about an error.
+ *
+ * If connFailed is true, then the value nAuthTypes does not make sense.
+ * In this case the structure is followed by a string describing the reason for
+ * connection failure (where a string is specified as a 32-bit length followed
+ * by that many ASCII characters).  After sending such a reason string, the
+ * server will close the connection.
+ *
+ * If connFailed is false, then nAuthTypes specifies the number of following
+ * rfbCapabilityInfo structures that list all supported authentication schemes
+ * in the order of preference.
+ *
+ * NOTE: If nAuthTypes is 0, that tells the client that no authentication is
+ * necessary, and the client should not send a response requesting an
+ * authentication scheme.
+ */
+
+typedef struct _rfbAuthenticationCapsMsg {
+    CARD8 connFailed;
+    CARD8 pad;
+    CARD16 nAuthTypes;
+    /* followed by nAuthTypes * rfbCapabilityInfo structures */
+} rfbAuthenticationCapsMsg;
+
+#define sz_rfbAuthenticationCapsMsg 4
+
+/*-----------------------------------------------------------------------------
+ * The following structure can be used instead of rfbTunnelingCapsMsg or
+ * rfbAuthenticationCapsMsg structures, in situations when the connFailed
+ * value is true.
+ */
+
+typedef struct _rfbConnFailedMsg {
+    CARD8 connFailed;
+    CARD8 pad1;
+    CARD16 pad2;
+    CARD32 reasonLength;
+    /* followed by char[reasonLength] */
+} rfbConnFailedMsg;
+
+#define sz_rfbConnFailedMsg 8
+
+/*-----------------------------------------------------------------------------
+ * VNC Authentication (protocol version 3.3)
+ *
+ * Once the protocol version has been decided, and if that version is 3.0-3.3,
+ * the server then sends a 32-bit word indicating whether any authentication
+ * is needed on the connection. The value of this word determines the
+ * authentication scheme in use.  For versions 3.0 of the protocol this may
+ * have one of the values (0, 1, or 2) defined below.
+ *
+ * NOTE: In the protocol version 3.130, the authentication scheme is chosen on
+ * the client side, from the list of supported schemes sent by the server.
  */
 
 #define rfbConnFailed 0
