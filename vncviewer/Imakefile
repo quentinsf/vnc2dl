@@ -40,4 +40,4 @@ SRCS = \
 
 OBJS = $(SRCS:.c=.o)
 
-ComplexProgramTargetNoMan(vncviewer)
+ComplexProgramTarget(vncviewer)
