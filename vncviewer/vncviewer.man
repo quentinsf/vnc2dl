@@ -20,6 +20,10 @@ vncviewer \- an X viewer client for VNC
 .br
 .B vncviewer
 .RI [\| options \|]
+.RI [\| host \|][\| ::port \|]
+.br
+.B vncviewer
+.RI [\| options \|]
 .IR \-listen
 .RI [\| display \|]
 .br

@@ -287,6 +287,7 @@ usage(void)
 	  "TightVNC viewer version 1.2.6\n"
 	  "\n"
 	  "Usage: %s [<OPTIONS>] [<HOST>][:<DISPLAY#>]\n"
+	  "       %s [<OPTIONS>] [<HOST>][::<PORT#>]\n"
 	  "       %s [<OPTIONS>] -listen [<DISPLAY#>]\n"
 	  "       %s -help\n"
 	  "\n"
@@ -310,7 +311,7 @@ usage(void)
 	  "\n"
 	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233.\n"
 	  "See the manual page for more information."
-	  "\n", programName, programName, programName);
+	  "\n", programName, programName, programName, programName);
   exit(1);
 }
 
@@ -325,7 +326,8 @@ void
 GetArgsAndResources(int argc, char **argv)
 {
   int i;
-  char *vncServerName;
+  char *vncServerName, *colonPos;
+  int len, portOffset;
 
   /* Turn app resource specs into our appData structure for the rest of the
      program to use */
@@ -369,16 +371,25 @@ GetArgsAndResources(int argc, char **argv)
     exit(1);
   }
 
-  for (i = 0; vncServerName[i] != ':' && vncServerName[i] != 0; i++);
-
-  strncpy(vncServerHost, vncServerName, i);
-
-  if (vncServerName[i] == ':') {
-    vncServerPort = atoi(&vncServerName[i+1]);
+  colonPos = strchr(vncServerName, ':');
+  if (colonPos == NULL) {
+    /* No colon -- use default port number */
+    strcpy(vncServerHost, vncServerName);
+    vncServerPort = SERVER_PORT_OFFSET;
   } else {
-    vncServerPort = 0;
+    memcpy(vncServerHost, vncServerName, colonPos - vncServerName);
+    vncServerHost[colonPos - vncServerName] = '\0';
+    len = strlen(colonPos + 1);
+    portOffset = SERVER_PORT_OFFSET;
+    if (colonPos[1] == ':') {
+      /* Two colons -- interpret as a port number */
+      colonPos++;
+      len--;
+      portOffset = 0;
+    }
+    if (!len || strspn(colonPos + 1, "0123456789") != len) {
+      usage();
+    }
+    vncServerPort = atoi(colonPos + 1) + portOffset;
   }
-
-  if (vncServerPort < 100)
-    vncServerPort += SERVER_PORT_OFFSET;
 }

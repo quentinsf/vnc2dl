@@ -130,29 +130,37 @@ processViaArgs(char **gatewayHost, char **remoteHost,
 	       int *remotePort, int localPort,
 	       int *pargc, char **argv, int tunnelArgIndex)
 {
-  char *pdisplay;
-  int port;
+  char *colonPos;
+  int len, portOffset;
 
   if (tunnelArgIndex >= *pargc - 2)
     usage();
 
-  pdisplay = strchr(argv[*pargc - 1], ':');
-  if (pdisplay == NULL)
-    usage();
+  colonPos = strchr(argv[*pargc - 1], ':');
+  if (colonPos == NULL) {
+    /* No colon -- use default port number */
+    *remotePort = SERVER_PORT_OFFSET;
+  } else {
+    *colonPos++ = '\0';
+    len = strlen(colonPos);
+    portOffset = SERVER_PORT_OFFSET;
+    if (colonPos[0] == ':') {
+      /* Two colons -- interpret as a port number */
+      colonPos++;
+      len--;
+      portOffset = 0;
+    }
+    if (!len || strspn(colonPos, "-0123456789") != len) {
+      usage();
+    }
+    *remotePort = atoi(colonPos) + portOffset;
+  }
 
-  *pdisplay++ = '\0';
-  if (strspn(pdisplay, "-0123456789") != strlen(pdisplay))
-    usage();
-
-  *remotePort = atoi(pdisplay);
-  if (*remotePort < 100)
-    *remotePort += SERVER_PORT_OFFSET;
-
-  sprintf(lastArgv, "localhost:%d", localPort);
+  sprintf(lastArgv, "localhost::%d", localPort);
 
   *gatewayHost = argv[tunnelArgIndex + 1];
 
-  if (pdisplay != &argv[*pargc - 1][1])
+  if (argv[*pargc - 1][0] != '\0')
     *remoteHost = argv[*pargc - 1];
 
   argv[*pargc - 1] = lastArgv;
