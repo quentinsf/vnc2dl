@@ -578,19 +578,17 @@ rfbProcessClientNormalMessage(cl)
 		break;
 
 	    case rfbEncodingXCursor:
-		rfbLog("Enabling X-style cursor shape updates for client %s\n",
+		rfbLog("Enabling X-style cursor updates for client %s\n",
 		       cl->host);
-		if (!cl->enableCursorShapeUpdates) {
-		    cl->enableCursorShapeUpdates = TRUE;
-		    cl->useRichCursorEncoding = FALSE;
-		    cl->cursorWasChanged = TRUE;
-		}
+		cl->enableCursorShapeUpdates = TRUE;
+		cl->useRichCursorEncoding = FALSE;
+		cl->cursorWasChanged = TRUE;
 		break;
 
 	    case rfbEncodingRichCursor:
-		rfbLog("Enabling cursor shape updates for client %s\n",
-		       cl->host);
 		if (!cl->enableCursorShapeUpdates) {
+		    rfbLog("Enabling full-color cursor updates for client "
+			   "%s\n", cl->host);
 		    cl->enableCursorShapeUpdates = TRUE;
 		    cl->useRichCursorEncoding = TRUE;
 		    cl->cursorWasChanged = TRUE;
