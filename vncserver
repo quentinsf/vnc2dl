@@ -67,7 +67,7 @@ $xauthorityFile = "$ENV{XAUTHORITY}";
 $vncUserDirUnderTmp = ($vncUserDir =~ m|^/tmp/.+|) ? 1 : 0;
 $xstartup = ($vncUserDirUnderTmp) ?
   "$ENV{HOME}/.vncstartup" : "$vncUserDir/xstartup";
-if (!xauthorityFile) {
+if (!$xauthorityFile) {
     if ($vncUserDirUnderTmp) {
         $xauthorityFile = "$vncUserDir/.Xauthority";
     } else {
