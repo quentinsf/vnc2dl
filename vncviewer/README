@@ -261,7 +261,9 @@ These are the actions which you can use in translations:
 
     Send an RFB event to the VNC server.  With no argument, simply sends the
     RFB equivalent of the X event which caused the action.  With arguments,
-    generates either key or pointer events depending on the arguments:
+    generates events depending on the arguments:
+
+      SendRFBEvent(fbupdate)
 
       SendRFBEvent(keydown,<keysym>)
       SendRFBEvent(keyup,<keysym>)

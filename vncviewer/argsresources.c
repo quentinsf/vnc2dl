@@ -74,7 +74,7 @@ char *fallback_resources[] = {
   "*popup.buttonForm.translations: #override\\n\
      <KeyPress>: SendRFBEvent() HidePopup()",
 
-  "*popupButtonCount: 7",
+  "*popupButtonCount: 8",
 
   "*popup*button1.label: Dismiss popup",
   "*popup*button1.translations: #override\\n\
@@ -98,8 +98,12 @@ char *fallback_resources[] = {
   "*popup*button5.translations: #override\\n\
      <Btn1Down>,<Btn1Up>: SelectionFromVNC(always) HidePopup()",
 
-  "*popup*button6.label: Send ctrl-alt-del",
+  "*popup*button6.label: Request refresh",
   "*popup*button6.translations: #override\\n\
+     <Btn1Down>,<Btn1Up>: SendRFBEvent(fbupdate) HidePopup()",
+
+  "*popup*button7.label: Send ctrl-alt-del",
+  "*popup*button7.translations: #override\\n\
      <Btn1Down>,<Btn1Up>: SendRFBEvent(keydown,Control_L)\
                           SendRFBEvent(keydown,Alt_L)\
                           SendRFBEvent(key,Delete)\
@@ -107,8 +111,8 @@ char *fallback_resources[] = {
                           SendRFBEvent(keyup,Control_L)\
                           HidePopup()",
 
-  "*popup*button7.label: Send F8",
-  "*popup*button7.translations: #override\\n\
+  "*popup*button8.label: Send F8",
+  "*popup*button8.translations: #override\\n\
      <Btn1Down>,<Btn1Up>: SendRFBEvent(key,F8) HidePopup()",
 
   NULL

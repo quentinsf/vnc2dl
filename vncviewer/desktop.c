@@ -194,7 +194,8 @@ HandleBasicDesktopEvent(Widget w, XtPointer ptr, XEvent *ev, Boolean *cont)
  * ways.  Without any parameters it simply sends an RFB event corresponding to
  * the X event which caused it to be called.  With parameters, it generates a
  * "fake" RFB event based on those parameters.  The first parameter is the
- * event type, either "ptr", "keydown", "keyup" or "key" (down&up).  For a
+ * event type, either "fbupdate", "ptr", "keydown", "keyup" or "key"
+ * (down&up).  The "fbupdate" event requests full framebuffer update. For a
  * "key" event the second parameter is simply a keysym string as understood by
  * XStringToKeysym().  For a "ptr" event, the following three parameters are
  * just X, Y and the button mask (0 for all up, 1 for button1 down, 2 for
@@ -240,6 +241,13 @@ SendRFBEvent(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 		params[0]);
 	return;
       }
+    } else if (strcasecmp(params[0],"fbupdate") == 0) {
+      if (*num_params != 1) {
+	fprintf(stderr, "Invalid params: SendRFBEvent(fbupdate)\n");
+	return;
+      }
+      SendFramebufferUpdateRequest(0, 0, si.framebufferWidth,
+				   si.framebufferHeight, False);
     } else if (strcasecmp(params[0],"ptr") == 0) {
       if (*num_params == 4) {
 	x = atoi(params[1]);
