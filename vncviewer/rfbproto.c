@@ -584,12 +584,14 @@ HandleRFBServerMessage()
       if (!ReadFromRFBServer((char *)&rect, sz_rfbFramebufferUpdateRectHeader))
 	return False;
 
+      rect.encoding = Swap32IfLE(rect.encoding);
+      if (rect.encoding == rfbEncodingLastRect)
+	break;
+
       rect.r.x = Swap16IfLE(rect.r.x);
       rect.r.y = Swap16IfLE(rect.r.y);
       rect.r.w = Swap16IfLE(rect.r.w);
       rect.r.h = Swap16IfLE(rect.r.h);
-
-      rect.encoding = Swap32IfLE(rect.encoding);
 
       if (rect.encoding == rfbEncodingXCursor) {
 	if (!HandleXCursor(rect.r.x, rect.r.y, rect.r.w, rect.r.h)) {
