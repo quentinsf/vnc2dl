@@ -24,8 +24,9 @@
 #include <vncviewer.h>
 
 
-#define COPY_OP_SAVE     0
-#define COPY_OP_RESTORE  1
+#define OPER_SAVE     0
+#define OPER_RESTORE  1
+
 
 /* Copied from Xvnc/lib/font/util/utilbitmap.c */
 static unsigned char _reverse_byte[0x100] = {
@@ -73,16 +74,20 @@ static Pixmap rcSavedArea;
 static CARD8 *rcSource, *rcMask;
 static int rcHotX, rcHotY, rcWidth, rcHeight;
 static int rcCursorX, rcCursorY;
-static int rcHideCounter;
+static int rcLockX, rcLockY, rcLockWidth, rcLockHeight;
+static Bool rcCursorHidden, rcLockSet;
 
+static Bool SoftCursorInLockedArea(void);
 static void SoftCursorCopyArea(int oper);
 static void SoftCursorDraw(void);
 static void FreeCursors(Bool setDotCursor);
 
-/*
- * XCursor encoding support. XCursor shape updates are translated
- * directly into X cursors and saved in the prevXCursor variable.
- */
+
+/*********************************************************************
+ * HandleXCursor(). XCursor encoding support code is concentrated in
+ * this function. XCursor shape updates are translated directly into X
+ * cursors and saved in the prevXCursor variable.
+ ********************************************************************/
 
 Bool HandleXCursor(int xhot, int yhot, int width, int height)
 {
@@ -148,6 +153,14 @@ Bool HandleXCursor(int xhot, int yhot, int width, int height)
 
   return True;
 }
+
+
+/*********************************************************************
+ * HandleRichCursor(). RichCursor shape updates support. This
+ * variation of cursor shape updates cannot be supported directly via
+ * Xlib cursors so we have to emulate cursor operating on the frame
+ * buffer (that is why we call it "software cursor").
+ ********************************************************************/
 
 Bool HandleRichCursor(int xhot, int yhot, int width, int height)
 {
@@ -222,63 +235,110 @@ Bool HandleRichCursor(int xhot, int yhot, int width, int height)
   rcWidth = width;
   rcHeight = height;
 
-  SoftCursorCopyArea(COPY_OP_SAVE);
+  SoftCursorCopyArea(OPER_SAVE);
   SoftCursorDraw();
 
-  rcHideCounter = 0;
+  rcCursorHidden = False;
+  rcLockSet = False;
+
   prevRichCursorSet = True;
   return True;
 }
 
-Bool SoftCursorInArea(int x, int y, int w, int h)
+
+/*********************************************************************
+ * SoftCursorLockArea(). This function should be used to prevent
+ * collisions between simultaneous framebuffer update operations and
+ * cursor drawing operations caused by movements of pointing device.
+ * The parameters denote a rectangle where mouse cursor should not be
+ * drawn. Every next call to this function expands locked area so
+ * previous locks remain active.
+ ********************************************************************/
+
+void SoftCursorLockArea(int x, int y, int w, int h)
 {
-  if (!prevRichCursorSet)
-    return False;
+  int newX, newY;
 
-  return (x < rcCursorX - rcHotX + rcWidth &&
-	  y < rcCursorY - rcHotY + rcHeight &&
-	  x + w >= rcCursorX - rcHotX &&
-	  y + h >= rcCursorY - rcHotY);
-}
-
-void SoftCursorHide(void)
-{
-  if (!prevRichCursorSet)
-    return;
-
-  if (!rcHideCounter++)
-    SoftCursorCopyArea(COPY_OP_RESTORE);
-}
-
-void SoftCursorShow(void)
-{
   if (!prevRichCursorSet)
     return;
 
-  if (!--rcHideCounter) {
-    SoftCursorCopyArea(COPY_OP_SAVE);
-    SoftCursorDraw();
+  if (!rcLockSet) {
+    rcLockX = x;
+    rcLockY = y;
+    rcLockWidth = w;
+    rcLockHeight = h;
+    rcLockSet = True;
+  } else {
+    if (x < rcLockX) newX = x;
+    if (y < rcLockY) newY = y;
+    if (x + w > rcLockX + rcLockWidth)
+      rcLockWidth = x + w - newX;
+    if (y + h > rcLockY + rcLockHeight)
+      rcLockHeight = y + h - newY;
+    rcLockX = newX;
+    rcLockY = newY;
+  }
+
+  if (!rcCursorHidden && SoftCursorInLockedArea()) {
+    SoftCursorCopyArea(OPER_RESTORE);
+    rcCursorHidden = True;
   }
 }
 
+/*********************************************************************
+ * SoftCursorUnlockScreen(). This function discards all locks
+ * performed since previous SoftCursorUnlockScreen() call.
+ ********************************************************************/
+
+void SoftCursorUnlockScreen(void)
+{
+  if (!prevRichCursorSet)
+    return;
+
+  if (rcCursorHidden) {
+    SoftCursorCopyArea(OPER_SAVE);
+    SoftCursorDraw();
+    rcCursorHidden = False;
+  }
+  rcLockSet = False;
+}
+
+/*********************************************************************
+ * SoftCursorMove(). Moves soft cursor in particular location. This
+ * function respects locking of screen areas so when the cursor is
+ * moved in the locked area, it becomes invisible until
+ * SoftCursorUnlock() functions is called.
+ ********************************************************************/
+
 void SoftCursorMove(int x, int y)
 {
-  if (prevRichCursorSet && !rcHideCounter) {
-    SoftCursorCopyArea(COPY_OP_RESTORE);
+  if (prevRichCursorSet && !rcCursorHidden) {
+    SoftCursorCopyArea(OPER_RESTORE);
+    rcCursorHidden = True;
   }
 
   rcCursorX = x;
   rcCursorY = y;
 
-  if (prevRichCursorSet && !rcHideCounter) {
-    SoftCursorCopyArea(COPY_OP_SAVE);
+  if (prevRichCursorSet && !(rcLockSet && SoftCursorInLockedArea())) {
+    SoftCursorCopyArea(OPER_SAVE);
     SoftCursorDraw();
+    rcCursorHidden = False;
   }
 }
 
-/*
- * Internal low-level functions.
- */
+
+/*********************************************************************
+ * Internal (static) low-level functions.
+ ********************************************************************/
+
+static Bool SoftCursorInLockedArea(void)
+{
+  return (rcLockX < rcCursorX - rcHotX + rcWidth &&
+	  rcLockY < rcCursorY - rcHotY + rcHeight &&
+	  rcLockX + rcLockWidth >= rcCursorX - rcHotX &&
+	  rcLockY + rcLockHeight >= rcCursorY - rcHotY);
+}
 
 static void SoftCursorCopyArea(int oper)
 {
@@ -304,7 +364,7 @@ static void SoftCursorCopyArea(int oper)
     h = si.framebufferHeight - y;
   }
 
-  if (oper == COPY_OP_SAVE) {
+  if (oper == OPER_SAVE) {
     /* Save screen area in memory. */
 #ifdef MITSHM
     if (appData.useShm)

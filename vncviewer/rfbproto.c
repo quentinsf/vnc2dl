@@ -512,7 +512,6 @@ HandleRFBServerMessage()
     int bytesPerLine;
     int i;
     int usecs;
-    Bool repaintCursor = False;
 
     if (!ReadFromRFBServer(((char *)&msg.fu) + 1,
 			   sz_rfbFramebufferUpdateMsg - 1))
@@ -557,10 +556,9 @@ HandleRFBServerMessage()
 	continue;
       }
 
-      if (SoftCursorInArea(rect.r.x, rect.r.y, rect.r.w, rect.r.h)) {
-	SoftCursorHide();
-	repaintCursor = True;
-      }
+      /* If RichCursor encoding is used, we should prevent collisions
+         between framebuffer updates and cursor drawing operations. */
+      SoftCursorLockArea(rect.r.x, rect.r.y, rect.r.w, rect.r.h);
 
       switch (rect.encoding) {
 
@@ -595,11 +593,10 @@ HandleRFBServerMessage()
 	cr.srcX = Swap16IfLE(cr.srcX);
 	cr.srcY = Swap16IfLE(cr.srcY);
 
-	if (!repaintCursor &&
-	    SoftCursorInArea(cr.srcX, cr.srcY, rect.r.w, rect.r.h)) {
-	  SoftCursorHide();
-	  repaintCursor = True;
-	}
+	/* If RichCursor encoding is used, we should extend our
+	   "cursor lock area" (previously set to destination
+	   rectangle) to the source rectangle as well. */
+	SoftCursorLockArea(cr.srcX, cr.srcY, rect.r.w, rect.r.h);
 
 	if (appData.copyRectDelay != 0) {
 	  XFillRectangle(dpy, desktopWin, srcGC, cr.srcX, cr.srcY,
@@ -702,10 +699,8 @@ HandleRFBServerMessage()
 	return False;
       }
 
-      if (repaintCursor) {
-	SoftCursorShow();
-	repaintCursor = False;
-      }
+      /* Now we may discard "soft cursor locks". */
+      SoftCursorUnlockScreen();
     }
 
 #ifdef MITSHM
