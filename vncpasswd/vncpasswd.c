@@ -154,7 +154,8 @@ static void mkdir_and_check(char *dirname, int be_strict) {
     }
     fprintf(stderr, "VNC directory %s does not exist, creating.\n", dirname);
     if (mkdir(dirname, S_IRWXU) == -1) {
-      perror(dirname);
+      fprintf(stderr, "Error creating directory %s: %s\n",
+              dirname, strerror(errno));
       exit(1);
     }
   }
