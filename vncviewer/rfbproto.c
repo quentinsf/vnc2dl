@@ -26,6 +26,7 @@
 #include <pwd.h>
 #include <vncviewer.h>
 #include <vncauth.h>
+#include <zlib.h>
 
 static Bool HandleRRE8(int rx, int ry, int rw, int rh);
 static Bool HandleRRE16(int rx, int ry, int rw, int rh);
@@ -36,6 +37,9 @@ static Bool HandleCoRRE32(int rx, int ry, int rw, int rh);
 static Bool HandleHextile8(int rx, int ry, int rw, int rh);
 static Bool HandleHextile16(int rx, int ry, int rw, int rh);
 static Bool HandleHextile32(int rx, int ry, int rw, int rh);
+static Bool HandleTight8(int rx, int ry, int rw, int rh);
+static Bool HandleTight16(int rx, int ry, int rw, int rh);
+static Bool HandleTight32(int rx, int ry, int rw, int rh);
 
 int rfbsock;
 char *desktopName;
@@ -668,16 +672,19 @@ HandleRFBServerMessage()
 #include "rre.c"
 #include "corre.c"
 #include "hextile.c"
+#include "tight.c"
 #undef BPP
 #define BPP 16
 #include "rre.c"
 #include "corre.c"
 #include "hextile.c"
+#include "tight.c"
 #undef BPP
 #define BPP 32
 #include "rre.c"
 #include "corre.c"
 #include "hextile.c"
+#include "tight.c"
 #undef BPP
 
 
