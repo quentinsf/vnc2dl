@@ -545,6 +545,8 @@ rfbProcessClientNormalMessage(cl)
 	cl->useCopyRect = FALSE;
 	cl->enableCursorShapeUpdates = FALSE;
 	cl->enableLastRectEncoding = FALSE;
+	cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
+	cl->tightQualityLevel = -1;
 
 	for (i = 0; i < msg.se.nEncodings; i++) {
 	    if ((n = ReadExact(cl->sock, (char *)&enc, 4)) <= 0) {
