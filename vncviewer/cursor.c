@@ -146,8 +146,8 @@ Bool HandleXCursor(int xhot, int yhot, int width, int height)
   XFreePixmap(dpy, mask);
   free(buf);
 
-  FreeCursors(False);
   XDefineCursor(dpy, desktopWin, cursor);
+  FreeCursors(False);
   prevXCursor = cursor;
   prevXCursorSet = True;
 
@@ -414,7 +414,7 @@ static void FreeCursors(Bool setDotCursor)
   }
 
   if (prevRichCursorSet) {
-    SoftCursorCopyArea(True);
+    SoftCursorCopyArea(OPER_RESTORE);
     XFreePixmap(dpy, rcSavedArea);
     free(rcSource);
     free(rcMask);
