@@ -143,6 +143,7 @@ rfbNewClient(sock)
 
     cl->state = RFB_PROTOCOL_VERSION;
 
+    cl->viewOnly = FALSE;
     cl->reverseConnection = FALSE;
     cl->readyForSetColourMapEntries = FALSE;
     cl->useCopyRect = FALSE;
@@ -743,7 +744,7 @@ rfbProcessClientNormalMessage(cl)
 	if (!isKeyboardEnabled(cl))
 	    return;
 #endif
-	if (!rfbViewOnly) {
+	if (!rfbViewOnly && !cl->viewOnly) {
 	    KbdAddEvent(msg.ke.down, (KeySym)Swap32IfLE(msg.ke.key), cl);
 	}
 	return;
@@ -776,7 +777,7 @@ rfbProcessClientNormalMessage(cl)
 	else
 	    pointerClient = cl;
 
-	if (!rfbViewOnly) {
+	if (!rfbViewOnly && !cl->viewOnly) {
 	    cl->cursorX = (int)Swap16IfLE(msg.pe.x);
             cl->cursorY = (int)Swap16IfLE(msg.pe.y);
 	    PtrAddEvent(msg.pe.buttonMask, cl->cursorX, cl->cursorY, cl);
@@ -806,7 +807,9 @@ rfbProcessClientNormalMessage(cl)
 	    return;
 	}
 
-	rfbSetXCutText(str, msg.cct.length);
+	/* NOTE: We do not accept cut text from a view-only client */
+	if (!cl->viewOnly)
+	    rfbSetXCutText(str, msg.cct.length);
 
 	xfree(str);
 	return;

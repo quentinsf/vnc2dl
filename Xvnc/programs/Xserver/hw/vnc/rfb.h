@@ -135,6 +135,8 @@ typedef struct rfbClientRec {
 	RFB_NORMAL		/* normal protocol messages */
     } state;
 
+    Bool viewOnly;		/* Do not accept input from this client. */
+
     Bool reverseConnection;
 
     Bool readyForSetColourMapEntries;
