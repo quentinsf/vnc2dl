@@ -37,13 +37,13 @@ $depth = 8;
 $desktopName = "X";
 $vncClasses = "/usr/local/vnc/classes";
 $vncUserDir = "$ENV{HOME}/.vnc";
-$vncFontPath = "unix/:7100";
+$fontPath = "unix/:7100";
 
 # Here is another example of setting the font path:
-# $vncFontPath = "/usr/lib/X11/fonts/misc/,/usr/lib/X11/fonts/75dpi/";
+# $fontPath = "/usr/lib/X11/fonts/misc/,/usr/lib/X11/fonts/75dpi/";
 
 # X colors database path is optional, uncomment and edit to use:
-# $vncColorsPath = "/usr/lib/X11/rgb";
+# $colorPath = "/usr/lib/X11/rgb";
 
 unless ($xauthorityFile = "$ENV{XAUTHORITY}") {
   $xauthorityFile = "$ENV{HOME}/.Xauthority";
@@ -137,7 +137,7 @@ $cookie = "";
 for (1..16) {
     $cookie .= sprintf("%02x", int(rand(256)));
 }
-    
+
 system("xauth -f $xauthorityFile add $host:$displayNumber . $cookie");
 system("xauth -f $xauthorityFile add $host/unix:$displayNumber . $cookie"); 
 
@@ -153,8 +153,8 @@ $cmd .= " -pixelformat $pixelformat" if ($pixelformat);
 $cmd .= " -rfbwait 120000";
 $cmd .= " -rfbauth $vncUserDir/passwd";
 $cmd .= " -rfbport $vncPort";
-$cmd .= " -fp $vncFontPath" if ($vncFontPath);
-$cmd .= " -co $vncColorsPath" if ($vncColorsPath);
+$cmd .= " -fp $fontPath" if ($fontPath);
+$cmd .= " -co $colorPath" if ($colorPath);
 
 foreach $arg (@ARGV) {
     $cmd .= " " . &quotedString($arg);
@@ -171,7 +171,7 @@ system("$cmd & echo \$! >$pidFile");
 sleep(1);
 unless (kill 0, `cat $pidFile`) {
     warn "Couldn't start Xvnc; trying default font path.\n";
-    warn "Please set correct vncFontPath in the $prog script.\n";
+    warn "Please set correct fontPath in the $prog script.\n";
     $cmd =~ s@-fp [^ ]+@@;
     system("$cmd & echo \$! >$pidFile");
     sleep(1);
