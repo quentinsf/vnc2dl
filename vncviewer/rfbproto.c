@@ -943,7 +943,6 @@ SendClientCutText(char *str, int len)
 }
 
 
-
 /*
  * HandleRFBServerMessage.
  */
@@ -1308,7 +1307,7 @@ HandleRFBServerMessage()
 #undef BPP
 
 /*
- * PrintPixelFormat.
+ * Read the string describing the reason for a connection failure.
  */
 
 static void
@@ -1362,6 +1361,11 @@ PrintPixelFormat(format)
     }
   }
 }
+
+/*
+ * Read an integer value encoded in 1..3 bytes. This function is used
+ * by the Tight decoder.
+ */
 
 static long
 ReadCompactLen (void)
