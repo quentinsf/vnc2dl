@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2000-2002 Constantin Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 2000 Tridia Corporation.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
@@ -381,6 +381,8 @@ SetFormatAndEncodings()
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
       if (se->nEncodings < MAX_ENCODINGS)
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
+      if (se->nEncodings < MAX_ENCODINGS)
+	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
     }
 
     if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding) {
@@ -423,6 +425,7 @@ SetFormatAndEncodings()
     if (appData.useRemoteCursor) {
       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
+      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
     }
 
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
@@ -602,6 +605,13 @@ HandleRFBServerMessage()
 	  rect.encoding == rfbEncodingRichCursor) {
 	if (!HandleCursorShape(rect.r.x, rect.r.y, rect.r.w, rect.r.h,
 			      rect.encoding)) {
+	  return False;
+	}
+	continue;
+      }
+
+      if (rect.encoding == rfbEncodingPointerPos) {
+	if (!HandleCursorPos(rect.r.x, rect.r.y)) {
 	  return False;
 	}
 	continue;

@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2000-2002 Constantin Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 2000 Tridia Corporation.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
@@ -318,6 +318,7 @@ typedef struct {
 
 #define rfbEncodingXCursor         0xFFFFFF10
 #define rfbEncodingRichCursor      0xFFFFFF11
+#define rfbEncodingPointerPos      0xFFFFFF18
 
 #define rfbEncodingLastRect        0xFFFFFF20
 

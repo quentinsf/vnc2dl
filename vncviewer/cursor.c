@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2001 Constantin Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2001,2002 Constantin Kaplinsky.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -199,6 +199,23 @@ Bool HandleCursorShape(int xhot, int yhot, int width, int height, CARD32 enc)
   return True;
 }
 
+/*********************************************************************
+ * HandleCursorPos(). Support for the PointerPos pseudo-encoding used
+ * to transmit changes in pointer position from server to clients.
+ * PointerPos encoding is used together with cursor shape updates.
+ ********************************************************************/
+
+Bool HandleCursorPos(int x, int y)
+{
+
+  if (x >= si.framebufferWidth)
+    x = si.framebufferWidth - 1;
+  if (y >= si.framebufferHeight)
+    y = si.framebufferHeight - 1;
+
+  SoftCursorMove(x, y);
+  return True;
+}
 
 /*********************************************************************
  * SoftCursorLockArea(). This function should be used to prevent
@@ -258,9 +275,9 @@ void SoftCursorUnlockScreen(void)
 }
 
 /*********************************************************************
- * SoftCursorMove(). Moves soft cursor in particular location. This
- * function respects locking of screen areas so when the cursor is
- * moved in the locked area, it becomes invisible until
+ * SoftCursorMove(). Moves soft cursor into a particular location. 
+ * This function respects locking of screen areas so when the cursor
+ * is moved into the locked area, it becomes invisible until
  * SoftCursorUnlock() functions is called.
  ********************************************************************/
 
