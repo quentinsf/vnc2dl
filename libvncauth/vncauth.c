@@ -93,18 +93,25 @@ vncDecryptPasswdFromFile(char *fname)
     int i, ch;
     unsigned char *passwd = (unsigned char *)malloc(9);
 
-    if ((fp = fopen(fname,"r")) == NULL) return NULL;
+    if (strcmp(fname, "-") != 0) {
+	if ((fp = fopen(fname,"r")) == NULL)
+	    return NULL;
+    } else {
+	fp = stdin;
+    }
 
     for (i = 0; i < 8; i++) {
 	ch = getc(fp);
-	if (ch == EOF) {
-	    fclose(fp);
-	    return NULL;
-	}
+	if (ch == EOF)
+	    break;
 	passwd[i] = ch;
     }
 
-    fclose(fp);
+    if (fp != stdin)
+	fclose(fp);
+
+    if (i != 8)                 /* Could not read eight bytes */
+	return NULL;
 
     deskey(fixedkey, DE1);
     des(passwd, passwd);
