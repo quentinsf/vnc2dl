@@ -493,6 +493,23 @@ typedef struct {
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
  * Tight Encoding.  FIXME: Add more documentation.
+ *
+ * First byte of each Tight-encoded update is a "compression control"
+ * byte. It's format is as follows (bit 0 is the least significant one):
+ *   bit 0:     if 1, then compression stream 0 should be reset;
+ *   bit 1:     if 1, then compression stream 1 should be reset;
+ *   bit 2:     if 1, then compression stream 2 should be reset;
+ *   bit 3:     if 1, then compression stream 3 should be reset;
+ *   bits 7..4: if 1000 (0x08), then the compression type is "fill",
+ *              if 1001 (0x09), then the compression type is "jpeg",
+ *              if 0xxx, then the compression type is "basic",
+ *              values greater than 1001 are not valid.
+ * If the compression type is "basic", then bits 6..4 of the
+ * "compression control" byte specify the following:
+ *   bits 5,4:  decimal representation is the index of a particular zlib
+ *              stream which should be used for decompressing the data;
+ *   bit 6:     if 1, then a "filter id" byte is following this byte.
+ *
  */
 
 #define rfbTightExplicitFilter         0x04
