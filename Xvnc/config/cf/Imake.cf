@@ -259,12 +259,12 @@ XCOMM $XFree86: xc/config/cf/Imake.cf,v 3.66 2001/04/18 16:13:17 dawes Exp $
 # define SunArchitecture
 #endif /* sun */
 
-#ifdef hpux
+#ifdef __hpux
 # define MacroIncludeFile <hp.cf>
 # define MacroFile hp.cf
-# undef hpux
+# undef __hpux
 # define HPArchitecture
-#endif /* hpux */
+#endif /* __hpux */
 
 #ifdef sco
 # define MacroIncludeFile <sco5.cf>
