@@ -53,6 +53,8 @@ typedef struct PALETTE8_s {
 } PALETTE8;
 
 
+static BOOL usePixelFormat24;
+
 static int paletteMaxColors;
 static int paletteNumColors;
 static PALETTE palette;
@@ -63,6 +65,8 @@ static char *tightBeforeBuf = NULL;
 
 static int tightAfterBufSize = 0;
 static char *tightAfterBuf = NULL;
+
+static int *prevRowBuf = NULL;
 
 
 static int SendSubrect(rfbClientPtr cl, int x, int y, int w, int h);
@@ -80,21 +84,20 @@ static void PaletteReset(void);
 static int PaletteFind(CARD32 rgb);
 static int PaletteInsert(CARD32 rgb, int numPixels);
 
-static void Pack24(char *buf, rfbPixelFormat *format, int count);
+static void Pack24(char *buf, rfbPixelFormat *fmt, int count);
 
 static void EncodeIndexedRect8(CARD8 *buf, int w, int h);
 static void EncodeIndexedRect16(CARD8 *buf, int w, int h);
 static void EncodeIndexedRect32(CARD8 *buf, int w, int h);
 
-static void ApplyFilterGradient24(char *buf, rfbPixelFormat *format,
-                                  int w, int h);
-static void ApplyFilterGradient8(CARD8 *buf, rfbPixelFormat *format,
-                                  int w, int h);
-static void ApplyFilterGradient16(CARD16 *buf, rfbPixelFormat *format,
-                                  int w, int h);
-static void ApplyFilterGradient32(CARD32 *buf, rfbPixelFormat *format,
-                                  int w, int h);
+static void FilterGradient24(char *buf, rfbPixelFormat *fmt, int w, int h);
+static void FilterGradient16(CARD16 *buf, rfbPixelFormat *fmt, int w, int h);
+static void FilterGradient32(CARD32 *buf, rfbPixelFormat *fmt, int w, int h);
 
+static int DetectStillImage (rfbPixelFormat *fmt, int w, int h);
+static int DetectStillImage24 (rfbPixelFormat *fmt, int w, int h);
+static int DetectStillImage16 (rfbPixelFormat *fmt, int w, int h);
+static int DetectStillImage32 (rfbPixelFormat *fmt, int w, int h);
 
 /*
  * Tight encoding implementation.
@@ -109,6 +112,13 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
     int subrectMaxWidth, subrectMaxHeight;
     int dx, dy;
     int rw, rh;
+
+    if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
+         cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
+        usePixelFormat24 = TRUE;
+    } else {
+        usePixelFormat24 = FALSE;
+    }
 
     maxBeforeSize = TIGHT_MAX_RECT_SIZE * (cl->format.bitsPerPixel / 8);
     maxAfterSize = maxBeforeSize + (maxBeforeSize + 99) / 100 + 12;
@@ -204,7 +214,11 @@ SendSubrect(cl, x, y, w, h)
         break;
     case 0:
         /* Truecolor image */
-        success = SendFullColorRect(cl, w, h);
+        if (DetectStillImage(&cl->format, w, h)) {
+            success = SendGradientRect(cl, w, h);
+        } else {
+            success = SendFullColorRect(cl, w, h);
+        }
         break;
     default:
         /* Up to 256 different colors */
@@ -225,8 +239,7 @@ SendSolidRect(cl, w, h)
 {
     int len;
 
-    if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
-         cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
+    if (usePixelFormat24) {
         Pack24(tightBeforeBuf, &cl->format, 1);
         len = 3;
     } else
@@ -265,11 +278,8 @@ SendIndexedRect(cl, w, h)
         streamId = 1;
         dataLen = (w + 7) / 8;
         dataLen *= h;
-    } else if (paletteNumColors <= 32) {
-        streamId = 2;
-        dataLen = w * h;
     } else {
-        streamId = 3;
+        streamId = 2;
         dataLen = w * h;
     }
     updateBuf[ublen++] = (streamId | rfbTightExplicitFilter) << 4;
@@ -284,8 +294,7 @@ SendIndexedRect(cl, w, h)
                 palette.entry[i].listNode->rgb;
         }
 
-        if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
-             cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
+        if (usePixelFormat24) {
             Pack24(tightAfterBuf, &cl->format, paletteNumColors);
             entryLen = 3;
         } else
@@ -336,8 +345,7 @@ SendFullColorRect(cl, w, h)
     updateBuf[ublen++] = 0x00;  /* stream id = 0, no flushing, no filter */
     cl->rfbBytesSent[rfbEncodingTight]++;
 
-    if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
-         cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
+    if (usePixelFormat24) {
         Pack24(tightBeforeBuf, &cl->format, w * h);
         len = 3;
     } else
@@ -353,33 +361,30 @@ SendGradientRect(cl, w, h)
 {
     int len;
 
+    if (cl->format.bitsPerPixel == 8)
+        return SendFullColorRect(cl, w, h);
+
     if (ublen + TIGHT_MIN_TO_COMPRESS + 2 > UPDATE_BUF_SIZE) {
 	if (!rfbSendUpdateBuf(cl))
 	    return FALSE;
     }
 
+    if (prevRowBuf == NULL)
+        prevRowBuf = (int *)xalloc(2048 * 3 * sizeof(int));
+
     updateBuf[ublen++] = (3 | rfbTightExplicitFilter) << 4;
     updateBuf[ublen++] = rfbTightFilterGradient;
     cl->rfbBytesSent[rfbEncodingTight] += 2;
 
-    if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
-         cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
-        ApplyFilterGradient24(tightBeforeBuf, &cl->format, w, h);
+    if (usePixelFormat24) {
+        FilterGradient24(tightBeforeBuf, &cl->format, w, h);
         len = 3;
+    } else if (cl->format.bitsPerPixel == 32) {
+        FilterGradient32((CARD32 *)tightBeforeBuf, &cl->format, w, h);
+        len = 4;
     } else {
-        switch (cl->format.bitsPerPixel) {
-        case 32:
-            ApplyFilterGradient32((CARD32 *)tightBeforeBuf, &cl->format, w, h);
-            len = 4;
-            break;
-        case 16:
-            ApplyFilterGradient16((CARD16 *)tightBeforeBuf, &cl->format, w, h);
-            len = 2;
-            break;
-        default:
-            ApplyFilterGradient8((CARD8 *)tightBeforeBuf, &cl->format, w, h);
-            len = 1;
-        }
+        FilterGradient16((CARD16 *)tightBeforeBuf, &cl->format, w, h);
+        len = 2;
     }
 
     return CompressData(cl, 3, w * h * len);
@@ -392,7 +397,7 @@ CompressData(cl, streamId, dataLen)
 {
     z_streamp pz;
     int compressedLen, portionLen;
-    int i;
+    int i, err;
 
     if (dataLen < TIGHT_MIN_TO_COMPRESS) {
         memcpy(&updateBuf[ublen], tightBeforeBuf, dataLen);
@@ -409,10 +414,17 @@ CompressData(cl, streamId, dataLen)
         pz->zfree = Z_NULL;
         pz->opaque = Z_NULL;
 
-        if (deflateInit2 (pz, 9, Z_DEFLATED, MAX_WBITS,
-                          MAX_MEM_LEVEL, Z_DEFAULT_STRATEGY) != Z_OK) {
-            return FALSE;
+        if (streamId == 3) {
+            err = deflateInit2 (pz, 6, Z_DEFLATED, MAX_WBITS,
+                                MAX_MEM_LEVEL, Z_FILTERED);
+        } else {
+            err = deflateInit2 (pz, 9, Z_DEFLATED, MAX_WBITS,
+                                MAX_MEM_LEVEL, Z_DEFAULT_STRATEGY);
         }
+
+        if (err != Z_OK)
+            return FALSE;
+
         cl->zsActive[streamId] = TRUE;
     }
 
@@ -670,21 +682,33 @@ PaletteInsert(rgb, numPixels)
 /*
  * Converting 32-bit color samples into 24-bit colors.
  * Should be called only when redMax, greenMax and blueMax are 256.
+ * 8-bit samples assumed to be byte-aligned.
  */
 
-static void Pack24(buf, format, count)
+static void Pack24(buf, fmt, count)
     char *buf;
-    rfbPixelFormat *format;
+    rfbPixelFormat *fmt;
     int count;
 {
     int i;
     CARD32 pix;
+    int r_shift, g_shift, b_shift;
+
+    if (!rfbServerFormat.bigEndian == !fmt->bigEndian) {
+        r_shift = fmt->redShift;
+        g_shift = fmt->greenShift;
+        b_shift = fmt->blueShift;
+    } else {
+        r_shift = 24 - fmt->redShift;
+        g_shift = 24 - fmt->greenShift;
+        b_shift = 24 - fmt->blueShift;
+    }
 
     for (i = 0; i < count; i++) {
         pix = ((CARD32 *)buf)[i];
-        buf[i*3]   = (char)(pix >> format->redShift);
-        buf[i*3+1] = (char)(pix >> format->greenShift);
-        buf[i*3+2] = (char)(pix >> format->blueShift);
+        buf[i*3]   = (char)(pix >> r_shift);
+        buf[i*3+1] = (char)(pix >> g_shift);
+        buf[i*3+2] = (char)(pix >> b_shift);
     }
 }
 
@@ -736,16 +760,16 @@ DEFINE_IDX_ENCODE_FUNCTION(32)
 /*
  * ``Gradient'' filter for 24-bit color samples.
  * Should be called only when redMax, greenMax and blueMax are 256.
+ * 8-bit samples assumed to be byte-aligned.
  */
 
-static void ApplyFilterGradient24(buf, format, w, h)
+static void FilterGradient24(buf, fmt, w, h)
     char *buf;
-    rfbPixelFormat *format;
+    rfbPixelFormat *fmt;
     int w, h;
 {
     CARD32 *buf32;
     CARD32 pix32;
-    int prevRow[2048*3];        /* FIXME: Allocate this dynamically. */
     int *prevRowPtr;
     int shiftBits[3];
     int pixHere[3], pixUpper[3], pixLeft[3], pixUpperLeft[3];
@@ -753,18 +777,24 @@ static void ApplyFilterGradient24(buf, format, w, h)
     int x, y, c;
 
     buf32 = (CARD32 *)buf;
-    memset (prevRow, 0, w * 3 * sizeof(int));
+    memset (prevRowBuf, 0, w * 3 * sizeof(int));
 
-    shiftBits[0] = format->redShift;
-    shiftBits[1] = format->greenShift;
-    shiftBits[2] = format->blueShift;
+    if (!rfbServerFormat.bigEndian == !fmt->bigEndian) {
+        shiftBits[0] = fmt->redShift;
+        shiftBits[1] = fmt->greenShift;
+        shiftBits[2] = fmt->blueShift;
+    } else {
+        shiftBits[0] = 24 - fmt->redShift;
+        shiftBits[1] = 24 - fmt->greenShift;
+        shiftBits[2] = 24 - fmt->blueShift;
+    }
 
     for (y = 0; y < h; y++) {
         for (c = 0; c < 3; c++) {
             pixUpper[c] = 0;
             pixHere[c] = 0;
         }
-        prevRowPtr = prevRow;
+        prevRowPtr = prevRowBuf;
         for (x = 0; x < w; x++) {
             pix32 = *buf32++;
             for (c = 0; c < 3; c++) {
@@ -793,36 +823,41 @@ static void ApplyFilterGradient24(buf, format, w, h)
 
 #define DEFINE_GRADIENT_FILTER_FUNCTION(bpp)                             \
                                                                          \
-static void ApplyFilterGradient##bpp(buf, format, w, h)                  \
+static void FilterGradient##bpp(buf, fmt, w, h)                          \
     CARD##bpp *buf;                                                      \
-    rfbPixelFormat *format;                                              \
+    rfbPixelFormat *fmt;                                                 \
     int w, h;                                                            \
 {                                                                        \
     CARD##bpp pix, diff;                                                 \
-    int prevRow[2048*3];        /* FIXME: Allocate this dynamically. */  \
+    BOOL endianMismatch;                                                 \
     int *prevRowPtr;                                                     \
     int maxColor[3], shiftBits[3];                                       \
     int pixHere[3], pixUpper[3], pixLeft[3], pixUpperLeft[3];            \
     int prediction;                                                      \
     int x, y, c;                                                         \
                                                                          \
-    memset (prevRow, 0, w * 3 * sizeof(int));                            \
+    memset (prevRowBuf, 0, w * 3 * sizeof(int));                         \
                                                                          \
-    maxColor[0] = format->redMax;                                        \
-    maxColor[1] = format->greenMax;                                      \
-    maxColor[2] = format->blueMax;                                       \
-    shiftBits[0] = format->redShift;                                     \
-    shiftBits[1] = format->greenShift;                                   \
-    shiftBits[2] = format->blueShift;                                    \
+    endianMismatch = (!rfbServerFormat.bigEndian != !fmt->bigEndian);    \
+                                                                         \
+    maxColor[0] = fmt->redMax;                                           \
+    maxColor[1] = fmt->greenMax;                                         \
+    maxColor[2] = fmt->blueMax;                                          \
+    shiftBits[0] = fmt->redShift;                                        \
+    shiftBits[1] = fmt->greenShift;                                      \
+    shiftBits[2] = fmt->blueShift;                                       \
                                                                          \
     for (y = 0; y < h; y++) {                                            \
         for (c = 0; c < 3; c++) {                                        \
             pixUpper[c] = 0;                                             \
             pixHere[c] = 0;                                              \
         }                                                                \
-        prevRowPtr = prevRow;                                            \
+        prevRowPtr = prevRowBuf;                                         \
         for (x = 0; x < w; x++) {                                        \
             pix = *buf;                                                  \
+            if (endianMismatch) {                                        \
+                pix = Swap##bpp(pix);                                    \
+            }                                                            \
             diff = 0;                                                    \
             for (c = 0; c < 3; c++) {                                    \
                 pixUpperLeft[c] = pixUpper[c];                           \
@@ -840,12 +875,185 @@ static void ApplyFilterGradient##bpp(buf, format, w, h)                  \
                 diff |= ((pixHere[c] - prediction) & maxColor[c])        \
                     << shiftBits[c];                                     \
             }                                                            \
+            if (endianMismatch) {                                        \
+                diff = Swap##bpp(diff);                                  \
+            }                                                            \
             *buf++ = diff;                                               \
         }                                                                \
     }                                                                    \
 }
 
-DEFINE_GRADIENT_FILTER_FUNCTION(8)
 DEFINE_GRADIENT_FILTER_FUNCTION(16)
 DEFINE_GRADIENT_FILTER_FUNCTION(32)
+
+
+/*
+ * Code to guess if given rectangle is suitable for still image
+ * compression.
+ */
+
+#define DETECT_SUBROW_WIDTH   7
+#define DETECT_MIN_WIDTH      8
+#define DETECT_MIN_HEIGHT     8
+#define DETECT_MIN_SIZE    8192
+
+static int DetectStillImage (fmt, w, h)
+    rfbPixelFormat *fmt;
+    int w, h;
+{
+    if ( fmt->bitsPerPixel == 8 || w * h < DETECT_MIN_SIZE ||
+         w < DETECT_MIN_WIDTH || h < DETECT_MIN_HEIGHT ) {
+        return 0;
+    }
+
+    if (fmt->bitsPerPixel == 32) {
+        if (usePixelFormat24) {
+            return DetectStillImage24(fmt, w, h);
+        } else {
+            return DetectStillImage32(fmt, w, h);
+        }
+    } else {
+        return DetectStillImage16(fmt, w, h);
+    }
+}
+
+static int DetectStillImage24 (fmt, w, h)
+    rfbPixelFormat *fmt;
+    int w, h;
+{
+    int off;
+    int x, y, d, dx, c;
+    int diffStat[256];
+    int pixelCount = 0;
+    int pix, left[3];
+    unsigned long avgError;
+
+    /* If client is big-endian, color samples begin from the second
+       byte (offset 1) of a 32-bit pixel value. */
+    off = (fmt->bigEndian != 0);
+
+    memset(diffStat, 0, 256*sizeof(int));
+
+    y = 0, x = 0;
+    while (y < h && x < w) {
+        for (d = 0; d < h - y && d < w - x - DETECT_SUBROW_WIDTH; d++) {
+            for (c = 0; c < 3; c++) {
+                left[c] = (int)tightBeforeBuf[((y+d)*w+x+d)*4+off+c] & 0xFF;
+            }
+            for (dx = 1; dx <= DETECT_SUBROW_WIDTH; dx++) {
+                for (c = 0; c < 3; c++) {
+                    pix = (int)tightBeforeBuf[((y+d)*w+x+d+dx)*4+off+c] & 0xFF;
+                    diffStat[abs(pix - left[c])]++;
+                    left[c] = pix;
+                }
+                pixelCount++;
+            }
+        }
+        if (w > h) {
+            x += h;
+            y = 0;
+        } else {
+            x = 0;
+            y += w;
+        }
+    }
+
+    if (diffStat[0] * 33 / pixelCount >= 95)
+        return 0;
+
+    avgError = 0;
+    for (c = 1; c < 8; c++) {
+        avgError += (unsigned long)diffStat[c] * (unsigned long)(c * c);
+        if (diffStat[c] == 0 || diffStat[c] > diffStat[c-1] * 2)
+            return 0;
+    }
+    for (; c < 256; c++) {
+        avgError += (unsigned long)diffStat[c] * (unsigned long)(c * c);
+    }
+    avgError /= (pixelCount * 3 - diffStat[0]);
+
+    return (avgError < 1800);
+}
+
+#define DEFINE_DETECT_FUNCTION(bpp)                                          \
+                                                                             \
+static int DetectStillImage##bpp (fmt, w, h)                                 \
+    rfbPixelFormat *fmt;                                                     \
+    int w, h;                                                                \
+{                                                                            \
+    BOOL endianMismatch;                                                     \
+    CARD##bpp pix;                                                           \
+    int maxColor[3], shiftBits[3];                                           \
+    int x, y, d, dx, c;                                                      \
+    int diffStat[256];                                                       \
+    int pixelCount = 0;                                                      \
+    int sample, sum, left[3];                                                \
+    unsigned long avgError;                                                  \
+                                                                             \
+    endianMismatch = (!rfbServerFormat.bigEndian != !fmt->bigEndian);        \
+                                                                             \
+    maxColor[0] = fmt->redMax;                                               \
+    maxColor[1] = fmt->greenMax;                                             \
+    maxColor[2] = fmt->blueMax;                                              \
+    shiftBits[0] = fmt->redShift;                                            \
+    shiftBits[1] = fmt->greenShift;                                          \
+    shiftBits[2] = fmt->blueShift;                                           \
+                                                                             \
+    memset(diffStat, 0, 256*sizeof(int));                                    \
+                                                                             \
+    y = 0, x = 0;                                                            \
+    while (y < h && x < w) {                                                 \
+        for (d = 0; d < h - y && d < w - x - DETECT_SUBROW_WIDTH; d++) {     \
+            pix = ((CARD##bpp *)tightBeforeBuf)[(y+d)*w+x+d];                \
+            if (endianMismatch) {                                            \
+                pix = Swap##bpp(pix);                                        \
+            }                                                                \
+            for (c = 0; c < 3; c++) {                                        \
+                left[c] = (int)(pix >> shiftBits[c] & maxColor[c]);          \
+            }                                                                \
+            for (dx = 1; dx <= DETECT_SUBROW_WIDTH; dx++) {                  \
+                pix = ((CARD##bpp *)tightBeforeBuf)[(y+d)*w+x+d+dx];         \
+                if (endianMismatch) {                                        \
+                    pix = Swap##bpp(pix);                                    \
+                }                                                            \
+                sum = 0;                                                     \
+                for (c = 0; c < 3; c++) {                                    \
+                    sample = (int)(pix >> shiftBits[c] & maxColor[c]);       \
+                    sum += abs(sample - left[c]);                            \
+                    left[c] = sample;                                        \
+                }                                                            \
+                if (sum > 255)                                               \
+                    sum = 255;                                               \
+                diffStat[sum]++;                                             \
+                pixelCount++;                                                \
+            }                                                                \
+        }                                                                    \
+        if (w > h) {                                                         \
+            x += h;                                                          \
+            y = 0;                                                           \
+        } else {                                                             \
+            x = 0;                                                           \
+            y += w;                                                          \
+        }                                                                    \
+    }                                                                        \
+                                                                             \
+    if ((diffStat[0] + diffStat[1]) * 100 / pixelCount >= 90)                \
+        return 0;                                                            \
+                                                                             \
+    avgError = 0;                                                            \
+    for (c = 1; c < 8; c++) {                                                \
+        avgError += (unsigned long)diffStat[c] * (unsigned long)(c * c);     \
+        if (diffStat[c] == 0 || diffStat[c] > diffStat[c-1] * 2)             \
+            return 0;                                                        \
+    }                                                                        \
+    for (; c < 256; c++) {                                                   \
+        avgError += (unsigned long)diffStat[c] * (unsigned long)(c * c);     \
+    }                                                                        \
+    avgError /= (pixelCount - diffStat[0]);                                  \
+                                                                             \
+    return (avgError < 200);                                                 \
+}
+
+DEFINE_DETECT_FUNCTION(16)
+DEFINE_DETECT_FUNCTION(32)
 
