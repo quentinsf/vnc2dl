@@ -117,7 +117,7 @@ processTunnelArgs(char **remoteHost, int *remotePort, int localPort,
   if (*remotePort < 100)
     *remotePort += SERVER_PORT_OFFSET;
 
-  sprintf(lastArgv, "localhost:%d", localPort);
+  sprintf(lastArgv, "localhost::%d", localPort);
 
   *remoteHost = argv[*pargc - 1];
   argv[*pargc - 1] = lastArgv;
