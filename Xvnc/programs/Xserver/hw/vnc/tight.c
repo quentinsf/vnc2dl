@@ -139,6 +139,10 @@ static int DetectStillImage32(rfbPixelFormat *fmt, int w, int h);
 static BOOL SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h,
                          int quality);
 static void PrepareRowForJpeg(CARD8 *dst, int x, int y, int count);
+static void PrepareRowForJpeg24(CARD8 *dst, int x, int y, int count);
+static void PrepareRowForJpeg16(CARD8 *dst, int x, int y, int count);
+static void PrepareRowForJpeg32(CARD8 *dst, int x, int y, int count);
+
 static void JpegInitDestination(j_compress_ptr cinfo);
 static boolean JpegEmptyOutputBuffer(j_compress_ptr cinfo);
 static void JpegTermDestination(j_compress_ptr cinfo);
@@ -1254,6 +1258,7 @@ static int DetectStillImage##bpp (fmt, w, h)                                 \
 DEFINE_DETECT_FUNCTION(16)
 DEFINE_DETECT_FUNCTION(32)
 
+
 /*
  * JPEG compression stuff.
  */
@@ -1274,12 +1279,8 @@ SendJpegRect(cl, x, y, w, h, quality)
     JSAMPROW rowPointer[1];
     int dy;
 
-    if ( rfbServerFormat.bitsPerPixel != 32 ||
-         rfbServerFormat.redMax != 0xFF ||
-         rfbServerFormat.greenMax != 0xFF ||
-         rfbServerFormat.blueMax != 0xFF ) {
+    if (rfbServerFormat.bitsPerPixel == 8)
         return SendFullColorRect(cl, w, h);
-    }
 
     srcBuf = (CARD8 *)xalloc(w * 3);
     if (srcBuf == NULL) {
@@ -1334,6 +1335,25 @@ PrepareRowForJpeg(dst, x, y, count)
     CARD8 *dst;
     int x, y, count;
 {
+    if (rfbServerFormat.bitsPerPixel == 32) {
+        if ( rfbServerFormat.redMax == 0xFF &&
+             rfbServerFormat.greenMax == 0xFF &&
+             rfbServerFormat.blueMax == 0xFF ) {
+            PrepareRowForJpeg24(dst, x, y, count);
+        } else {
+            PrepareRowForJpeg32(dst, x, y, count);
+        }
+    } else {
+        /* 16 bpp assumed. */
+        PrepareRowForJpeg16(dst, x, y, count);
+    }
+}
+
+static void
+PrepareRowForJpeg24(dst, x, y, count)
+    CARD8 *dst;
+    int x, y, count;
+{
     CARD32 *fbptr;
     CARD32 pix;
 
@@ -1347,6 +1367,43 @@ PrepareRowForJpeg(dst, x, y, count)
         *dst++ = (CARD8)(pix >> rfbServerFormat.blueShift);
     }
 }
+
+#define DEFINE_JPEG_GET_ROW_FUNCTION(bpp)                                   \
+                                                                            \
+static void                                                                 \
+PrepareRowForJpeg##bpp(dst, x, y, count)                                    \
+    CARD8 *dst;                                                             \
+    int x, y, count;                                                        \
+{                                                                           \
+    CARD##bpp *fbptr;                                                       \
+    CARD##bpp pix;                                                          \
+    int inRed, inGreen, inBlue;                                             \
+                                                                            \
+    fbptr = (CARD##bpp *)                                                   \
+        &rfbScreen.pfbMemory[y * rfbScreen.paddedWidthInBytes +             \
+                             x * (bpp / 8)];                                \
+                                                                            \
+    while (count--) {                                                       \
+        pix = *fbptr++;                                                     \
+                                                                            \
+        inRed = (int)                                                       \
+            (pix >> rfbServerFormat.redShift   & rfbServerFormat.redMax);   \
+        inGreen = (int)                                                     \
+            (pix >> rfbServerFormat.greenShift & rfbServerFormat.greenMax); \
+        inBlue  = (int)                                                     \
+            (pix >> rfbServerFormat.blueShift  & rfbServerFormat.blueMax);  \
+                                                                            \
+	*dst++ = (CARD8)((inRed   * 255 + rfbServerFormat.redMax / 2) /     \
+                         rfbServerFormat.redMax);                           \
+	*dst++ = (CARD8)((inGreen * 255 + rfbServerFormat.greenMax / 2) /   \
+                         rfbServerFormat.greenMax);                         \
+	*dst++ = (CARD8)((inBlue  * 255 + rfbServerFormat.blueMax / 2) /    \
+                         rfbServerFormat.blueMax);                          \
+    }                                                                       \
+}
+
+DEFINE_JPEG_GET_ROW_FUNCTION(16)
+DEFINE_JPEG_GET_ROW_FUNCTION(32)
 
 /*
  * Destination manager implementation for JPEG library.
