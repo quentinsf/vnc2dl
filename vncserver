@@ -183,7 +183,6 @@ unless (kill 0, `cat $pidFile`) {
     close(LOG);
     die "\n";
 }
-sleep(2);
 
 warn "\nNew '$desktopName' desktop is $host:$displayNumber\n\n";
 
