@@ -26,9 +26,16 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <vncauth.h>
 #include <d3des.h>
 
+
+/*
+ * Make sure we call srandom() only once.
+ */
+
+static int s_srandom_called = 0;
 
 /*
  * We use a fixed key to store passwords, since we assume that our local
@@ -36,7 +43,7 @@
  * as plaintext.
  */
 
-unsigned char fixedkey[8] = {23,82,107,6,35,78,88,7};
+static unsigned char s_fixedkey[8] = {23,82,107,6,35,78,88,7};
 
 
 /*
@@ -68,7 +75,7 @@ vncEncryptAndStorePasswd(char *passwd, char *fname)
     /* Do encryption in-place - this way we overwrite our copy of the plaintext
        password */
 
-    deskey(fixedkey, EN0);
+    deskey(s_fixedkey, EN0);
     des(encryptedPasswd, encryptedPasswd);
 
     for (i = 0; i < 8; i++) {
@@ -113,7 +120,7 @@ vncDecryptPasswdFromFile(char *fname)
     if (i != 8)                 /* Could not read eight bytes */
 	return NULL;
 
-    deskey(fixedkey, DE1);
+    deskey(s_fixedkey, DE1);
     des(passwd, passwd);
 
     passwd[8] = 0;
@@ -131,9 +138,14 @@ void
 vncRandomBytes(unsigned char *bytes)
 {
     int i;
-    unsigned int seed = (unsigned int) time(0);
+    unsigned int seed;
 
-    srandom(seed);
+    if (!s_srandom_called) {
+      seed = (unsigned int)time(0) ^ (unsigned int)getpid();
+      srandom(seed);
+      s_srandom_called = 1;
+    }
+
     for (i = 0; i < CHALLENGESIZE; i++) {
 	bytes[i] = (unsigned char)(random() & 255);    
     }
