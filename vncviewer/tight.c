@@ -45,14 +45,14 @@
 
 #ifndef RGB_TO_PIXEL
 
-#define RGB_TO_PIXEL(bpp,r,g,b)                                              \
-  ((CARD##bpp)(r) & myFormat.redMax) << myFormat.redShift |                  \
-  ((CARD##bpp)(g) & myFormat.greenMax) << myFormat.greenShift |              \
+#define RGB_TO_PIXEL(bpp,r,g,b)						\
+  ((CARD##bpp)(r) & myFormat.redMax) << myFormat.redShift |		\
+  ((CARD##bpp)(g) & myFormat.greenMax) << myFormat.greenShift |		\
   ((CARD##bpp)(b) & myFormat.blueMax) << myFormat.blueShift;
 
-#define RGB24_TO_PIXEL32(r,g,b)                                              \
-  ((CARD32)(r) & 0xFF) << myFormat.redShift |                                \
-  ((CARD32)(g) & 0xFF) << myFormat.greenShift |                              \
+#define RGB24_TO_PIXEL32(r,g,b)						\
+  ((CARD32)(r) & 0xFF) << myFormat.redShift |				\
+  ((CARD32)(g) & 0xFF) << myFormat.greenShift |				\
   ((CARD32)(b) & 0xFF) << myFormat.blueShift;
 
 #endif
@@ -93,8 +93,8 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
   for (stream_id = 0; stream_id < 4; stream_id++) {
     if ((comp_ctl & 1) && zlibStreamActive[stream_id]) {
       if (inflateEnd (&zlibStream[stream_id]) != Z_OK &&
-          zlibStream[stream_id].msg != NULL)
-        fprintf(stderr, "inflateEnd: %s\n", zlibStream[stream_id].msg);
+	  zlibStream[stream_id].msg != NULL)
+	fprintf(stderr, "inflateEnd: %s\n", zlibStream[stream_id].msg);
       zlibStreamActive[stream_id] = False;
     }
     comp_ctl >>= 1;
@@ -104,17 +104,17 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
   if (comp_ctl == rfbTightFill) {
 #if BPP == 32
     if (myFormat.depth == 24 && myFormat.redMax == 0xFF &&
-        myFormat.greenMax == 0xFF && myFormat.blueMax == 0xFF) {
+	myFormat.greenMax == 0xFF && myFormat.blueMax == 0xFF) {
       if (!ReadFromRFBServer(buffer, 3))
-        return False;
+	return False;
       fill_colour = RGB24_TO_PIXEL32(buffer[0], buffer[1], buffer[2]);
     } else {
       if (!ReadFromRFBServer((char*)&fill_colour, sizeof(fill_colour)))
-        return False;
+	return False;
     }
 #else
     if (!ReadFromRFBServer((char*)&fill_colour, sizeof(fill_colour)))
-        return False;
+	return False;
 #endif
 
 #if (BPP == 8)
@@ -201,7 +201,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
     err = inflateInit(zs);
     if (err != Z_OK) {
       if (zs->msg != NULL)
-        fprintf(stderr, "InflateInit error: %s.\n", zs->msg);
+	fprintf(stderr, "InflateInit error: %s.\n", zs->msg);
       return False;
     }
     zlibStreamActive[stream_id] = True;
@@ -240,14 +240,14 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
 
       err = inflate(zs, Z_SYNC_FLUSH);
       if (err == Z_BUF_ERROR)   /* Input exhausted -- no problem. */
-        break;
+	break;
       if (err != Z_OK && err != Z_STREAM_END) {
-        if (zs->msg != NULL) {
-          fprintf(stderr, "Inflate error: %s.\n", zs->msg);
-        } else {
-          fprintf(stderr, "Inflate error: %d.\n", err);
-        }
-        return False;
+	if (zs->msg != NULL) {
+	  fprintf(stderr, "Inflate error: %s.\n", zs->msg);
+	} else {
+	  fprintf(stderr, "Inflate error: %d.\n", err);
+	}
+	return False;
       }
 
       numRows = (bufferSize - zs->avail_out) / rowSize;
@@ -256,7 +256,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
 
       extraBytes = bufferSize - zs->avail_out - numRows * rowSize;
       if (extraBytes > 0)
-        memcpy(buffer, &buffer[numRows * rowSize], extraBytes);
+	memcpy(buffer, &buffer[numRows * rowSize], extraBytes);
 
       CopyDataToScreen(buffer2, rx, ry + rowsProcessed, rw, numRows);
       rowsProcessed += numRows;
@@ -314,10 +314,10 @@ FilterCopyBPP (int numRows, CARDBPP *dst)
   if (cutZeros) {
     for (y = 0; y < numRows; y++) {
       for (x = 0; x < rectWidth; x++) {
-        dst[y*rectWidth+x] =
-          RGB24_TO_PIXEL32(buffer[(y*rectWidth+x)*3],
-                           buffer[(y*rectWidth+x)*3+1],
-                           buffer[(y*rectWidth+x)*3+2]);
+	dst[y*rectWidth+x] =
+	  RGB24_TO_PIXEL32(buffer[(y*rectWidth+x)*3],
+			   buffer[(y*rectWidth+x)*3+1],
+			   buffer[(y*rectWidth+x)*3+2]);
       }
     }
     return;
@@ -363,15 +363,15 @@ FilterGradient24 (int numRows, CARD32 *dst)
     /* Remaining pixels of a row */
     for (x = 1; x < rectWidth; x++) {
       for (c = 0; c < 3; c++) {
-        est[c] = (int)tightPrevRow[x*3+c] + (int)pix[c] -
-                 (int)tightPrevRow[(x-1)*3+c];
-        if (est[c] > 0xFF) {
-          est[c] = 0xFF;
-        } else if (est[c] < 0x00) {
-          est[c] = 0x00;
-        }
-        pix[c] = (CARD8)est[c] + buffer[(y*rectWidth+x)*3+c];
-        thisRow[x*3+c] = pix[c];
+	est[c] = (int)tightPrevRow[x*3+c] + (int)pix[c] -
+		 (int)tightPrevRow[(x-1)*3+c];
+	if (est[c] > 0xFF) {
+	  est[c] = 0xFF;
+	} else if (est[c] < 0x00) {
+	  est[c] = 0x00;
+	}
+	pix[c] = (CARD8)est[c] + buffer[(y*rectWidth+x)*3+c];
+	thisRow[x*3+c] = pix[c];
       }
       dst[y*rectWidth+x] = RGB24_TO_PIXEL32(pix[0], pix[1], pix[2]);
     }
@@ -421,14 +421,14 @@ FilterGradientBPP (int numRows, CARDBPP *dst)
     /* Remaining pixels of a row */
     for (x = 1; x < rectWidth; x++) {
       for (c = 0; c < 3; c++) {
-        est[c] = (int)thatRow[x*3+c] + (int)pix[c] - (int)thatRow[(x-1)*3+c];
-        if (est[c] > (int)max[c]) {
-          est[c] = (int)max[c];
-        } else if (est[c] < 0) {
-          est[c] = 0;
-        }
-        pix[c] = (CARD16)((src[y*rectWidth+x] >> shift[c]) + est[c] & max[c]);
-        thisRow[x*3+c] = pix[c];
+	est[c] = (int)thatRow[x*3+c] + (int)pix[c] - (int)thatRow[(x-1)*3+c];
+	if (est[c] > (int)max[c]) {
+	  est[c] = (int)max[c];
+	} else if (est[c] < 0) {
+	  est[c] = 0;
+	}
+	pix[c] = (CARD16)((src[y*rectWidth+x] >> shift[c]) + est[c] & max[c]);
+	thisRow[x*3+c] = pix[c];
       }
       dst[y*rectWidth+x] = RGB_TO_PIXEL(BPP, pix[0], pix[1], pix[2]);
     }
@@ -459,8 +459,8 @@ InitFilterPaletteBPP (int rw, int rh)
       return 0;
     for (i = rectColors - 1; i >= 0; i--) {
       palette[i] = RGB24_TO_PIXEL32(tightPalette[i*3],
-                                    tightPalette[i*3+1],
-                                    tightPalette[i*3+2]);
+				    tightPalette[i*3+1],
+				    tightPalette[i*3+2]);
     }
     return (rectColors == 2) ? 1 : 8;
   }
@@ -483,17 +483,17 @@ FilterPaletteBPP (int numRows, CARDBPP *dst)
     w = (rectWidth + 7) / 8;
     for (y = 0; y < numRows; y++) {
       for (x = 0; x < rectWidth / 8; x++) {
-        for (b = 7; b >= 0; b--)
-          dst[y*rectWidth+x*8+7-b] = palette[src[y*w+x] >> b & 1];
+	for (b = 7; b >= 0; b--)
+	  dst[y*rectWidth+x*8+7-b] = palette[src[y*w+x] >> b & 1];
       }
       for (b = 7; b >= 8 - rectWidth % 8; b--) {
-        dst[y*rectWidth+x*8+7-b] = palette[src[y*w+x] >> b & 1];
+	dst[y*rectWidth+x*8+7-b] = palette[src[y*w+x] >> b & 1];
       }
     }
   } else {
     for (y = 0; y < numRows; y++)
       for (x = 0; x < rectWidth; x++)
-        dst[y*rectWidth+x] = palette[(int)src[y*rectWidth+x]];
+	dst[y*rectWidth+x] = palette[(int)src[y*rectWidth+x]];
   }
 }
 

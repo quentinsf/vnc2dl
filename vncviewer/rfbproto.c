@@ -534,13 +534,13 @@ HandleRFBServerMessage()
       if (rect.encoding == rfbEncodingXCursor) {
 	if (!HandleXCursor(rect.r.x, rect.r.y, rect.r.w, rect.r.h)) {
 	  return False;
-        }
+	}
 	continue;
       }
       if (rect.encoding == rfbEncodingRichCursor) {
 	if (!HandleRichCursor(rect.r.x, rect.r.y, rect.r.w, rect.r.h)) {
 	  return False;
-        }
+	}
 	continue;
       }
 
@@ -558,8 +558,8 @@ HandleRFBServerMessage()
       }
 
       if (SoftCursorInArea(rect.r.x, rect.r.y, rect.r.w, rect.r.h)) {
-        SoftCursorHide();
-        repaintCursor = True;
+	SoftCursorHide();
+	repaintCursor = True;
       }
 
       switch (rect.encoding) {
@@ -595,11 +595,11 @@ HandleRFBServerMessage()
 	cr.srcX = Swap16IfLE(cr.srcX);
 	cr.srcY = Swap16IfLE(cr.srcY);
 
-        if (!repaintCursor &&
-            SoftCursorInArea(cr.srcX, cr.srcY, rect.r.w, rect.r.h)) {
-          SoftCursorHide();
-          repaintCursor = True;
-        }
+	if (!repaintCursor &&
+	    SoftCursorInArea(cr.srcX, cr.srcY, rect.r.w, rect.r.h)) {
+	  SoftCursorHide();
+	  repaintCursor = True;
+	}
 
 	if (appData.copyRectDelay != 0) {
 	  XFillRectangle(dpy, desktopWin, srcGC, cr.srcX, cr.srcY,
@@ -703,8 +703,8 @@ HandleRFBServerMessage()
       }
 
       if (repaintCursor) {
-        SoftCursorShow();
-        repaintCursor = False;
+	SoftCursorShow();
+	repaintCursor = False;
       }
     }
 
@@ -841,7 +841,7 @@ ReadCompactLen (void)
     len |= ((int)b & 0x7F) << 7;
     if (b & 0x80) {
       if (!ReadFromRFBServer((char *)&b, 1))
-        return -1;
+	return -1;
       len |= ((int)b & 0xFF) << 14;
     }
   }

@@ -170,7 +170,7 @@ Bool HandleRichCursor(int xhot, int yhot, int width, int height)
     return False;
 
   if (!ReadFromRFBServer((char *)rcSource,
-                         width * height * (myFormat.bitsPerPixel / 8))) {
+			 width * height * (myFormat.bitsPerPixel / 8))) {
     free(rcSource);
     return False;
   }
@@ -200,7 +200,7 @@ Bool HandleRichCursor(int xhot, int yhot, int width, int height)
   for (y = 0; y < height; y++) {
     for (x = 0; x < width / 8; x++) {
       for (b = 7; b >= 0; b--) {
-        *ptr++ = buf[y * bytesPerRow + x] >> b & 1;
+	*ptr++ = buf[y * bytesPerRow + x] >> b & 1;
       }
     }
     for (b = 7; b > 7 - width % 8; b--) {
@@ -233,9 +233,9 @@ Bool SoftCursorInArea(int x, int y, int w, int h)
     return False;
 
   return (x < rcCursorX - rcHotX + rcWidth &&
-          y < rcCursorY - rcHotY + rcHeight &&
-          x + w >= rcCursorX - rcHotX &&
-          y + h >= rcCursorY - rcHotY);
+	  y < rcCursorY - rcHotY + rcHeight &&
+	  x + w >= rcCursorX - rcHotX &&
+	  y + h >= rcCursorY - rcHotY);
 }
 
 void SoftCursorHide(void)
@@ -327,14 +327,14 @@ static void SoftCursorDraw(void)
     y0 = rcCursorY - rcHotY + y;
     if (y0 >= 0 && y0 < si.framebufferHeight) {
       for (x = 0; x < rcWidth; x++) {
-        x0 = rcCursorX - rcHotX + x;
-        if (x0 >= 0 && x0 < si.framebufferWidth) {
-          offset = y * rcWidth + x;
-          if (rcMask[offset]) {
-            pos = (char *)&rcSource[offset * bytesPerPixel];
-            CopyDataToScreen(pos, x0, y0, 1, 1);
-          }
-        }
+	x0 = rcCursorX - rcHotX + x;
+	if (x0 >= 0 && x0 < si.framebufferWidth) {
+	  offset = y * rcWidth + x;
+	  if (rcMask[offset]) {
+	    pos = (char *)&rcSource[offset * bytesPerPixel];
+	    CopyDataToScreen(pos, x0, y0, 1, 1);
+	  }
+	}
       }
     }
   }

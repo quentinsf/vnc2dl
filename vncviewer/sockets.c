@@ -291,7 +291,7 @@ ListenAtTcpPort(int port)
   }
 
   if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
-                 (const char *)&one, sizeof(one)) < 0) {
+		 (const char *)&one, sizeof(one)) < 0) {
     fprintf(stderr,programName);
     perror(": ListenAtTcpPort: setsockopt");
     close(sock);

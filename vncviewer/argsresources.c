@@ -284,8 +284,8 @@ usage(void)
 	  "        -owncmap\n"
 	  "        -truecolour\n"
 	  "        -depth <depth>\n"
-          "        -compresslevel <compress-value> (0-9)\n"
-          "        -nocursorshape\n"
+	  "        -compresslevel <compress-value> (0-9)\n"
+	  "        -nocursorshape\n"
 	  "\n", programName, programName, programName);
   exit(1);
 }

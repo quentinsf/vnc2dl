@@ -55,7 +55,7 @@ extern int endianTest;
 
 #define DEFAULT_SSH_CMD "/usr/bin/ssh"
 #define DEFAULT_TUNNEL_CMD DEFAULT_SSH_CMD \
-                           " -f -L %L:%H:%R %H sleep 20"
+			   " -f -L %L:%H:%R %H sleep 20"
 
 
 /* argsresources.c */

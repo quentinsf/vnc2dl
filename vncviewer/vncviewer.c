@@ -52,7 +52,7 @@ main(int argc, char **argv)
     }
     if (strcmp(argv[i], "-tunnel") == 0) {
       if (!createTunnel(&argc, argv, i))
-        exit(1);
+	exit(1);
       break;
     }
   }
