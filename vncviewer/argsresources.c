@@ -269,7 +269,7 @@ void
 usage(void)
 {
   fprintf(stderr,
-	  "VNC viewer version 3.3.3r2 (Tight Encoding patch 1.2)\n"
+	  "TightVNC viewer version 1.1p6 (based on VNC 3.3.3r2)\n"
 	  "\n"
 	  "Usage: %s [<options>] [<host>]:<display#>\n"
 	  "       %s [<options>] -listen [<display#>]\n"

@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2000 Const Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
