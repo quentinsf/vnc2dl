@@ -269,12 +269,12 @@ void SoftCursorLockArea(int x, int y, int w, int h)
     rcLockHeight = h;
     rcLockSet = True;
   } else {
-    if (x < rcLockX) newX = x;
-    if (y < rcLockY) newY = y;
-    if (x + w > rcLockX + rcLockWidth)
-      rcLockWidth = x + w - newX;
-    if (y + h > rcLockY + rcLockHeight)
-      rcLockHeight = y + h - newY;
+    newX = (x < rcLockX) ? x : rcLockX;
+    newY = (y < rcLockY) ? y : rcLockY;
+    rcLockWidth = (x + w > rcLockX + rcLockWidth) ?
+      (x + w - newX) : (rcLockX + rcLockWidth - newX);
+    rcLockHeight = (y + h > rcLockY + rcLockHeight) ?
+      (y + h - newY) : (rcLockY + rcLockHeight - newY);
     rcLockX = newX;
     rcLockY = newY;
   }
@@ -336,8 +336,8 @@ static Bool SoftCursorInLockedArea(void)
 {
   return (rcLockX < rcCursorX - rcHotX + rcWidth &&
 	  rcLockY < rcCursorY - rcHotY + rcHeight &&
-	  rcLockX + rcLockWidth >= rcCursorX - rcHotX &&
-	  rcLockY + rcLockHeight >= rcCursorY - rcHotY);
+	  rcLockX + rcLockWidth > rcCursorX - rcHotX &&
+	  rcLockY + rcLockHeight > rcCursorY - rcHotY);
 }
 
 static void SoftCursorCopyArea(int oper)
