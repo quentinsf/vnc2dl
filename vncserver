@@ -148,6 +148,7 @@ $cmd .= " -rfbport $vncPort";
 
 # Add font path and color database stuff here, e.g.:
 #
+# $cmd .= " -fp unix/:7100";
 # $cmd .= " -fp /usr/lib/X11/fonts/misc/,/usr/lib/X11/fonts/75dpi/";
 # $cmd .= " -co /usr/lib/X11/rgb";
 #
