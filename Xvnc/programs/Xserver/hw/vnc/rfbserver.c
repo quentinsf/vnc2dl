@@ -3,7 +3,7 @@
  */
 
 /*
- *  Copyright (C) 2000-2003 Constantin Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2000-2004 Constantin Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 2000 Tridia Corporation.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
@@ -56,8 +56,6 @@ Bool rfbViewOnly = FALSE; /* run server in view only mode - Ehud Karni SW */
 
 static rfbClientPtr rfbNewClient(int sock);
 static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
-static void rfbSendTunnelingCaps(rfbClientPtr cl);
-static void rfbProcessClientTunnelingType(rfbClientPtr cl);
 static void rfbProcessClientInitMessage(rfbClientPtr cl);
 static void rfbSendInteractionCaps(rfbClientPtr cl);
 static void rfbProcessClientNormalMessage(rfbClientPtr cl);
@@ -307,14 +305,17 @@ rfbProcessClientMessage(sock)
     case RFB_PROTOCOL_VERSION:
 	rfbProcessClientProtocolVersion(cl);
 	break;
-    case RFB_TUNNELING_TYPE:	/* protocol 3.130 */
+    case RFB_SECURITY_TYPE:	/* protocol 3.7 */
+	rfbProcessClientSecurityType(cl);
+	break;
+    case RFB_TUNNELING_TYPE:	/* protocol 3.7t */
 	rfbProcessClientTunnelingType(cl);
 	break;
-    case RFB_AUTH_TYPE:		/* protocol 3.130 */
-	rfbAuthProcessType(cl);
+    case RFB_AUTH_TYPE:		/* protocol 3.7t */
+	rfbProcessClientAuthType(cl);
 	break;
     case RFB_AUTHENTICATION:
-	rfbAuthProcessResponse(cl);
+	rfbVncAuthProcessResponse(cl);
 	break;
     case RFB_INITIALISATION:
 	rfbProcessClientInitMessage(cl);
@@ -336,7 +337,7 @@ rfbProcessClientProtocolVersion(cl)
 {
     rfbProtocolVersionMsg pv;
     int n, major, minor;
-    char failureReason[256];
+    Bool mismatch;
 
     if ((n = ReadExact(cl->sock, pv, sz_rfbProtocolVersionMsg)) <= 0) {
 	if (n == 0)
@@ -353,93 +354,30 @@ rfbProcessClientProtocolVersion(cl)
 	rfbCloseSock(cl->sock);
 	return;
     }
-    rfbLog("Protocol version %d.%d\n", major, minor);
+    rfbLog("Using protocol version %d.%d\n", major, minor);
 
     if (major != rfbProtocolMajorVersion) {
-	/* Major version mismatch - send a ConnFailed message */
-
 	rfbLog("RFB protocol version mismatch - server %d.%d, client %d.%d\n",
-		rfbProtocolMajorVersion,rfbProtocolMinorVersion,major,minor);
+	       rfbProtocolMajorVersion, rfbProtocolMinorVersion, major, minor);
 	rfbCloseSock(cl->sock);
 	return;
     }
 
-    if ( minor != rfbProtocolMinorVersion &&
-	 minor != rfbProtocolFallbackMinorVersion ) {
-	/* Minor version mismatch - warn but try to continue */
-	rfbLog("Ignoring minor version mismatch\n");
-    }
-
+    /* Always use one of the two standard versions of the RFB protocol. */
     cl->protocol_minor_ver = minor;
-
-    if (cl->protocol_minor_ver >= 130) {
-	rfbSendTunnelingCaps(cl); /* protocol 3.130 */
-    } else {
-	rfbAuthNewClient(cl);
+    if (minor > rfbProtocolMinorVersion) {
+	cl->protocol_minor_ver = rfbProtocolMinorVersion;
+    } else if (minor < rfbProtocolMinorVersion) {
+	cl->protocol_minor_ver = rfbProtocolFallbackMinorVersion;
     }
-}
-
-
-/*
- * rfbSendTunnelingCaps is called after deciding the protocol version,
- * and only if the protocol version is 3.130.  In this function, we send
- * the list of our tunneling capabilities.
- */
-
-static void
-rfbSendTunnelingCaps(cl)
-    rfbClientPtr cl;
-{
-    rfbTunnelingCapsMsg caps;
-    int nTypes = 0;             /* we don't support tunneling yet */
-
-    caps.connFailed = FALSE;
-    caps.nTunnelTypes = Swap16IfLE(nTypes);
-    if (WriteExact(cl->sock, (char *)&caps, sz_rfbTunnelingCapsMsg) < 0) {
-	rfbLogPerror("rfbSendTunnelingCaps: write");
-	rfbCloseSock(cl->sock);
-	return;
+    if (minor != rfbProtocolMinorVersion &&
+	minor != rfbProtocolFallbackMinorVersion) {
+	rfbLog("Non-standard protocol version %d.%d, using %d.%d instead\n",
+	       major, minor, rfbProtocolMajorVersion, cl->protocol_minor_ver);
     }
 
-    if (nTypes) {
-	/* Dispatch client input to rfbProcessClientTunnelingType(). */
-	cl->state = RFB_TUNNELING_TYPE;
-    } else {
-	rfbAuthNewClient(cl);
-    }
-}
-
-
-/*
- * Read tunneling type requested by the client (protocol 3.130).
- */
-
-static void
-rfbProcessClientTunnelingType(cl)
-    rfbClientPtr cl;
-{
-    CARD32 tunnel_type;
-    int n;
-
-    n = ReadExact(cl->sock, (char *)&tunnel_type, sizeof(tunnel_type));
-    if (n <= 0) {
-	if (n == 0)
-	    rfbLog("rfbProcessClientTunnelingType: client gone\n");
-	else
-	    rfbLogPerror("rfbProcessClientTunnelingType: read");
-	rfbCloseSock(cl->sock);
-	return;
-    }
-
-    tunnel_type = Swap32IfLE(tunnel_type);
-
-    /* We cannot do tunneling yet. */
-    if (tunnel_type != rfbNoTunneling) {
-	rfbLog("Unsupported tunneling type requested by client %s\n",
-	       cl->host);
-	rfbCloseSock(cl->sock);
-	return;
-    }
+    /* TightVNC protocol extensions are not enabled yet. */
+    cl->protocol_tightvnc = FALSE;
 
     rfbAuthNewClient(cl);
 }
@@ -455,24 +393,19 @@ rfbClientConnFailed(cl, reason)
     rfbClientPtr cl;
     char *reason;
 {
-    int len = strlen(reason);
+    int headerLen, reasonLen;
+    char buf[8];
 
-    if (cl->protocol_minor_ver >= 130) {
-	rfbConnFailedMsg failMsg;
-	failMsg.connFailed = (CARD8)TRUE;
-	failMsg.reasonLength = Swap32IfLE(len);
-	if (WriteExact(cl->sock, (char *)&failMsg, sz_rfbConnFailedMsg) < 0)
-	    rfbLogPerror("rfbClientConnFailed: write");
-    } else {
-	char buf[8];
-	((CARD32 *)buf)[0] = Swap32IfLE(rfbConnFailed);
-	((CARD32 *)buf)[1] = Swap32IfLE(len);
-	if (WriteExact(cl->sock, buf, 8) < 0)
-	    rfbLogPerror("rfbClientConnFailed: write");
-    }
+    headerLen = (cl->protocol_minor_ver >= 7) ? 1 : 4;
+    reasonLen = strlen(reason);
+    ((CARD32 *)buf)[0] = 0;
+    ((CARD32 *)buf)[1] = Swap32IfLE(reasonLen);
 
-    if (WriteExact(cl->sock, reason, len) < 0)
+    if ( WriteExact(cl->sock, buf, headerLen) < 0 ||
+	 WriteExact(cl->sock, buf + 4, 4) < 0 ||
+	 WriteExact(cl->sock, reason, reasonLen) < 0 ) {
 	rfbLogPerror("rfbClientConnFailed: write");
+    }
 
     rfbCloseSock(cl->sock);
 }
@@ -531,8 +464,8 @@ rfbProcessClientInitMessage(cl)
 	return;
     }
 
-    if (cl->protocol_minor_ver >= 130)
-	rfbSendInteractionCaps(cl); /* protocol 3.130 */
+    if (cl->protocol_tightvnc)
+	rfbSendInteractionCaps(cl); /* protocol 3.7t */
 
     /* Dispatch client input to rfbProcessClientNormalMessage(). */
     cl->state = RFB_NORMAL;
@@ -565,9 +498,9 @@ rfbProcessClientInitMessage(cl)
 
 /*
  * rfbSendInteractionCaps is called after sending the server
- * initialisation message, only if the protocol version is 3.130.
- * In this function, we send the lists of supported protocol messages
- * and encodings.
+ * initialisation message, only if TightVNC protocol extensions were
+ * enabled (protocol 3.7t). In this function, we send the lists of
+ * supported protocol messages and encodings.
  */
 
 /* Update these constants on changing capability lists below! */

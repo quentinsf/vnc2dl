@@ -134,6 +134,7 @@ void rfbLoginAuthProcessClientMessage(rfbClientPtr cl)
 	return;
     }
 
+    /* Dispatch client input to rfbProcessClientInitMessage(). */
     cl->state = RFB_INITIALISATION;
 }
 
