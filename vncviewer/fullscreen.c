@@ -288,14 +288,14 @@ BumpScroll(XEvent *ev)
 {
   scrollLeft = scrollRight = scrollUp = scrollDown = False;
 
-  if (ev->xmotion.x_root == dpyWidth - 1)
+  if (ev->xmotion.x_root >= dpyWidth - 3)
     scrollRight = True;
-  else if (ev->xmotion.x_root == 0)
+  else if (ev->xmotion.x_root <= 2)
     scrollLeft = True;
 
-  if (ev->xmotion.y_root == dpyHeight - 1)
+  if (ev->xmotion.y_root >= dpyHeight - 3)
     scrollDown = True;
-  else if (ev->xmotion.y_root == 0)
+  else if (ev->xmotion.y_root <= 2)
     scrollUp = True;
 
   if (scrollLeft || scrollRight || scrollUp || scrollDown) {
