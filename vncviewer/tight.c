@@ -239,9 +239,14 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
       zs->avail_out = bufferSize - extraBytes;
 
       err = inflate(zs, Z_SYNC_FLUSH);
+      if (err == Z_BUF_ERROR)   /* Input exhausted -- no problem. */
+        break;
       if (err != Z_OK && err != Z_STREAM_END) {
-        if (zs->msg != NULL)
+        if (zs->msg != NULL) {
           fprintf(stderr, "Inflate error: %s.\n", zs->msg);
+        } else {
+          fprintf(stderr, "Inflate error: %d.\n", err);
+        }
         return False;
       }
 
