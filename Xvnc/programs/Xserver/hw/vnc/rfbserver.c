@@ -930,18 +930,19 @@ rfbSendFramebufferUpdate(cl)
 	    nUpdateRegionRects += (((h-1) / (ZLIB_MAX_SIZE( w ) / w)) + 1);
 	}
     } else if (cl->preferredEncoding == rfbEncodingTight) {
-	if (cl->enableLastRectEncoding) {
-	    nUpdateRegionRects = 0xFFFF;
-	} else {
-	    nUpdateRegionRects = 0;
+	nUpdateRegionRects = 0;
 
-	    for (i = 0; i < REGION_NUM_RECTS(&updateRegion); i++) {
-		int x = REGION_RECTS(&updateRegion)[i].x1;
-		int y = REGION_RECTS(&updateRegion)[i].y1;
-		int w = REGION_RECTS(&updateRegion)[i].x2 - x;
-		int h = REGION_RECTS(&updateRegion)[i].y2 - y;
-		nUpdateRegionRects += rfbNumCodedRectsTight(cl, x, y, w, h);
+	for (i = 0; i < REGION_NUM_RECTS(&updateRegion); i++) {
+	    int x = REGION_RECTS(&updateRegion)[i].x1;
+	    int y = REGION_RECTS(&updateRegion)[i].y1;
+	    int w = REGION_RECTS(&updateRegion)[i].x2 - x;
+	    int h = REGION_RECTS(&updateRegion)[i].y2 - y;
+	    int n = rfbNumCodedRectsTight(cl, x, y, w, h);
+	    if (n == 0) {
+		nUpdateRegionRects = 0xFFFF;
+		break;
 	    }
+	    nUpdateRegionRects += n;
 	}
     } else {
 	nUpdateRegionRects = REGION_NUM_RECTS(&updateRegion);
@@ -1013,16 +1014,9 @@ rfbSendFramebufferUpdate(cl)
 	    }
 	    break;
 	case rfbEncodingTight:
-	    if (cl->enableLastRectEncoding) {
-		if (!rfbSendRectSmartTight(cl, x, y, w, h)) {
-		    REGION_UNINIT(pScreen,&updateRegion);
-		    return FALSE;
-		}
-	    } else {
-		if (!rfbSendRectEncodingTight(cl, x, y, w, h)) {
-		    REGION_UNINIT(pScreen,&updateRegion);
-		    return FALSE;
-		}
+	    if (!rfbSendRectEncodingTight(cl, x, y, w, h)) {
+		REGION_UNINIT(pScreen,&updateRegion);
+		return FALSE;
 	    }
 	    break;
 	}

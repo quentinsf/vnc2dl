@@ -500,7 +500,6 @@ extern Bool rfbTightDisableGradient;
 
 extern int rfbNumCodedRectsTight(rfbClientPtr cl, int x,int y,int w,int h);
 extern Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
-extern Bool rfbSendRectSmartTight(rfbClientPtr cl, int x,int y,int w,int h);
 
 
 /* cursor.c */

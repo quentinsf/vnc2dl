@@ -115,13 +115,16 @@ static Bool CheckSolidTile16  (int x, int y, int w, int h,
 static Bool CheckSolidTile32  (int x, int y, int w, int h,
                                CARD32 *colorPtr, Bool needSameColor);
 
-static Bool SendSubrect(rfbClientPtr cl, int x, int y, int w, int h);
-static Bool SendTightHeader(rfbClientPtr cl, int x, int y, int w, int h);
+static Bool SendRectSimple  (rfbClientPtr cl, int x, int y, int w, int h);
+static Bool SendSubrect     (rfbClientPtr cl, int x, int y, int w, int h);
+static Bool SendTightHeader (rfbClientPtr cl, int x, int y, int w, int h);
+
 static Bool SendSolidRect(rfbClientPtr cl);
 static Bool SendMonoRect(rfbClientPtr cl, int w, int h);
 static Bool SendIndexedRect(rfbClientPtr cl, int w, int h);
 static Bool SendFullColorRect(rfbClientPtr cl, int w, int h);
 static Bool SendGradientRect(rfbClientPtr cl, int w, int h);
+
 static Bool CompressData(rfbClientPtr cl, int streamId, int dataLen,
                          int zlibLevel, int zlibStrategy);
 static Bool SendCompressedData(rfbClientPtr cl, int compressedLen);
@@ -146,10 +149,10 @@ static void FilterGradient24(char *buf, rfbPixelFormat *fmt, int w, int h);
 static void FilterGradient16(CARD16 *buf, rfbPixelFormat *fmt, int w, int h);
 static void FilterGradient32(CARD32 *buf, rfbPixelFormat *fmt, int w, int h);
 
-static int DetectStillImage(rfbPixelFormat *fmt, int w, int h);
-static unsigned long DetectStillImage24(rfbPixelFormat *fmt, int w, int h);
-static unsigned long DetectStillImage16(rfbPixelFormat *fmt, int w, int h);
-static unsigned long DetectStillImage32(rfbPixelFormat *fmt, int w, int h);
+static int DetectSmoothImage(rfbPixelFormat *fmt, int w, int h);
+static unsigned long DetectSmoothImage24(rfbPixelFormat *fmt, int w, int h);
+static unsigned long DetectSmoothImage16(rfbPixelFormat *fmt, int w, int h);
+static unsigned long DetectSmoothImage32(rfbPixelFormat *fmt, int w, int h);
 
 static Bool SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h,
                          int quality);
@@ -168,8 +171,40 @@ static void JpegSetDstManager(j_compress_ptr cinfo);
  * Tight encoding implementation.
  */
 
+#define MIN_SPLIT_RECT_SIZE     4096
+#define MIN_SOLID_SUBRECT_SIZE  2048
+/*
+#define MIN_SOLID_SUBRECT_SIDE    16
+*/
+
+int
+rfbNumCodedRectsTight(cl, x, y, w, h)
+    rfbClientPtr cl;
+    int x, y, w, h;
+{
+    int maxRectSize, maxRectWidth;
+    int subrectMaxWidth, subrectMaxHeight;
+
+    /* No matter how many rectangles we will send if LastRect markers
+       are used to terminate rectangle stream. */
+    if (cl->enableLastRectEncoding && w * h >= MIN_SPLIT_RECT_SIZE)
+      return 0;
+
+    maxRectSize = tightConf[cl->tightCompressLevel].maxRectSize;
+    maxRectWidth = tightConf[cl->tightCompressLevel].maxRectWidth;
+
+    if (w > maxRectWidth || w * h > maxRectSize) {
+        subrectMaxWidth = (w > maxRectWidth) ? maxRectWidth : w;
+        subrectMaxHeight = maxRectSize / subrectMaxWidth;
+        return (((w - 1) / maxRectWidth + 1) *
+                ((h - 1) / subrectMaxHeight + 1));
+    } else {
+        return 1;
+    }
+}
+
 Bool
-rfbSendRectSmartTight(cl, x, y, w, h)
+rfbSendRectEncodingTight(cl, x, y, w, h)
     rfbClientPtr cl;
     int x, y, w, h;
 {
@@ -178,23 +213,15 @@ rfbSendRectSmartTight(cl, x, y, w, h)
     int w_best, h_best;
     char *fbptr;
 
-#define MIN_SPLIT_RECT_SIZE     4096
-#define MIN_SOLID_SUBRECT_SIZE  2048
-/*
-  #define MIN_SOLID_SUBRECT_SIDE    16
-*/
-
-    if (w * h < MIN_SPLIT_RECT_SIZE)
-        return rfbSendRectEncodingTight(cl, x, y, w, h);
-
-    /* Set usePixelFormat24 variable for SendSolidRect(). */
-
     if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
          cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
         usePixelFormat24 = TRUE;
     } else {
         usePixelFormat24 = FALSE;
     }
+
+    if (!cl->enableLastRectEncoding || w * h < MIN_SPLIT_RECT_SIZE)
+        return SendRectSimple(cl, x, y, w, h);
 
     /* Make sure we can write one pixel into tightBeforeBuf. */
 
@@ -234,11 +261,10 @@ rfbSendRectSmartTight(cl, x, y, w, h)
 
                 /* Send rectangles at top and left to solid-color area. */
 
-                if ( dy != y &&
-                     !rfbSendRectSmartTight(cl, x, y, w, dy-y) )
+                if ( dy != y && !SendRectSimple(cl, x, y, w, dy-y) )
                     return FALSE;
                 if ( dx != x &&
-                     !rfbSendRectSmartTight(cl, x, dy, dx-x, h_best) )
+                     !rfbSendRectEncodingTight(cl, x, dy, dx-x, h_best) )
                     return FALSE;
 
                 /* Send solid-color rectangle. */
@@ -260,12 +286,12 @@ rfbSendRectSmartTight(cl, x, y, w, h)
                 /* Send remaining rectangles (at right and bottom). */
 
                 if ( dx + w_best != x + w &&
-                     !rfbSendRectSmartTight(cl, dx+w_best, dy,
-                                            w-(dx-x)-w_best, h_best) )
+                     !rfbSendRectEncodingTight(cl, dx+w_best, dy,
+                                               w-(dx-x)-w_best, h_best) )
                     return FALSE;
                 if ( dy + h_best != y + h &&
-                     !rfbSendRectSmartTight(cl, x, dy+h_best,
-                                            w, h-(dy-y)-h_best) )
+                     !rfbSendRectEncodingTight(cl, x, dy+h_best,
+                                               w, h-(dy-y)-h_best) )
                     return FALSE;
 
                 /* Return after all recursive calls done. */
@@ -277,7 +303,7 @@ rfbSendRectSmartTight(cl, x, y, w, h)
 
     /* No suitable solid-color rectangles found. */
 
-    return rfbSendRectEncodingTight(cl, x, y, w, h);
+    return SendRectSimple(cl, x, y, w, h);
 }
 
 static Bool
@@ -365,33 +391,8 @@ DEFINE_CHECK_SOLID_FUNCTION(8)
 DEFINE_CHECK_SOLID_FUNCTION(16)
 DEFINE_CHECK_SOLID_FUNCTION(32)
 
-/*
- * Next two functions are primary interface to the Tight Encoder.
- */
-
-int
-rfbNumCodedRectsTight(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
-{
-    int maxRectSize, maxRectWidth;
-    int subrectMaxWidth, subrectMaxHeight;
-
-    maxRectSize = tightConf[cl->tightCompressLevel].maxRectSize;
-    maxRectWidth = tightConf[cl->tightCompressLevel].maxRectWidth;
-
-    if (w > maxRectWidth || w * h > maxRectSize) {
-        subrectMaxWidth = (w > maxRectWidth) ? maxRectWidth : w;
-        subrectMaxHeight = maxRectSize / subrectMaxWidth;
-        return (((w - 1) / maxRectWidth + 1) *
-                ((h - 1) / subrectMaxHeight + 1));
-    } else {
-        return 1;
-    }
-}
-
-Bool
-rfbSendRectEncodingTight(cl, x, y, w, h)
+static Bool
+SendRectSimple(cl, x, y, w, h)
     rfbClientPtr cl;
     int x, y, w, h;
 {
@@ -405,13 +406,6 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
     qualityLevel = cl->tightQualityLevel;
     maxRectSize = tightConf[compressLevel].maxRectSize;
     maxRectWidth = tightConf[compressLevel].maxRectWidth;
-
-    if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
-         cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
-        usePixelFormat24 = TRUE;
-    } else {
-        usePixelFormat24 = FALSE;
-    }
 
     maxBeforeSize = maxRectSize * (cl->format.bitsPerPixel / 8);
     maxAfterSize = maxBeforeSize + (maxBeforeSize + 99) / 100 + 12;
@@ -491,7 +485,7 @@ SendSubrect(cl, x, y, w, h)
     switch (paletteNumColors) {
     case 0:
         /* Truecolor image */
-        if (DetectStillImage(&cl->format, w, h)) {
+        if (DetectSmoothImage(&cl->format, w, h)) {
             if (qualityLevel != -1) {
                 success = SendJpegRect(cl, x, y, w, h,
                                        tightConf[qualityLevel].jpegQuality);
@@ -514,7 +508,7 @@ SendSubrect(cl, x, y, w, h)
         /* Up to 256 different colors */
         if ( paletteNumColors > 64 &&
              qualityLevel != -1 && qualityLevel <= 3 &&
-             DetectStillImage(&cl->format, w, h) ) {
+             DetectSmoothImage(&cl->format, w, h) ) {
             success = SendJpegRect(cl, x, y, w, h,
                                    tightConf[qualityLevel].jpegQuality);
         } else {
@@ -1329,8 +1323,8 @@ DEFINE_GRADIENT_FILTER_FUNCTION(32)
 
 
 /*
- * Code to guess if given rectangle is suitable for still image
- * compression.
+ * Code to guess if given rectangle is suitable for smooth image
+ * compression (by applying "gradient" filter or JPEG coder).
  */
 
 #define JPEG_MIN_RECT_SIZE  4096
@@ -1340,7 +1334,7 @@ DEFINE_GRADIENT_FILTER_FUNCTION(32)
 #define DETECT_MIN_HEIGHT      8
 
 static int
-DetectStillImage (fmt, w, h)
+DetectSmoothImage (fmt, w, h)
     rfbPixelFormat *fmt;
     int w, h;
 {
@@ -1364,16 +1358,16 @@ DetectStillImage (fmt, w, h)
 
     if (fmt->bitsPerPixel == 32) {
         if (usePixelFormat24) {
-            avgError = DetectStillImage24(fmt, w, h);
+            avgError = DetectSmoothImage24(fmt, w, h);
             if (qualityLevel != -1) {
                 return (avgError < tightConf[qualityLevel].jpegThreshold24);
             }
             return (avgError < tightConf[compressLevel].gradientThreshold24);
         } else {
-            avgError = DetectStillImage32(fmt, w, h);
+            avgError = DetectSmoothImage32(fmt, w, h);
         }
     } else {
-        avgError = DetectStillImage16(fmt, w, h);
+        avgError = DetectSmoothImage16(fmt, w, h);
     }
     if (qualityLevel != -1) {
         return (avgError < tightConf[qualityLevel].jpegThreshold);
@@ -1382,7 +1376,7 @@ DetectStillImage (fmt, w, h)
 }
 
 static unsigned long
-DetectStillImage24 (fmt, w, h)
+DetectSmoothImage24 (fmt, w, h)
     rfbPixelFormat *fmt;
     int w, h;
 {
@@ -1443,7 +1437,7 @@ DetectStillImage24 (fmt, w, h)
 #define DEFINE_DETECT_FUNCTION(bpp)                                          \
                                                                              \
 static unsigned long                                                         \
-DetectStillImage##bpp (fmt, w, h)                                            \
+DetectSmoothImage##bpp (fmt, w, h)                                           \
     rfbPixelFormat *fmt;                                                     \
     int w, h;                                                                \
 {                                                                            \
