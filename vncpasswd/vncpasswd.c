@@ -106,4 +106,6 @@ int main(int argc, char *argv[]) {
 
     fprintf(stderr,"Passwords do not match. Please try again.\n\n");
   }
+
+  return 2;                     /* never executed */
 }
