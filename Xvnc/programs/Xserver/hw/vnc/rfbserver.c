@@ -852,7 +852,7 @@ rfbSendFramebufferUpdate(cl)
 	    int y = REGION_RECTS(&updateRegion)[i].y1;
 	    int w = REGION_RECTS(&updateRegion)[i].x2 - x;
 	    int h = REGION_RECTS(&updateRegion)[i].y2 - y;
-            if ((w > 2 && h > 2 && w * h > 1024) || w > 2048 || h > 2048) {
+            if ((w > 8 && h > 8 && w * h > 16384) || w > 2048 || h > 2048) {
                 nUpdateRegionRects += (((w-1) / TIGHT_MAX_RECT_WIDTH + 1)
                                        * ((h-1) / TIGHT_MAX_RECT_HEIGHT + 1));
             } else {
