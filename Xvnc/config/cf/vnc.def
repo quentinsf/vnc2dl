@@ -117,7 +117,7 @@
 #ifdef SunArchitecture
 #define ProjectRoot /usr/openwin
 #else
-#ifdef i386Architecture
+#ifdef LinuxArchitecture
 #define ProjectRoot /usr/X11R6
 #endif
 #endif

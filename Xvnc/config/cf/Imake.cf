@@ -548,9 +548,20 @@ XCOMM $XFree86: xc/config/cf/Imake.cf,v 3.34.2.3 1997/07/27 02:41:02 dawes Exp $
 #  define i386Architecture
 #  undef i386
 # endif /* i386 */
-# ifdef __alpha
+# ifdef __i386__
+#  ifndef i386Architecture
+#   define i386Architecture
+#  endif
+#  undef __i386__
+# endif /* __i386__ */
+# if defined(sparc) || defined(__sparc__)
+#  define SparcArchitecture
+#  undef sparc
+#  undef __sparc__
+# endif
+# ifdef __alpha__
 #  define AlphaArchitecture
-#  undef __alpha
+#  undef __alpha__
 # endif /* __alpha */
 # ifdef mc68000
 #  define Mc68020Architecture
