@@ -130,7 +130,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
   }
 
   /* Quit on unsupported subencoding value. */
-  if (comp_ctl >=8) {
+  if (comp_ctl > rfbTightMaxSubencoding) {
     fprintf(stderr, "Tight encoding: bad subencoding value received.\n");
     return False;
   }
@@ -141,7 +141,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
    */
 
   /* First, we should identify a filter to use. */
-  if (comp_ctl >= 4) {
+  if ((comp_ctl & rfbTightExplicitFilter) != 0) {
     if (!ReadFromRFBServer((char*)&filter_id, 1))
       return False;
 
