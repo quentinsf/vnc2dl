@@ -192,8 +192,8 @@ KbdDeviceInit(pDevice, pKeySyms, pModMap)
     pModMap[CONTROL_R_KEY_CODE] = ControlMask;
     pModMap[SHIFT_L_KEY_CODE] = ShiftMask;
     pModMap[SHIFT_R_KEY_CODE] = ShiftMask;
-    pModMap[META_L_KEY_CODE] = Mod1Mask;
-    pModMap[META_R_KEY_CODE] = Mod1Mask;
+    pModMap[META_L_KEY_CODE] = Mod4Mask;
+    pModMap[META_R_KEY_CODE] = Mod4Mask;
     pModMap[ALT_L_KEY_CODE] = Mod1Mask;
     pModMap[ALT_R_KEY_CODE] = Mod1Mask;
 
