@@ -28,7 +28,12 @@
 #include "rfb.h"
 
 
+/* Note: The following constant should not be changed. */
 #define TIGHT_MIN_TO_COMPRESS 12
+
+/* May be set to TRUE with "-lazytight" Xvnc option. */
+Bool rfbTightDisableGradient = FALSE;
+
 
 typedef struct COLOR_LIST_s {
     struct COLOR_LIST_s *next;
@@ -214,7 +219,7 @@ SendSubrect(cl, x, y, w, h)
         break;
     case 0:
         /* Truecolor image */
-        if (DetectStillImage(&cl->format, w, h)) {
+        if (!rfbTightDisableGradient && DetectStillImage(&cl->format, w, h)) {
             success = SendGradientRect(cl, w, h);
         } else {
             success = SendFullColorRect(cl, w, h);

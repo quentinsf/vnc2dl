@@ -259,6 +259,11 @@ ddxProcessArgument (argc, argv, i)
 	return 1;
     }
 
+    if (strcmp(argv[i], "-lazytight") == 0) {
+	rfbTightDisableGradient = TRUE;
+	return 1;
+    }
+
     if (strcmp(argv[i], "-desktop") == 0) {	/* -desktop desktop-name */
 	if (i + 1 >= argc) UseMsg();
 	desktopName = argv[i+1];
@@ -744,6 +749,8 @@ ddxUseMsg()
     ErrorF("-deferupdate time      time in ms to defer updates "
 							     "(default 40)\n");
     ErrorF("-economictranslate     less memory-hungry translation\n");
+    ErrorF("-lazytight             disable \"gradient\" filter in tight "
+                                                                "encoding\n");
     ErrorF("-desktop name          VNC desktop name (default x11)\n");
     ErrorF("-alwaysshared          always treat new clients as shared\n");
     ErrorF("-nevershared           never treat new clients as shared\n");
