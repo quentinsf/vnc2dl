@@ -807,8 +807,18 @@ HandleRFBServerMessage()
   }
 
   case rfbBell:
-    XBell(dpy,0);
+  {
+    Window toplevelWin;
+
+    XBell(dpy, 0);
+
+    if (appData.raiseOnBeep) {
+      toplevelWin = XtWindow(toplevel);
+      XMapRaised(dpy, toplevelWin);
+    }
+
     break;
+  }
 
   case rfbServerCutText:
   {

@@ -141,6 +141,9 @@ static XtResource appDataResourceList[] = {
   {"fullScreen", "FullScreen", XtRBool, sizeof(Bool),
    XtOffsetOf(AppData, fullScreen), XtRImmediate, (XtPointer) False},
 
+  {"raiseOnBeep", "RaiseOnBeep", XtRBool, sizeof(Bool),
+   XtOffsetOf(AppData, raiseOnBeep), XtRImmediate, (XtPointer) True},
+
   {"passwordFile", "PasswordFile", XtRString, sizeof(String),
    XtOffsetOf(AppData, passwordFile), XtRImmediate, (XtPointer) 0},
 
@@ -216,6 +219,7 @@ XrmOptionDescRec cmdLineOptions[] = {
   {"-noshared",      "*shareDesktop",       XrmoptionNoArg,  "False"},
   {"-viewonly",      "*viewOnly",           XrmoptionNoArg,  "True"},
   {"-fullscreen",    "*fullScreen",         XrmoptionNoArg,  "True"},
+  {"-noraiseonbeep", "*raiseOnBeep",        XrmoptionNoArg,  "False"},
   {"-passwd",        "*passwordFile",       XrmoptionSepArg, 0},
   {"-encodings",     "*encodings",          XrmoptionSepArg, 0},
   {"-bgr233",        "*useBGR233",          XrmoptionNoArg,  "True"},
@@ -285,6 +289,7 @@ usage(void)
 	  "        -noshared\n"
 	  "        -viewonly\n"
 	  "        -fullscreen\n"
+	  "        -noraiseonbeep\n"
 	  "        -passwd <PASSWD-FILENAME>\n"
 	  "        -encodings <ENCODING-LIST> (e.g. \"tight copyrect\")\n"
 	  "        -bgr233\n"

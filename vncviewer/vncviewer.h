@@ -68,6 +68,7 @@ typedef struct {
   Bool shareDesktop;
   Bool viewOnly;
   Bool fullScreen;
+  Bool raiseOnBeep;
 
   String encodingsString;
 
