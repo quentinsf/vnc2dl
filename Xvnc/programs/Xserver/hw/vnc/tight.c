@@ -34,6 +34,37 @@
 /* May be set to TRUE with "-lazytight" Xvnc option. */
 Bool rfbTightDisableGradient = FALSE;
 
+/* This variable is set on every rfbSendRectEncodingTight() call. */
+static BOOL usePixelFormat24;
+
+
+/* Compression level stuff. The following array contains various
+   encoder parameters for each of 10 compression levels (0..9). */
+
+typedef struct TIGHT_CONF_s {
+    int maxRectSize, maxRectWidth;
+    int monoMinRectSize, gradientMinRectSize;
+    int idxZlibLevel, monoZlibLevel, rawZlibLevel, gradientZlibLevel;
+    int gradientThreshold, gradientThreshold24;
+    int idxMaxColorsDivisor;
+} TIGHT_CONF;
+
+static TIGHT_CONF tightConf[10] = {
+    {  1024,   64,   6, 65536, 0, 0, 0, 0,   0,   0,   4 },
+    {  2048,  128,   6, 65536, 1, 1, 1, 0,   0,   0,   8 },
+    {  6144,  256,   8, 65536, 3, 3, 2, 0,   0,   0,  24 },
+    { 10240, 1024,  12, 65536, 5, 5, 3, 0,   0,   0,  32 },
+    { 16384, 2048,  12, 65536, 6, 6, 4, 0,   0,   0,  32 },
+    { 32768, 2048,  12,  4096, 7, 7, 5, 4, 150, 380,  32 },
+    { 65536, 2048,  16,  4096, 7, 7, 6, 4, 170, 420,  48 },
+    { 65536, 2048,  16,  4096, 8, 8, 7, 5, 180, 450,  64 },
+    { 65536, 2048,  32,  8192, 9, 9, 8, 6, 190, 475,  64 },
+    { 65536, 2048,  32,  8192, 9, 9, 9, 6, 200, 500,  96 }
+};
+
+static compressLevel;
+
+/* Stuff dealing with palettes. */
 
 typedef struct COLOR_LIST_s {
     struct COLOR_LIST_s *next;
@@ -52,12 +83,11 @@ typedef struct PALETTE_s {
     COLOR_LIST list[256];
 } PALETTE;
 
-
-static BOOL usePixelFormat24;
-
 static int paletteNumColors, paletteMaxColors;
 static CARD32 monoBackground, monoForeground;
 static PALETTE palette;
+
+/* Pointers to dynamically-allocated buffers. */
 
 static int tightBeforeBufSize = 0;
 static char *tightBeforeBuf = NULL;
@@ -68,12 +98,15 @@ static char *tightAfterBuf = NULL;
 static int *prevRowBuf = NULL;
 
 
+/* Prototypes for static functions. */
+
 static int SendSubrect(rfbClientPtr cl, int x, int y, int w, int h);
 static BOOL SendSolidRect(rfbClientPtr cl, int w, int h);
 static BOOL SendIndexedRect(rfbClientPtr cl, int w, int h);
 static BOOL SendFullColorRect(rfbClientPtr cl, int w, int h);
 static BOOL SendGradientRect(rfbClientPtr cl, int w, int h);
-static BOOL CompressData(rfbClientPtr cl, int streamId, int dataLen);
+static BOOL CompressData(rfbClientPtr cl, int streamId, int dataLen,
+                         int zlibLevel, int zlibStrategy);
 
 static void FillPalette8(int count);
 static void FillPalette16(int count);
@@ -100,9 +133,31 @@ static int DetectStillImage24 (rfbPixelFormat *fmt, int w, int h);
 static int DetectStillImage16 (rfbPixelFormat *fmt, int w, int h);
 static int DetectStillImage32 (rfbPixelFormat *fmt, int w, int h);
 
+
 /*
  * Tight encoding implementation.
  */
+
+int
+rfbNumCodedRectsTight(cl, x, y, w, h)
+    rfbClientPtr cl;
+    int x, y, w, h;
+{
+    int maxRectSize, maxRectWidth;
+    int subrectMaxWidth, subrectMaxHeight;
+
+    maxRectSize = tightConf[cl->tightCompressLevel].maxRectSize;
+    maxRectWidth = tightConf[cl->tightCompressLevel].maxRectWidth;
+
+    if (w > maxRectWidth || w * h > maxRectSize) {
+        subrectMaxWidth = (w > maxRectWidth) ? maxRectWidth : w;
+        subrectMaxHeight = maxRectSize / subrectMaxWidth;
+        return (((w - 1) / maxRectWidth + 1) *
+                ((h - 1) / subrectMaxHeight + 1));
+    } else {
+        return 1;
+    }
+}
 
 Bool
 rfbSendRectEncodingTight(cl, x, y, w, h)
@@ -110,9 +165,14 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
     int x, y, w, h;
 {
     int maxBeforeSize, maxAfterSize;
+    int maxRectSize, maxRectWidth;
     int subrectMaxWidth, subrectMaxHeight;
     int dx, dy;
     int rw, rh;
+
+    compressLevel = cl->tightCompressLevel;
+    maxRectSize = tightConf[compressLevel].maxRectSize;
+    maxRectWidth = tightConf[compressLevel].maxRectWidth;
 
     if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
          cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
@@ -121,7 +181,7 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
         usePixelFormat24 = FALSE;
     }
 
-    maxBeforeSize = TIGHT_MAX_RECT_SIZE * (cl->format.bitsPerPixel / 8);
+    maxBeforeSize = maxRectSize * (cl->format.bitsPerPixel / 8);
     maxAfterSize = maxBeforeSize + (maxBeforeSize + 99) / 100 + 12;
 
     if (tightBeforeBufSize < maxBeforeSize) {
@@ -142,13 +202,13 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
                                              tightAfterBufSize);
     }
 
-    if (w > 2048 || w * h > TIGHT_MAX_RECT_SIZE) {
-        subrectMaxWidth = (w > 2048) ? 2048 : w;
-        subrectMaxHeight = TIGHT_MAX_RECT_SIZE / subrectMaxWidth;
+    if (w > maxRectWidth || w * h > maxRectSize) {
+        subrectMaxWidth = (w > maxRectWidth) ? maxRectWidth : w;
+        subrectMaxHeight = maxRectSize / subrectMaxWidth;
 
         for (dy = 0; dy < h; dy += subrectMaxHeight) {
-            for (dx = 0; dx < w; dx += 2048) {
-                rw = (dx + 2048 < w) ? 2048 : w - dx;
+            for (dx = 0; dx < w; dx += maxRectWidth) {
+                rw = (dx + maxRectWidth < w) ? maxRectWidth : w - dx;
                 rh = (dy + subrectMaxHeight < h) ? subrectMaxHeight : h - dy;
                 if (!SendSubrect(cl, x+dx, y+dy, rw, rh))
                     return FALSE;
@@ -196,7 +256,11 @@ SendSubrect(cl, x, y, w, h)
                        &cl->format, fbptr, tightBeforeBuf,
                        rfbScreen.paddedWidthInBytes, w, h);
 
-    paletteMaxColors = w * h / 128;
+    paletteMaxColors = w * h / tightConf[compressLevel].idxMaxColorsDivisor;
+    if ( paletteMaxColors < 2 &&
+         w * h >= tightConf[compressLevel].monoMinRectSize ) {
+        paletteMaxColors = 2;
+    }
     switch (cl->format.bitsPerPixel) {
     case 8:
         FillPalette8(w * h);
@@ -340,7 +404,11 @@ SendIndexedRect(cl, w, h)
         cl->rfbBytesSent[rfbEncodingTight] += 5;
     }
 
-    return CompressData(cl, streamId, dataLen);
+    return CompressData(cl, streamId, dataLen,
+                        ((paletteNumColors == 2) ?
+                         tightConf[compressLevel].monoZlibLevel :
+                         tightConf[compressLevel].idxZlibLevel),
+                        Z_DEFAULT_STRATEGY);
 }
 
 static BOOL
@@ -364,7 +432,9 @@ SendFullColorRect(cl, w, h)
     } else
         len = cl->format.bitsPerPixel / 8;
 
-    return CompressData(cl, 0, w * h * len);
+    return CompressData(cl, 0, w * h * len,
+                        tightConf[compressLevel].rawZlibLevel,
+                        Z_DEFAULT_STRATEGY);
 }
 
 static BOOL
@@ -400,13 +470,15 @@ SendGradientRect(cl, w, h)
         len = 2;
     }
 
-    return CompressData(cl, 3, w * h * len);
+    return CompressData(cl, 3, w * h * len,
+                        tightConf[compressLevel].gradientZlibLevel,
+                        Z_FILTERED);
 }
 
 static BOOL
-CompressData(cl, streamId, dataLen)
+CompressData(cl, streamId, dataLen, zlibLevel, zlibStrategy)
     rfbClientPtr cl;
-    int streamId, dataLen;
+    int streamId, dataLen, zlibLevel, zlibStrategy;
 {
     z_streamp pz;
     int compressedLen, portionLen;
@@ -421,32 +493,36 @@ CompressData(cl, streamId, dataLen)
 
     pz = &cl->zsStruct[streamId];
 
-    /* Initialize compression stream. */
+    /* Initialize compression stream if needed. */
     if (!cl->zsActive[streamId]) {
         pz->zalloc = Z_NULL;
         pz->zfree = Z_NULL;
         pz->opaque = Z_NULL;
 
-        if (streamId == 3) {
-            err = deflateInit2 (pz, 6, Z_DEFLATED, MAX_WBITS,
-                                MAX_MEM_LEVEL, Z_FILTERED);
-        } else {
-            err = deflateInit2 (pz, 9, Z_DEFLATED, MAX_WBITS,
-                                MAX_MEM_LEVEL, Z_DEFAULT_STRATEGY);
-        }
-
+        err = deflateInit2 (pz, zlibLevel, Z_DEFLATED, MAX_WBITS,
+                            MAX_MEM_LEVEL, zlibStrategy);
         if (err != Z_OK)
             return FALSE;
 
         cl->zsActive[streamId] = TRUE;
+        cl->zsLevel[streamId] = zlibLevel;
     }
 
-    /* Actual compression. */
+    /* Prepare buffer pointers. */
     pz->next_in = (Bytef *)tightBeforeBuf;
     pz->avail_in = dataLen;
     pz->next_out = (Bytef *)tightAfterBuf;
     pz->avail_out = tightAfterBufSize;
 
+    /* Change compression parameters if needed. */
+    if (zlibLevel != cl->zsLevel[streamId]) {
+        if (deflateParams (pz, zlibLevel, zlibStrategy) != Z_OK) {
+            return FALSE;
+        }
+        cl->zsLevel[streamId] = zlibLevel;
+    }
+
+    /* Actual compression. */
     if ( deflate (pz, Z_SYNC_FLUSH) != Z_OK ||
          pz->avail_in != 0 || pz->avail_out == 0 ) {
         return FALSE;
@@ -956,13 +1032,13 @@ DEFINE_GRADIENT_FILTER_FUNCTION(32)
 #define DETECT_SUBROW_WIDTH   7
 #define DETECT_MIN_WIDTH      8
 #define DETECT_MIN_HEIGHT     8
-#define DETECT_MIN_SIZE    8192
 
 static int DetectStillImage (fmt, w, h)
     rfbPixelFormat *fmt;
     int w, h;
 {
-    if ( fmt->bitsPerPixel == 8 || w * h < DETECT_MIN_SIZE ||
+    if ( fmt->bitsPerPixel == 8 ||
+         w * h < tightConf[compressLevel].gradientMinRectSize ||
          w < DETECT_MIN_WIDTH || h < DETECT_MIN_HEIGHT ) {
         return 0;
     }
@@ -1033,7 +1109,7 @@ static int DetectStillImage24 (fmt, w, h)
     }
     avgError /= (pixelCount * 3 - diffStat[0]);
 
-    return (avgError < 500);
+    return (avgError < tightConf[compressLevel].gradientThreshold24);
 }
 
 #define DEFINE_DETECT_FUNCTION(bpp)                                          \
@@ -1112,7 +1188,7 @@ static int DetectStillImage##bpp (fmt, w, h)                                 \
     }                                                                        \
     avgError /= (pixelCount - diffStat[0]);                                  \
                                                                              \
-    return (avgError < 200);                                                 \
+    return (avgError < tightConf[compressLevel].gradientThreshold);          \
 }
 
 DEFINE_DETECT_FUNCTION(16)

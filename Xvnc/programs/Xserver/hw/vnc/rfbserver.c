@@ -164,6 +164,7 @@ rfbNewClient(sock)
     cl->translateFn = rfbTranslateNone;
     cl->translateLookupTable = NULL;
 
+    cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
     for (i = 0; i < 4; i++)
         cl->zsActive[i] = FALSE;
 
@@ -852,17 +853,10 @@ rfbSendFramebufferUpdate(cl)
 	    int y = REGION_RECTS(&updateRegion)[i].y1;
 	    int w = REGION_RECTS(&updateRegion)[i].x2 - x;
 	    int h = REGION_RECTS(&updateRegion)[i].y2 - y;
-            if (w > 2048 || w * h > TIGHT_MAX_RECT_SIZE) {
-                int subrectMaxWidth = (w > 2048) ? 2048 : w;
-                int subrectMaxHeight = TIGHT_MAX_RECT_SIZE / subrectMaxWidth;
-                nUpdateRegionRects += (((w - 1) / 2048 + 1)
-                                       * ((h - 1) / subrectMaxHeight + 1));
-            } else {
-                nUpdateRegionRects++;
-            }
+            nUpdateRegionRects += rfbNumCodedRectsTight (cl, x, y, w, h);
 	}
     } else {
-	nUpdateRegionRects = REGION_NUM_RECTS(&updateRegion);
+        nUpdateRegionRects = REGION_NUM_RECTS(&updateRegion);
     }
 
     fu->type = rfbFramebufferUpdate;

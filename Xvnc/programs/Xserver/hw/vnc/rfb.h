@@ -212,6 +212,8 @@ typedef struct rfbClientRec {
 
     z_stream zsStruct[4];
     Bool zsActive[4];
+    int zsLevel[4];
+    int tightCompressLevel;
 
     struct rfbClientRec *next;
 
@@ -450,10 +452,11 @@ extern Bool rfbSendRectEncodingHextile(rfbClientPtr cl, int x, int y, int w,
 
 /* tight.c */
 
-#define TIGHT_MAX_RECT_SIZE  65536
+#define TIGHT_DEFAULT_COMPRESSION  6
 
 extern Bool rfbTightDisableGradient;
 
+extern int rfbNumCodedRectsTight(rfbClientPtr cl, int x,int y,int w,int h);
 extern Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
 
 
