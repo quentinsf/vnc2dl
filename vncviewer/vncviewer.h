@@ -94,6 +94,7 @@ typedef struct {
   int bumpScrollPixels;
 
   int compressLevel;
+  int qualityLevel;
   Bool useRemoteCursor;
 
 } AppData;

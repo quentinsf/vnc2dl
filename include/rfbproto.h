@@ -300,7 +300,8 @@ typedef struct {
  *   0xFFFFFF00 .. 0xFFFFFF0F -- encoding-specific compression levels;
  *   0xFFFFFF10 .. 0xFFFFFF1F -- mouse cursor shape data;
  *   0xFFFFFF20 .. 0xFFFFFF2F -- various protocol extensions;
- *   0xFFFFFF30 .. 0xFFFFFFEF -- not allocated yet;
+ *   0xFFFFFF30 .. 0xFFFFFFDF -- not allocated yet;
+ *   0xFFFFFFE0 .. 0xFFFFFFEF -- quality level for JPEG compressor;
  *   0xFFFFFFF0 .. 0xFFFFFFFF -- cross-encoding compression levels.
  */
 
@@ -319,6 +320,17 @@ typedef struct {
 #define rfbEncodingRichCursor      0xFFFFFF11
 
 #define rfbEncodingLastRect        0xFFFFFF20
+
+#define rfbEncodingQualityLevel0   0xFFFFFFE0
+#define rfbEncodingQualityLevel1   0xFFFFFFE1
+#define rfbEncodingQualityLevel2   0xFFFFFFE2
+#define rfbEncodingQualityLevel3   0xFFFFFFE3
+#define rfbEncodingQualityLevel4   0xFFFFFFE4
+#define rfbEncodingQualityLevel5   0xFFFFFFE5
+#define rfbEncodingQualityLevel6   0xFFFFFFE6
+#define rfbEncodingQualityLevel7   0xFFFFFFE7
+#define rfbEncodingQualityLevel8   0xFFFFFFE8
+#define rfbEncodingQualityLevel9   0xFFFFFFE9
 
 
 /*****************************************************************************

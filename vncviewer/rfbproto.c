@@ -306,6 +306,8 @@ SetFormatAndEncodings()
   CARD32 *encs = (CARD32 *)(&buf[sz_rfbSetEncodingsMsg]);
   int len = 0;
   Bool requestCompressLevel = False;
+  Bool requestQualityLevel = False;
+  Bool requestLastRectEncoding = False;
 
   spf.type = rfbSetPixelFormat;
   spf.format = myFormat;
@@ -337,8 +339,11 @@ SetFormatAndEncodings()
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
       } else if (strncasecmp(encStr,"tight",encStrLen) == 0) {
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
+	requestLastRectEncoding = True;
 	if (appData.compressLevel >= 0 && appData.compressLevel <= 9)
 	  requestCompressLevel = True;
+	if (appData.qualityLevel >= 0 && appData.qualityLevel <= 9)
+	  requestQualityLevel = True;
       } else if (strncasecmp(encStr,"hextile",encStrLen) == 0) {
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
       } else if (strncasecmp(encStr,"zlib",encStrLen) == 0) {
@@ -361,13 +366,23 @@ SetFormatAndEncodings()
 					  rfbEncodingCompressLevel0);
     }
 
+    if (se->nEncodings < MAX_ENCODINGS && requestQualityLevel) {
+      encs[se->nEncodings++] = Swap32IfLE(appData.qualityLevel +
+					  rfbEncodingQualityLevel0);
+    }
+
     if (appData.useRemoteCursor) {
       if (se->nEncodings < MAX_ENCODINGS)
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
       if (se->nEncodings < MAX_ENCODINGS)
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
     }
-  } else {
+
+    if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding) {
+      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
+    }
+  }
+  else {
     if (SameMachine(rfbsock)) {
       if (!tunnelSpecified) {
 	fprintf(stderr,"Same machine: preferring raw encoding\n");
@@ -395,10 +410,17 @@ SetFormatAndEncodings()
       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCompressLevel1);
     }
 
+    if (appData.qualityLevel >= 0 && appData.qualityLevel <= 9) {
+      encs[se->nEncodings++] = Swap32IfLE(appData.qualityLevel +
+					  rfbEncodingQualityLevel0);
+    }
+
     if (appData.useRemoteCursor) {
       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
     }
+
+    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
   }
 
   len = sz_rfbSetEncodingsMsg + se->nEncodings * 4;
