@@ -68,7 +68,7 @@ defaults.
 \fBvncserver\fR \fI:1\fR
 Invokes \fBXvnc\fR on display :1.
 .TP
-\fBvncserver\fR \fI\-geometry 800x600 -depth 16 :1\fR
+\fBvncserver\fR \fI\-geometry 800x600 \-depth 16 :1\fR
 Invokes \fBXvnc\fR on display :1 with desktop size of 800x600 pixels
 and color depth of 16 bits per pixel.
 .TP
