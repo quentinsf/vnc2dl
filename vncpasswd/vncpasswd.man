@@ -4,13 +4,13 @@
 .\"
 .\" Copyright (C) 1998 Marcus.Brinkmann@ruhr-uni-bochum.de
 .\" Copyright (C) 2000 Red Hat, Inc.
-.\" Copyright (C) 2001 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
+.\" Copyright (C) 2001, 2002 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
 .\"
 .\" You may distribute under the terms of the GNU General Public
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH vncpasswd 1 "March 2002" "" "TightVNC"
+.TH vncpasswd 1 "May 2002" "" "TightVNC"
 .SH NAME
 vncpasswd \- set password for VNC server
 .SH SYNOPSIS
