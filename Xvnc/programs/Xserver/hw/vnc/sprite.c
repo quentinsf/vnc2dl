@@ -2033,14 +2033,19 @@ rfbDisplayCursor(pScreen, pCursor)
 {
     rfbClientPtr cl;
     rfbSpriteScreenPtr pPriv;
-
-    for (cl = rfbClientHead; cl ; cl = cl->next) {
-	if (cl->enableCursorShapeUpdates)
-	    cl->cursorWasChanged = TRUE;
-    }
+    Bool result;
 
     pPriv = (rfbSpriteScreenPtr)pScreen->devPrivates[rfbSpriteScreenIndex].ptr;
-    return (*pPriv->DisplayCursor)(pScreen, pCursor);
+    result = (*pPriv->DisplayCursor)(pScreen, pCursor);
+
+    for (cl = rfbClientHead; cl; cl = cl->next) {
+	if (cl->enableCursorShapeUpdates) {
+	    cl->cursorWasChanged = TRUE;
+	    rfbSendFramebufferUpdate(cl);
+	}
+    }
+
+    return result;
 }
 
 
