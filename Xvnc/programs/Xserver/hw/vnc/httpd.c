@@ -42,11 +42,11 @@
 
 #include "rfb.h"
 
-#define NOT_FOUND_STR "HTTP/1.0 404 Not found\n\n" \
+#define NOT_FOUND_STR "HTTP/1.0 404 Not found\r\n\r\n" \
     "<HEAD><TITLE>File Not Found</TITLE></HEAD>\n" \
     "<BODY><H1>File Not Found</H1></BODY>\n"
 
-#define OK_STR "HTTP/1.0 200 OK\n\n"
+#define OK_STR "HTTP/1.0 200 OK\r\n\r\n"
 
 static void httpProcessInput();
 static Bool compareAndSkip(char **ptr, const char *str);
