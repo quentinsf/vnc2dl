@@ -458,7 +458,8 @@ sub Usage
 	"        -geometry <WIDTH>x<HEIGHT>\n".
 	"        -pixelformat rgb<NNN>\n".
 	"        -pixelformat bgr<NNN>\n".
-	"\n");
+	"\n".
+	"See vncserver and Xvnc manual pages for more information.\n");
 }
 
 
