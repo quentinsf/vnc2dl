@@ -179,8 +179,10 @@ rfbSendRectSmartTight(cl, x, y, w, h)
     char *fbptr;
 
 #define MIN_SPLIT_RECT_SIZE     4096
-#define MIN_SOLID_SUBRECT_SIZE  4096
-#define MIN_SOLID_SUBRECT_SIDE    32
+#define MIN_SOLID_SUBRECT_SIZE  2048
+/*
+  #define MIN_SOLID_SUBRECT_SIDE    16
+*/
 
     if (w * h < MIN_SPLIT_RECT_SIZE)
         return rfbSendRectEncodingTight(cl, x, y, w, h);
@@ -220,10 +222,15 @@ rfbSendRectSmartTight(cl, x, y, w, h)
 
                 /* Make sure a solid rectangle is large enough. */
 
+#ifdef MIN_SOLID_SUBRECT_SIDE
                 if ( w_best < MIN_SOLID_SUBRECT_SIDE ||
                      h_best < MIN_SOLID_SUBRECT_SIDE ||
                      w_best * h_best < MIN_SOLID_SUBRECT_SIZE )
                     continue;
+#else
+                if (w_best * h_best < MIN_SOLID_SUBRECT_SIZE)
+                    continue;
+#endif
 
                 /* Send solid rectangle. */
 
