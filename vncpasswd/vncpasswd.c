@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002 Constantin Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2002-2003 Constantin Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -20,9 +20,10 @@
 
 /*
  *  vncpasswd:  A standalone program which gets and verifies a password, 
- *              encrypts it, and stores it to a file.  Always ignore anything
- *              after 8 characters, since this is what Solaris getpass() does
- *              anyway.
+ *              encrypts it, and stores it to a file.  Optionally, it does
+ *              the same for a second (view-only) password.  Always ignore
+ *              anything after 8 characters, since this is what Solaris
+ *              getpass() does anyway.
  */
 
 #include <errno.h>
@@ -38,12 +39,16 @@
 static void usage(char *argv[]);
 static char *getenv_safe(char *name, size_t maxlen);
 static void mkdir_and_check(char *dirname, int be_strict);
+static int ask_password(char *result);
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
   int make_directory = 0;
   int check_strictly = 0;
-  char *passwd;
-  char *passwd1;
+  char passwd1[9];
+  char passwd2[9];
+  char *passwd2_ptr;
+  char yesno[2];
   char passwdDir[256];
   char passwdFile[256];
   int i;
@@ -72,51 +77,40 @@ int main(int argc, char *argv[]) {
     usage(argv);
   }
 
-  if (make_directory)
+  if (make_directory) {
     fprintf(stderr, "Using password file %s\n", passwdFile);
-
-  while (1) {  
-    passwd = getpass("Password: ");
-    if (!passwd) {
-      fprintf(stderr,"Can't get password: not a tty?\n");
-      exit(1);
-    }   
-    if (strlen(passwd) < 6) {
-      fprintf(stderr,"Password too short\n");
-      exit(1);
-    }   
-    if (strlen(passwd) > 8) {
-      passwd[8] = '\0';
-    }
-
-    passwd1 = strdup(passwd);
-
-    passwd = getpass("Verify:   ");
-    if (strlen(passwd) > 8) {
-      passwd[8] = '\0';
-    }
-
-    if (strcmp(passwd1, passwd) == 0) {
-      if (make_directory) {
-        mkdir_and_check(passwdDir, check_strictly);
-      }
-      if (vncEncryptAndStorePasswd(passwd, passwdFile) != 0) {
-	fprintf(stderr,"Cannot write password file %s\n",passwdFile);
-	exit(1);
-      }
-      for (i = 0; i < strlen(passwd); i++) {
-	passwd[i] = passwd1[i] = '\0';
-      }
-      return 0;
-    }
-
-    fprintf(stderr,"Passwords do not match. Please try again.\n\n");
+    mkdir_and_check(passwdDir, check_strictly);
   }
 
-  return 2;                     /* never executed */
+  /* Ask the primary (full-control) password. */
+  if (!ask_password(passwd1))
+    exit(1);
+
+  /* Optionally ask the second (view-only) password. */
+  /* FIXME: Is it correct to read from stdin here? */
+  passwd2_ptr = NULL;
+  fprintf(stderr, "Would you like to enter a view-only password (y/n)? ");
+  if (fgets(yesno, 2, stdin) != NULL && strchr("Yy", yesno[0]) != NULL) {
+    if (ask_password(passwd2))
+      passwd2_ptr = passwd2;
+  }
+
+  /* Actually write the passwords. */
+  if (!vncEncryptAndStorePasswd2(passwd1, passwd2_ptr, passwdFile)) {
+    memset(passwd1, 0, strlen(passwd1));
+    memset(passwd2, 0, strlen(passwd2));
+    fprintf(stderr, "Cannot write password file %s\n", passwdFile);
+    exit(1);
+  }
+
+  /* Zero the memory. */
+  memset(passwd1, 0, strlen(passwd1));
+  memset(passwd2, 0, strlen(passwd2));
+  return 0;
 }
 
-static void usage(char *argv[]) {
+static void usage(char *argv[])
+{
   fprintf(stderr,
           "Usage: %s [FILE]\n"
           "       %s -t\n",
@@ -124,7 +118,8 @@ static void usage(char *argv[]) {
   exit(1);
 }
 
-static char *getenv_safe(char *name, size_t maxlen) {
+static char *getenv_safe(char *name, size_t maxlen)
+{
   char *result;
 
   result = getenv(name);
@@ -144,7 +139,8 @@ static char *getenv_safe(char *name, size_t maxlen) {
  * necessary, and perform a number of sanity checks.
  */
 
-static void mkdir_and_check(char *dirname, int be_strict) {
+static void mkdir_and_check(char *dirname, int be_strict)
+{
   struct stat stbuf;
 
   if (lstat(dirname, &stbuf) != 0) {
@@ -176,4 +172,50 @@ static void mkdir_and_check(char *dirname, int be_strict) {
     fprintf(stderr, "Error: bad access modes on %s\n", dirname);
     exit(1);
   }
+}
+
+/*
+ * Ask a password, check its length and ask to confirm it once more. 
+ * Return 1 on success, 0 on error. On success, the password will be
+ * stored in the specified 9-byte buffer.
+ */
+
+static int ask_password(char *result)
+{
+  char *passwd;
+  char passwd_copy[9];
+
+  while (1) {  
+    passwd = getpass("Password: ");
+    if (!passwd) {
+      fprintf(stderr, "Can't get password: not a tty?\n");
+      return 0;
+    }   
+    if (strlen(passwd) < 6) {
+      fprintf(stderr, "Password too short\n");
+      return 0;
+    }   
+    if (strlen(passwd) > 8) {
+      memset(passwd + 8, 0, strlen(passwd) - 8);
+      fprintf(stderr, "Warning: password truncated to the length of 8.\n");
+    }
+
+    strcpy(passwd_copy, passwd);
+
+    passwd = getpass("Verify:   ");
+    if (strlen(passwd) > 8)
+      memset(passwd + 8, 0, strlen(passwd) - 8);
+
+    if (strcmp(passwd, passwd_copy) == 0)
+      break;                    /* success */
+
+    fprintf(stderr,"Passwords do not match. Please try again.\n\n");
+  }
+
+  /* Save the password and zero our copies. */
+  strcpy(result, passwd);
+  memset(passwd, 0, strlen(passwd));
+  memset(passwd_copy, 0, strlen(passwd_copy));
+
+  return 1;
 }
