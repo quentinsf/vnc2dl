@@ -3,7 +3,8 @@
  */
 
 /*
- *  Copyright (C) Const Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2000 Tridia Corporation.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -176,6 +177,15 @@ rfbNewClient(sock)
 
     rfbResetStats(cl);
 
+    cl->compStreamInited = FALSE;
+    cl->compStream.total_in = 0;
+    cl->compStream.total_out = 0;
+    cl->compStream.zalloc = Z_NULL;
+    cl->compStream.zfree = Z_NULL;
+    cl->compStream.opaque = Z_NULL;
+
+    cl->zlibCompressLevel = 5;
+
     sprintf(pv,rfbProtocolVersionFormat,rfbProtocolMajorVersion,
 	    rfbProtocolMinorVersion);
 
@@ -214,9 +224,14 @@ rfbClientConnectionGone(sock)
     rfbLog("Client %s gone\n",cl->host);
     free(cl->host);
 
+    /* Release the compression state structures if any. */
+    if ( cl->compStreamInited == TRUE ) {
+	deflateEnd( &(cl->compStream) );
+    }
+
     for (i = 0; i < 4; i++) {
-        if (cl->zsActive[i])
-            deflateEnd(&cl->zsStruct[i]);
+	if (cl->zsActive[i])
+	    deflateEnd(&cl->zsStruct[i]);
     }
 
     if (pointerClient == cl)
@@ -569,6 +584,13 @@ rfbProcessClientNormalMessage(cl)
 			   cl->host);
 		}
 		break;
+	    case rfbEncodingZlib:
+		if (cl->preferredEncoding == -1) {
+		    cl->preferredEncoding = enc;
+		    rfbLog("Using zlib encoding for client %s\n",
+			   cl->host);
+		}
+              break;
 	    case rfbEncodingTight:
 		if (cl->preferredEncoding == -1) {
 		    cl->preferredEncoding = enc;
@@ -576,7 +598,6 @@ rfbProcessClientNormalMessage(cl)
 			   cl->host);
 		}
 		break;
-
 	    case rfbEncodingXCursor:
 		rfbLog("Enabling X-style cursor updates for client %s\n",
 		       cl->host);
@@ -584,7 +605,6 @@ rfbProcessClientNormalMessage(cl)
 		cl->useRichCursorEncoding = FALSE;
 		cl->cursorWasChanged = TRUE;
 		break;
-
 	    case rfbEncodingRichCursor:
 		if (!cl->enableCursorShapeUpdates) {
 		    rfbLog("Enabling full-color cursor updates for client "
@@ -594,10 +614,10 @@ rfbProcessClientNormalMessage(cl)
 		    cl->cursorWasChanged = TRUE;
 		}
 		break;
-
 	    default:
 		if ( enc >= (CARD32)rfbEncodingCompressLevel0 &&
 		     enc <= (CARD32)rfbEncodingCompressLevel9 ) {
+		    cl->zlibCompressLevel = enc & 0x0F;
 		    cl->tightCompressLevel = enc & 0x0F;
 		    rfbLog("Using compression level %d for client %s\n",
 			   cl->tightCompressLevel, cl->host);
@@ -883,6 +903,16 @@ rfbSendFramebufferUpdate(cl)
 	    nUpdateRegionRects += (((w-1) / cl->correMaxWidth + 1)
 				     * ((h-1) / cl->correMaxHeight + 1));
 	}
+    } else if (cl->preferredEncoding == rfbEncodingZlib) {
+	nUpdateRegionRects = 0;
+
+	for (i = 0; i < REGION_NUM_RECTS(&updateRegion); i++) {
+	    int x = REGION_RECTS(&updateRegion)[i].x1;
+	    int y = REGION_RECTS(&updateRegion)[i].y1;
+	    int w = REGION_RECTS(&updateRegion)[i].x2 - x;
+	    int h = REGION_RECTS(&updateRegion)[i].y2 - y;
+	    nUpdateRegionRects += (((h-1) / (ZLIB_MAX_SIZE( w ) / w)) + 1);
+	}
     } else if (cl->preferredEncoding == rfbEncodingTight) {
 	nUpdateRegionRects = 0;
 
@@ -891,10 +921,10 @@ rfbSendFramebufferUpdate(cl)
 	    int y = REGION_RECTS(&updateRegion)[i].y1;
 	    int w = REGION_RECTS(&updateRegion)[i].x2 - x;
 	    int h = REGION_RECTS(&updateRegion)[i].y2 - y;
-            nUpdateRegionRects += rfbNumCodedRectsTight (cl, x, y, w, h);
+	    nUpdateRegionRects += rfbNumCodedRectsTight(cl, x, y, w, h);
 	}
     } else {
-        nUpdateRegionRects = REGION_NUM_RECTS(&updateRegion);
+	nUpdateRegionRects = REGION_NUM_RECTS(&updateRegion);
     }
 
     fu->type = rfbFramebufferUpdate;
@@ -948,6 +978,12 @@ rfbSendFramebufferUpdate(cl)
 	    break;
 	case rfbEncodingHextile:
 	    if (!rfbSendRectEncodingHextile(cl, x, y, w, h)) {
+		REGION_UNINIT(pScreen,&updateRegion);
+		return FALSE;
+	    }
+	    break;
+	case rfbEncodingZlib:
+	    if (!rfbSendRectEncodingZlib(cl, x, y, w, h)) {
 		REGION_UNINIT(pScreen,&updateRegion);
 		return FALSE;
 	    }

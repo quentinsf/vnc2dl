@@ -1,4 +1,6 @@
 /*
+ *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2000 Tridia Corporation.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -459,6 +461,19 @@ typedef struct {
 #define rfbHextileExtractY(byte) ((byte) & 0xf)
 #define rfbHextileExtractW(byte) (((byte) >> 4) + 1)
 #define rfbHextileExtractH(byte) (((byte) & 0xf) + 1)
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ * zlib - zlib compressed Encoding.  We have an rfbZlibHeader structure
+ * giving the number of bytes following.  Finally the data follows is
+ * zlib compressed version of the raw pixel data as negotiated.
+ */
+
+typedef struct {
+    CARD32 nBytes;
+} rfbZlibHeader;
+
+#define sz_rfbZlibHeader 4
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

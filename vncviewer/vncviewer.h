@@ -1,4 +1,6 @@
 /*
+ *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2000 Tridia Corporation.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -54,8 +56,7 @@ extern int endianTest;
 #define SERVER_PORT_OFFSET 5900
 
 #define DEFAULT_SSH_CMD "/usr/bin/ssh"
-#define DEFAULT_TUNNEL_CMD DEFAULT_SSH_CMD \
-			   " -f -L %L:%H:%R %H sleep 20"
+#define DEFAULT_TUNNEL_CMD (DEFAULT_SSH_CMD " -f -L %L:%H:%R %H sleep 20")
 
 
 /* argsresources.c */

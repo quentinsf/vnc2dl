@@ -3,6 +3,8 @@
  */
 
 /*
+ *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2000 Tridia Corporation.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -209,6 +211,13 @@ typedef struct rfbClientRec {
     int rfbRawBytesEquivalent;
     int rfbKeyEventsRcvd;
     int rfbPointerEventsRcvd;
+
+    /* zlib encoding -- necessary compression state info per client */
+
+    struct z_stream_s compStream;
+    Bool compStreamInited;
+
+    CARD32 zlibCompressLevel;
 
     /* tight encoding -- preserve zlib streams' state for each client */
 
@@ -458,6 +467,24 @@ extern Bool rfbSendRectEncodingCoRRE(rfbClientPtr cl, int x,int y,int w,int h);
 
 extern Bool rfbSendRectEncodingHextile(rfbClientPtr cl, int x, int y, int w,
 				       int h);
+
+
+/* zlib.c */
+
+/* Minimum zlib rectangle size in bytes.  Anything smaller will
+ * not compress well due to overhead.
+ */
+#define VNC_ENCODE_ZLIB_MIN_COMP_SIZE (17)
+
+/* Set maximum zlib rectangle size in pixels.  Always allow at least
+ * two scan lines.
+ */
+#define ZLIB_MAX_RECT_SIZE (128*256)
+#define ZLIB_MAX_SIZE(min) ((( min * 2 ) > ZLIB_MAX_RECT_SIZE ) ? \
+			    ( min * 2 ) : ZLIB_MAX_RECT_SIZE )
+
+extern Bool rfbSendRectEncodingZlib(rfbClientPtr cl, int x, int y, int w,
+				    int h);
 
 
 /* tight.c */

@@ -1,4 +1,6 @@
 /*
+ *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2000 Tridia Corporation.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -39,6 +41,9 @@ static Bool HandleCoRRE32(int rx, int ry, int rw, int rh);
 static Bool HandleHextile8(int rx, int ry, int rw, int rh);
 static Bool HandleHextile16(int rx, int ry, int rw, int rh);
 static Bool HandleHextile32(int rx, int ry, int rw, int rh);
+static Bool HandleZlib8(int rx, int ry, int rw, int rh);
+static Bool HandleZlib16(int rx, int ry, int rw, int rh);
+static Bool HandleZlib32(int rx, int ry, int rw, int rh);
 static Bool HandleTight8(int rx, int ry, int rw, int rh);
 static Bool HandleTight16(int rx, int ry, int rw, int rh);
 static Bool HandleTight32(int rx, int ry, int rw, int rh);
@@ -60,6 +65,19 @@ int endianTest = 1;
 
 #define BUFFER_SIZE (640*480)
 static char buffer[BUFFER_SIZE];
+
+
+/* The zlib encoding requires expansion/decompression/deflation of the
+   compressed data in the "buffer" above into another, result buffer.
+   However, the size of the result buffer can be determined precisely
+   based on the bitsPerPixel, height and width of the rectangle.  We
+   allocate this buffer one time to be the full size of the buffer. */
+
+static int raw_buffer_size = -1;
+static char *raw_buffer;
+
+static z_stream decompStream;
+static Bool decompStreamInited = False;
 
 
 /*
@@ -203,7 +221,7 @@ InitialiseRFBConnection()
       passwd[i] = '\0';
     }
 
-    if (!WriteExact(rfbsock, challenge, CHALLENGESIZE)) return False;
+    if (!WriteExact(rfbsock, (char *)challenge, CHALLENGESIZE)) return False;
 
     if (!ReadFromRFBServer((char *)&authResult, 4)) return False;
 
@@ -311,6 +329,10 @@ SetFormatAndEncodings()
 	  requestCompressLevel = True;
       } else if (strncasecmp(encStr,"hextile",encStrLen) == 0) {
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
+      } else if (strncasecmp(encStr,"zlib",encStrLen) == 0) {
+	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZlib);
+	if (appData.compressLevel >= 0 && appData.compressLevel <= 9)
+	  requestCompressLevel = True;
       } else if (strncasecmp(encStr,"corre",encStrLen) == 0) {
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
       } else if (strncasecmp(encStr,"rre",encStrLen) == 0) {
@@ -334,14 +356,19 @@ SetFormatAndEncodings()
 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
     }
   } else {
-    if (SameMachine(rfbsock) && !tunnelSpecified) {
-      fprintf(stderr,"Same machine: preferring raw encoding\n");
-      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
+    if (SameMachine(rfbsock)) {
+      if (!tunnelSpecified) {
+	fprintf(stderr,"Same machine: preferring raw encoding\n");
+	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
+      } else {
+	fprintf(stderr,"Tunneling active: preferring tight encoding\n");
+      }
     }
 
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
+    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZlib);
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRRE);
 
@@ -674,6 +701,25 @@ HandleRFBServerMessage()
 	break;
       }
 
+      case rfbEncodingZlib:
+      {
+	switch (myFormat.bitsPerPixel) {
+	case 8:
+	  if (!HandleZlib8(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+	    return False;
+	  break;
+	case 16:
+	  if (!HandleZlib16(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+	    return False;
+	  break;
+	case 32:
+	  if (!HandleZlib32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+	    return False;
+	  break;
+	}
+	break;
+     }
+
       case rfbEncodingTight:
       {
 	switch (myFormat.bitsPerPixel) {
@@ -775,18 +821,21 @@ HandleRFBServerMessage()
 #include "rre.c"
 #include "corre.c"
 #include "hextile.c"
+#include "zlib.c"
 #include "tight.c"
 #undef BPP
 #define BPP 16
 #include "rre.c"
 #include "corre.c"
 #include "hextile.c"
+#include "zlib.c"
 #include "tight.c"
 #undef BPP
 #define BPP 32
 #include "rre.c"
 #include "corre.c"
 #include "hextile.c"
+#include "zlib.c"
 #include "tight.c"
 #undef BPP
 
