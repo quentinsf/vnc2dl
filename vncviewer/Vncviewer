@@ -7,7 +7,7 @@
 ! The title of the main window.  "%s" will be replaced by the desktop name.
 ! 
 
-Vncviewer.title: VNC: %s
+Vncviewer.title: TightVNC: %s
 
 
 !

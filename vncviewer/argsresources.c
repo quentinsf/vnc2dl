@@ -30,7 +30,7 @@
 
 char *fallback_resources[] = {
 
-  "Vncviewer.title: VNC: %s",
+  "Vncviewer.title: TightVNC: %s",
 
   "Vncviewer.translations:\
     <Enter>: SelectionToVNC()\\n\
@@ -268,9 +268,9 @@ void
 usage(void)
 {
   fprintf(stderr,
-	  "VNC viewer version 3.3.3r2 (Tight Encoding patch 1.1p3)\n"
+	  "VNC viewer version 3.3.3r2 (Tight Encoding patch 1.2)\n"
 	  "\n"
-	  "Usage: %s [<options>] [<host>:]<display#>\n"
+	  "Usage: %s [<options>] [<host>]:<display#>\n"
 	  "       %s [<options>] -listen [<display#>]\n"
 	  "       %s [<options>] -tunnel <host>:<display#>\n"
 	  "\n"
