@@ -27,6 +27,7 @@
 #include "osdep.h"
 #include <rfbproto.h>
 #include <vncauth.h>
+#include <zlib.h>
 
 #define MAX_ENCODINGS 10
 
@@ -206,6 +207,11 @@ typedef struct rfbClientRec {
     int rfbRawBytesEquivalent;
     int rfbKeyEventsRcvd;
     int rfbPointerEventsRcvd;
+
+    /* tight encoding -- preserve zlib streams' state for each client */
+
+    z_stream zsStruct[4];
+    Bool zsActive[4];
 
     struct rfbClientRec *next;
 
@@ -440,6 +446,15 @@ extern Bool rfbSendRectEncodingCoRRE(rfbClientPtr cl, int x,int y,int w,int h);
 
 extern Bool rfbSendRectEncodingHextile(rfbClientPtr cl, int x, int y, int w,
 				       int h);
+
+
+/* tight.c */
+
+#define TIGHT_MAX_RECT_WIDTH 128
+#define TIGHT_MAX_RECT_HEIGHT 128
+#define TIGHT_OUT_BUFFER_SIZE 4096
+
+extern Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
 
 
 /* stats.c */

@@ -3,11 +3,11 @@ XCOMM $XConsortium: Imakefile,v 1.5 94/01/21 22:04:27 dpw Exp $
 
 SRCS = init.c sockets.c kbdptr.c cmap.c draw.c cutpaste.c \
        dispcur.c sprite.c rfbserver.c translate.c httpd.c auth.c \
-       rre.c corre.c stats.c hextile.c
+       rre.c corre.c stats.c hextile.c tight.c
 
 OBJS = init.o sockets.o kbdptr.o cmap.o draw.o cutpaste.o \
        dispcur.o sprite.o rfbserver.o translate.o httpd.o auth.o \
-       rre.o corre.o stats.o hextile.o
+       rre.o corre.o stats.o hextile.o tight.o
 
 #include <vnclibs.def>
 INCLUDES = -I. -I$(XBUILDINCDIR) -I$(FONTINCSRC) -I$(XINCLUDESRC) \

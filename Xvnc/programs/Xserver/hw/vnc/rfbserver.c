@@ -118,6 +118,7 @@ rfbNewClient(sock)
     BoxRec box;
     struct sockaddr_in addr;
     int addrlen = sizeof(struct sockaddr_in);
+    int i;
 
     if (rfbClientHead == NULL) {
 	/* no other clients - make sure we don't think any keys are pressed */
@@ -163,6 +164,9 @@ rfbNewClient(sock)
     cl->translateFn = rfbTranslateNone;
     cl->translateLookupTable = NULL;
 
+    for (i = 0; i < 4; i++)
+        cl->zsActive[i] = FALSE;
+
     cl->next = rfbClientHead;
     rfbClientHead = cl;
 
@@ -191,6 +195,7 @@ rfbClientConnectionGone(sock)
     int sock;
 {
     rfbClientPtr cl, prev;
+    int i;
 
     for (prev = NULL, cl = rfbClientHead; cl; prev = cl, cl = cl->next) {
 	if (sock == cl->sock)
@@ -204,6 +209,11 @@ rfbClientConnectionGone(sock)
 
     rfbLog("Client %s gone\n",cl->host);
     free(cl->host);
+
+    for (i = 0; i < 4; i++) {
+        if (cl->zsActive[i])
+            deflateEnd(&cl->zsStruct[i]);
+    }
 
     if (pointerClient == cl)
 	pointerClient = NULL;
@@ -554,6 +564,13 @@ rfbProcessClientNormalMessage(cl)
 			   cl->host);
 		}
 		break;
+	    case rfbEncodingTight:
+		if (cl->preferredEncoding == -1) {
+		    cl->preferredEncoding = enc;
+		    rfbLog("Using tight encoding for client %s\n",
+			   cl->host);
+		}
+		break;
 	    default:
 		rfbLog("rfbProcessClientNormalMessage: ignoring unknown "
 		       "encoding type %d\n", (int)enc);
@@ -827,6 +844,21 @@ rfbSendFramebufferUpdate(cl)
 	    nUpdateRegionRects += (((w-1) / cl->correMaxWidth + 1)
 				     * ((h-1) / cl->correMaxHeight + 1));
 	}
+    } else if (cl->preferredEncoding == rfbEncodingTight) {
+	nUpdateRegionRects = 0;
+
+	for (i = 0; i < REGION_NUM_RECTS(&updateRegion); i++) {
+	    int x = REGION_RECTS(&updateRegion)[i].x1;
+	    int y = REGION_RECTS(&updateRegion)[i].y1;
+	    int w = REGION_RECTS(&updateRegion)[i].x2 - x;
+	    int h = REGION_RECTS(&updateRegion)[i].y2 - y;
+            if ((w > 2 && h > 2 && w * h > 1024) || w > 2048 || h > 2048) {
+                nUpdateRegionRects += (((w-1) / TIGHT_MAX_RECT_WIDTH + 1)
+                                       * ((h-1) / TIGHT_MAX_RECT_HEIGHT + 1));
+            } else {
+                nUpdateRegionRects++;
+            }
+	}
     } else {
 	nUpdateRegionRects = REGION_NUM_RECTS(&updateRegion);
     }
@@ -876,6 +908,12 @@ rfbSendFramebufferUpdate(cl)
 	    break;
 	case rfbEncodingHextile:
 	    if (!rfbSendRectEncodingHextile(cl, x, y, w, h)) {
+		REGION_UNINIT(pScreen,&updateRegion);
+		return FALSE;
+	    }
+	    break;
+	case rfbEncodingTight:
+	    if (!rfbSendRectEncodingTight(cl, x, y, w, h)) {
 		REGION_UNINIT(pScreen,&updateRegion);
 		return FALSE;
 	    }
