@@ -232,7 +232,16 @@ rfbSendRectSmartTight(cl, x, y, w, h)
                     continue;
 #endif
 
-                /* Send solid rectangle. */
+                /* Send rectangles at top and left to solid-color area. */
+
+                if ( dy != y &&
+                     !rfbSendRectSmartTight(cl, x, y, w, dy-y) )
+                    return FALSE;
+                if ( dx != x &&
+                     !rfbSendRectSmartTight(cl, x, dy, dx-x, h_best) )
+                    return FALSE;
+
+                /* Send solid-color rectangle. */
 
                 if (!SendTightHeader(cl, dx, dy, w_best, h_best))
                     return FALSE;
@@ -248,14 +257,8 @@ rfbSendRectSmartTight(cl, x, y, w, h)
                 if (!SendSolidRect(cl))
                     return FALSE;
 
-                /* Send surrounding rectangles. */
+                /* Send remaining rectangles (at right and bottom). */
 
-                if ( dy != y &&
-                     !rfbSendRectSmartTight(cl, x, y, w, dy-y) )
-                    return FALSE;
-                if ( dx != x &&
-                     !rfbSendRectSmartTight(cl, x, dy, dx-x, h_best) )
-                    return FALSE;
                 if ( dx + w_best != x + w &&
                      !rfbSendRectSmartTight(cl, dx+w_best, dy,
                                             w-(dx-x)-w_best, h_best) )
