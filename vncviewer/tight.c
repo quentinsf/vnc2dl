@@ -32,10 +32,16 @@
 
 #define CARDBPP CONCAT2E(CARD,BPP)
 #define filterPtrBPP CONCAT2E(filterPtr,BPP)
+#define RGB_TO_PIXELBPP CONCAT2E(RGB_TO_PIXEL,BPP)
+#define RGB24_TO_PIXELBPP CONCAT2E(RGB24_TO_PIXEL,BPP)
 
 #define HandleTightBPP CONCAT2E(HandleTight,BPP)
 #define InitFilterCopyBPP CONCAT2E(InitFilterCopy,BPP)
+#define InitFilterPaletteBPP CONCAT2E(InitFilterPalette,BPP)
+#define InitFilterGradientBPP CONCAT2E(InitFilterGradient,BPP)
 #define FilterCopyBPP CONCAT2E(FilterCopy,BPP)
+#define FilterPaletteBPP CONCAT2E(FilterPalette,BPP)
+#define FilterGradientBPP CONCAT2E(FilterGradient,BPP)
 
 /* Type declarations */
 
@@ -44,7 +50,11 @@ typedef void (*filterPtrBPP)(int, CARDBPP *);
 /* Prototypes */
 
 static int InitFilterCopyBPP (int rw, int rh);
+static int InitFilterPaletteBPP (int rw, int rh);
+static int InitFilterGradientBPP (int rw, int rh);
 static void FilterCopyBPP (int numRows, CARDBPP *destBuffer);
+static void FilterPaletteBPP (int numRows, CARDBPP *destBuffer);
+static void FilterGradientBPP (int numRows, CARDBPP *destBuffer);
 
 /* Definitions */
 
@@ -104,7 +114,6 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
       filterFn = FilterCopyBPP;
       bitsPixel = InitFilterCopyBPP(rw, rh);
       break;
-/*
     case rfbTightFilterPalette:
       filterFn = FilterPaletteBPP;
       bitsPixel = InitFilterPaletteBPP(rw, rh);
@@ -113,11 +122,6 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
       filterFn = FilterGradientBPP;
       bitsPixel = InitFilterGradientBPP(rw, rh);
       break;
-    case rfbTightFilterGradientPalette:
-      filterFn = FilterGradientPaletteBPP;
-      bitsPixel = InitFilterGradientPaletteBPP(rw, rh);
-      break;
-*/
     delault:
       return False;
     }
@@ -125,7 +129,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
     filterFn = FilterCopyBPP;
     bitsPixel = InitFilterCopyBPP(rw, rh);
   }
-  if (!bitsPixel)
+  if (bitsPixel == 0)
     return False;               /* Filter initialization failed. */
 
   /* Read the length (1..3 bytes) of compressed data following. */
@@ -207,11 +211,26 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
  *
  */
 
+#ifndef RGB_TO_PIXEL
+
+#define RGB_TO_PIXEL(bpp,r,g,b)                                              \
+  ((CARD##bpp)(r) & myFormat.redMax) << myFormat.redShift |                  \
+  ((CARD##bpp)(g) & myFormat.greenMax) << myFormat.greenShift |              \
+  ((CARD##bpp)(b) & myFormat.blueMax) << myFormat.blueShift;
+
+#define RGB24_TO_PIXEL32(r,g,b)                                              \
+  ((CARD32)(r) & 0xFF) << myFormat.redShift |                                \
+  ((CARD32)(g) & 0xFF) << myFormat.greenShift |                              \
+  ((CARD32)(b) & 0xFF) << myFormat.blueShift;
+
+#endif
+
 /*
    The following variables are defined in rfbproto.c:
-     Bool cutZeros;
-     int rectWidth, rectHeight, currentLine, colorsUsed;
-     char rgbPalette[256*3];
+     static Bool cutZeros;
+     static int rectWidth, rectColors;
+     static CARD8 tightPalette[256*4];
+     static CARD8 tightPrevRow[2048*3*sizeof(CARD16)];
 */
 
 static int
@@ -224,37 +243,195 @@ InitFilterCopyBPP (int rw, int rh)
       myFormat.greenMax == 0xFF && myFormat.blueMax == 0xFF) {
     cutZeros = True;
     return 24;
+  } else {
+    cutZeros = False;
   }
-  cutZeros = False;
-  return BPP;
-#else
-  return BPP;
 #endif
+
+  return BPP;
 }
 
 static void
-FilterCopyBPP (int numRows, CARDBPP *destBuffer)
+FilterCopyBPP (int numRows, CARDBPP *dst)
 {
+
 #if BPP == 32
   int x, y;
 
   if (cutZeros) {
     for (y = 0; y < numRows; y++) {
       for (x = 0; x < rectWidth; x++) {
-        destBuffer[y*rectWidth+x] =
-          ((CARDBPP)buffer[(y*rectWidth+x)*3] & 0xFF)
-            << myFormat.redShift |
-          ((CARDBPP)buffer[(y*rectWidth+x)*3+1] & 0xFF)
-            << myFormat.greenShift |
-          ((CARDBPP)buffer[(y*rectWidth+x)*3+2] & 0xFF)
-            << myFormat.blueShift;
+        dst[y*rectWidth+x] =
+          RGB24_TO_PIXEL32(buffer[(y*rectWidth+x)*3],
+                           buffer[(y*rectWidth+x)*3+1],
+                           buffer[(y*rectWidth+x)*3+2]);
+      }
+    }
+    return;
+  }
+#endif
+
+  memcpy (dst, buffer, numRows * rectWidth * (BPP / 8));
+}
+
+static int
+InitFilterGradientBPP (int rw, int rh)
+{
+  memset(tightPrevRow, 0, rw * 3);
+  return InitFilterCopyBPP(rw, rh);
+}
+
+#if BPP == 32
+
+static void
+FilterGradient24 (int numRows, CARD32 *dst)
+{
+  int x, y, c;
+  CARD8 thisRow[2048*3];
+  CARD8 pix[3];
+  int est[3];
+
+  for (y = 0; y < numRows; y++) {
+    /* First pixel in a row */
+    for (c = 0; c < 3; c++) {
+      pix[c] = tightPrevRow[c] + buffer[y*rectWidth*3+c];
+      thisRow[c] = pix[c];
+    }
+    /* Remaining pixels of a row */
+    for (x = 1; x < rectWidth; x++) {
+      for (c = 0; c < 3; c++) {
+        est[c] = (int)tightPrevRow[x*3+c] + (int)pix[c] -
+                 (int)tightPrevRow[(x-1)*3+c];
+        if (est[c] > 0xFF) {
+          est[c] = 0xFF;
+        } else if (est[c] < 0x00) {
+          est[c] = 0x00;
+        }
+        pix[c] = (CARD8)est[c] + buffer[(y*rectWidth+x)*3+c];
+        thisRow[x*3+c] = pix[c];
+      }
+      dst[y*rectWidth+x] = RGB24_TO_PIXEL32(pix[0], pix[1], pix[2]);
+    }
+    memcpy(tightPrevRow, thisRow, rectWidth * 3);
+  }
+}
+
+#endif
+
+/* The following filter implementation is not very efficient, and in fact
+   it's currently not used. For now, this filter appies only to 24-bit
+   color samples, see FilterGradient24() above. The version below is
+   provided for compatibility with future implementations. */
+
+static void
+FilterGradientBPP (int numRows, CARDBPP *dst)
+{
+  int x, y, c;
+  CARDBPP *src = (CARDBPP *)buffer;
+  CARD16 *thatRow = (CARD16 *)tightPrevRow;
+  CARD16 thisRow[2048*3];
+  CARD16 pix[3];
+  CARD16 max[3];
+  int shift[3];
+  int est[3];
+
+#if BPP == 32
+  if (cutZeros) {
+    FilterGradient24(numRows, dst);
+    return;
+  }
+#endif
+
+  max[0] = myFormat.redMax;
+  max[1] = myFormat.greenMax;
+  max[2] = myFormat.blueMax;
+
+  shift[0] = myFormat.redShift;
+  shift[1] = myFormat.greenShift;
+  shift[2] = myFormat.blueShift;
+
+  for (y = 0; y < numRows; y++) {
+    /* First pixel in a row */
+    for (c = 0; c < 3; c++) {
+      pix[c] = (CARD16)((src[y*rectWidth] >> shift[c]) + thatRow[c] & max[c]);
+      thisRow[c] = pix[c];
+    }
+    /* Remaining pixels of a row */
+    for (x = 1; x < rectWidth; x++) {
+      for (c = 0; c < 3; c++) {
+        est[c] = (int)thatRow[x*3+c] + (int)pix[c] - (int)thatRow[(x-1)*3+c];
+        if (est[c] > (int)max[c]) {
+          est[c] = (int)max[c];
+        } else if (est[c] < 0) {
+          est[c] = 0;
+        }
+        pix[c] = (CARD16)((src[y*rectWidth+x] >> shift[c]) + est[c] & max[c]);
+        thisRow[x*3+c] = pix[c];
+      }
+      dst[y*rectWidth+x] = RGB_TO_PIXEL(BPP, pix[0], pix[1], pix[2]);
+    }
+    memcpy(thatRow, thisRow, rectWidth * 3 * sizeof(CARD16));
+  }
+}
+
+static int
+InitFilterPaletteBPP (int rw, int rh)
+{
+  CARD8 numColors;
+  CARDBPP *palette;
+  int i;
+
+  rectWidth = rw;
+
+  if (!ReadFromRFBServer((char*)&numColors, 1))
+    return 0;
+
+  rectColors = (int)numColors;
+  if (++rectColors < 2)
+    return 0;
+
+#if BPP == 32
+  if (myFormat.depth == 24 && myFormat.redMax == 0xFF &&
+      myFormat.greenMax == 0xFF && myFormat.blueMax == 0xFF) {
+    if (!ReadFromRFBServer((char*)&tightPalette, rectColors * 3))
+      return 0;
+    palette = (CARDBPP *)tightPalette;
+    for (i = rectColors - 1; i >= 0; i--) {
+      palette[i] = RGB24_TO_PIXEL32(tightPalette[i*3],
+                                    tightPalette[i*3+1],
+                                    tightPalette[i*3+2]);
+    }
+    return (rectColors == 2) ? 1 : 8;
+  }
+#endif
+
+  if (!ReadFromRFBServer((char*)&tightPalette, rectColors * (BPP / 8)))
+    return 0;
+
+  return (rectColors == 2) ? 1 : 8;
+}
+
+static void
+FilterPaletteBPP (int numRows, CARDBPP *dst)
+{
+  int x, y, b, w;
+  CARD8 *src = (CARD8 *)buffer;
+
+  if (rectColors == 2) {
+    w = (rectWidth + 7) / 8;
+    for (y = 0; y < numRows; y++) {
+      for (x = 0; x < rectWidth / 8; x++) {
+        for (b = 7; b >= 0; b--)
+          dst[y*rectWidth+x] = tightPalette[src[y*w+x] >> b & 1];
+      }
+      for (b = 7; b >= 8 - rectWidth % 8; b--) {
+        dst[y*rectWidth+x] = tightPalette[src[y*w+x] >> b & 1];
       }
     }
   } else {
-    memcpy (destBuffer, buffer, numRows * rectWidth * (BPP / 8));
+    for (y = 0; y < numRows; y++)
+      for (x = 0; x < rectWidth; x++)
+        dst[y*rectWidth+x] = tightPalette[(int)src[y*rectWidth+x]];
   }
-#else
-  memcpy (destBuffer, buffer, numRows * rectWidth * (BPP / 8));
-#endif
 }
 

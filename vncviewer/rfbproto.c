@@ -78,8 +78,9 @@ static Bool zlibStreamActive[4] = {
 
 /* Filter stuff. Should be initialized by filter initialization code. */
 static Bool cutZeros;
-static int rectWidth, rectHeight, rectColors, currentLine;
-static char tightPalette[256*3];
+static int rectWidth, rectColors;
+static char tightPalette[256*4];
+static CARD8 tightPrevRow[2048*3*sizeof(CARD16)];
 
 
 /*

@@ -450,7 +450,6 @@ typedef struct {
 #define rfbTightFilterCopy             0x00
 #define rfbTightFilterPalette          0x01
 #define rfbTightFilterGradient         0x02
-#define rfbTightFilterGradientPalette  0x03
 
 
 /*-----------------------------------------------------------------------------
