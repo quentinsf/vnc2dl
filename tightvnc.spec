@@ -1,11 +1,13 @@
 Summary:   A remote display system.
-Name:      vnc
-Version:   3.3.3r2+tight1.2.6
+Name:      tightvnc
+Version:   1.2.7
 Release:   1
 URL:       http://www.tightvnc.com/
-Source0:   tightvnc-1.2.6_unixsrc.tar.bz2
+Source0:   tightvnc-%{version}_unixsrc.tar.bz2
 License:   GPL
 Group:     User Interface/Desktops
+Packager:  Constantin Kaplinsky <const@ce.cctpu.edu.ru>
+Obsoletes: vnc
 BuildRoot: %{_tmppath}/%{name}-%{version}-root
 BuildPrereq: /usr/bin/perl tcp_wrappers
 BuildRequires: zlib-devel libjpeg-devel
@@ -16,27 +18,25 @@ ExclusiveArch: i386 alpha sparc ppc s390 s390x
 Virtual Network Computing (VNC) is a remote display system which
 allows you to view a computing 'desktop' environment not only on the
 machine where it is running, but from anywhere on the Internet and
-from a wide variety of machine architectures.  This package contains a
-client which will allow you to connect to other desktops running a VNC
-server.
-
-This package includes all improvements from TightVNC distribution.
+from a wide variety of machine architectures. TightVNC is an enhanced
+VNC distribution. This package contains a client which will allow you
+to connect to other desktops running a VNC or a TightVNC server.
 
 %package server
-Summary: A VNC server.
+Summary: TightVNC server
+Obsoletes: vnc-server
 Requires: XFree86 bash >= 2.0
 Group: User Interface/X
 Prereq: /sbin/chkconfig /etc/init.d
 
 %description server
 The VNC system allows you to access the same desktop from a wide
-variety of platforms.  This package is a VNC server, allowing others
-to access the desktop on your machine.
-
-This package includes all improvements from TightVNC distribution.
+variety of platforms. TightVNC is an enhanced VNC distribution. This
+package is a TightVNC server, allowing others to access the desktop on
+your machine.
 
 %prep
-%setup -q -n %{name}_unixsrc
+%setup -q -n vnc_unixsrc
 
 perl -pi -e "s|/usr/local/vnc/classes|%{_datadir}/vnc/classes|" vncserver
 
@@ -135,6 +135,9 @@ fi
 %{_mandir}/man1/vncpasswd.1*
 
 %changelog
+* Thu Nov 14 2002 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
+- TightVNC 1.2.7 update.
+
 * Sat Aug 10 2002 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
 - TightVNC 1.2.5 update.
 
