@@ -1,5 +1,3 @@
-XCOMM (FIXME) Use internal copy of zlib library?
-
 #ifdef SunArchitecture
 CC = gcc
 CCOPTIONS =
@@ -13,12 +11,12 @@ XCOMM seems to cause problems on Digital Unix.
 DEFINES = -DMITSHM
 #endif
 
-INCLUDES = -I../include -I. -I/usr/include
+INCLUDES = -I../include -I. -I../lib/zlib -I../lib/jpeg -I/usr/include
 VNCAUTH_LIB = ../libvncauth/libvncauth.a
-ZLIB_LIB = /usr/lib/libz.a
-JPEG_LIB = /usr/lib/libjpeg.a
+ZLIB_LIB = -L../lib/zlib -lz
+JPEG_LIB = -L../lib/jpeg -ljpeg
 
-DEPLIBS = XawClientDepLibs $(VNCAUTH_LIB) $(ZLIB_LIB) $(JPEG_LIB)
+DEPLIBS = XawClientDepLibs $(VNCAUTH_LIB)
 LOCAL_LIBRARIES = XawClientLibs $(VNCAUTH_LIB) $(ZLIB_LIB) $(JPEG_LIB)
 
 SRCS = \
