@@ -406,6 +406,7 @@ extern rfbClientPtr pointerClient;
 extern Bool rfbAlwaysShared;
 extern Bool rfbNeverShared;
 extern Bool rfbDontDisconnect;
+extern Bool rfbViewOnly; /* run server in view-only mode - Ehud Karni SW */
 
 extern void rfbNewClientConnection(int sock);
 extern rfbClientPtr rfbReverseConnection(char *host, int port);

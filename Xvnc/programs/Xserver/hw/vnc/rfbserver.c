@@ -52,6 +52,7 @@ rfbClientPtr pointerClient = NULL;  /* Mutex for pointer events */
 Bool rfbAlwaysShared = FALSE;
 Bool rfbNeverShared = FALSE;
 Bool rfbDontDisconnect = FALSE;
+Bool rfbViewOnly = FALSE; /* run server in view only mode - Ehud Karni SW */
 
 static rfbClientPtr rfbNewClient(int sock);
 static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
@@ -724,7 +725,9 @@ rfbProcessClientNormalMessage(cl)
 	if (!isKeyboardEnabled(cl))
 	    return;
 #endif
-	KbdAddEvent(msg.ke.down, (KeySym)Swap32IfLE(msg.ke.key), cl);
+	if (!rfbViewOnly) {
+	    KbdAddEvent(msg.ke.down, (KeySym)Swap32IfLE(msg.ke.key), cl);
+	}
 	return;
 
 
@@ -755,8 +758,10 @@ rfbProcessClientNormalMessage(cl)
 	else
 	    pointerClient = cl;
 
-	PtrAddEvent(msg.pe.buttonMask,
-		    Swap16IfLE(msg.pe.x), Swap16IfLE(msg.pe.y), cl);
+	if (!rfbViewOnly) {
+	    PtrAddEvent(msg.pe.buttonMask,
+			Swap16IfLE(msg.pe.x), Swap16IfLE(msg.pe.y), cl);
+	}
 	return;
 
 
@@ -1411,7 +1416,9 @@ rfbProcessUDPInput(sock)
 	    rfbDisconnectUDPSock();
 	    return;
 	}
-	KbdAddEvent(msg.ke.down, (KeySym)Swap32IfLE(msg.ke.key), 0);
+	if (!rfbViewOnly) {
+	    KbdAddEvent(msg.ke.down, (KeySym)Swap32IfLE(msg.ke.key), 0);
+	}
 	break;
 
     case rfbPointerEvent:
@@ -1420,8 +1427,10 @@ rfbProcessUDPInput(sock)
 	    rfbDisconnectUDPSock();
 	    return;
 	}
-	PtrAddEvent(msg.pe.buttonMask,
-		    Swap16IfLE(msg.pe.x), Swap16IfLE(msg.pe.y), 0);
+	if (!rfbViewOnly) {
+	    PtrAddEvent(msg.pe.buttonMask,
+			Swap16IfLE(msg.pe.x), Swap16IfLE(msg.pe.y), 0);
+	}
 	break;
 
     default:

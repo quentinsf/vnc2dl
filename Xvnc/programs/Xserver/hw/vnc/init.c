@@ -297,6 +297,12 @@ ddxProcessArgument (argc, argv, i)
 	return 1;
     }
 
+    /* Run server in view-only mode - Ehud Karni SW */
+    if (strcmp(argv[i], "-viewonly") == 0) {
+	rfbViewOnly = TRUE;
+	return 1;
+    }
+
     if (strcmp(argv[i], "-localhost") == 0) {
 	interface.s_addr = htonl (INADDR_LOOPBACK);
 	return 1;
@@ -906,6 +912,7 @@ ddxUseMsg()
                                                              "new non-shared\n"
 	   "                       connection comes in (refuse new connection "
 								 "instead)\n");
+    ErrorF("-viewonly              let clients only to view the desktop\n");
     ErrorF("-localhost             only allow connections from localhost\n");
     ErrorF("-interface ipaddr      only bind to specified interface "
 								"address\n");
