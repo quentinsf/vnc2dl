@@ -63,7 +63,7 @@ char *fallback_resources[] = {
   "*passwordDialog.dialog.value.translations: #override\\n\
      <Key>Return: PasswordDialogDone()",
 
-  "*popup.title: VNC popup",
+  "*popup.title: TightVNC popup",
   "*popup*background: grey",
   "*popup*font: -*-helvetica-bold-r-*-*-16-*-*-*-*-*-*-*",
   "*popup.buttonForm.Command.borderWidth: 0",
@@ -133,7 +133,7 @@ AppData appData;
 
 static XtResource appDataResourceList[] = {
   {"shareDesktop", "ShareDesktop", XtRBool, sizeof(Bool),
-   XtOffsetOf(AppData, shareDesktop), XtRImmediate, (XtPointer) False},
+   XtOffsetOf(AppData, shareDesktop), XtRImmediate, (XtPointer) True},
 
   {"viewOnly", "ViewOnly", XtRBool, sizeof(Bool),
    XtOffsetOf(AppData, viewOnly), XtRImmediate, (XtPointer) False},
@@ -210,6 +210,7 @@ static XtResource appDataResourceList[] = {
 
 XrmOptionDescRec cmdLineOptions[] = {
   {"-shared",        "*shareDesktop",       XrmoptionNoArg,  "True"},
+  {"-noshared",      "*shareDesktop",       XrmoptionNoArg,  "False"},
   {"-viewonly",      "*viewOnly",           XrmoptionNoArg,  "True"},
   {"-fullscreen",    "*fullScreen",         XrmoptionNoArg,  "True"},
   {"-passwd",        "*passwordFile",       XrmoptionSepArg, 0},
@@ -275,7 +276,8 @@ usage(void)
 	  "       %s [<options>] -tunnel <host>:<display#>\n"
 	  "\n"
 	  "<options> are standard Xt options, or:\n"
-	  "        -shared\n"
+	  "        -shared (set by default)\n"
+	  "        -noshared\n"
 	  "        -viewonly\n"
 	  "        -fullscreen\n"
 	  "        -passwd <passwd-file>\n"

@@ -70,7 +70,7 @@ Vncviewer.translations:\
 ! Popup window appearance
 !
 
-*popup.title: VNC popup
+*popup.title: TightVNC popup
 *popup*background: grey
 *popup*font: -*-helvetica-bold-r-*-*-16-*-*-*-*-*-*-*
 *popup.buttonForm.Command.borderWidth: 0
