@@ -49,11 +49,11 @@ typedef struct PALETTE_s {
 
 typedef struct PALETTE8_s {
     CARD8 pixelValue[2];
-    int numPixels[2];
     CARD8 colorIdx[256];
 } PALETTE8;
 
 
+static int paletteMaxColors;
 static int paletteNumColors;
 static PALETTE palette;
 static PALETTE8 palette8;
@@ -70,13 +70,14 @@ static BOOL SendSolidRect(rfbClientPtr cl, int w, int h);
 static BOOL SendIndexedRect(rfbClientPtr cl, int w, int h);
 static BOOL SendFullColorRect(rfbClientPtr cl, int w, int h);
 static BOOL CompressData(rfbClientPtr cl, int streamId, int dataLen);
-static void FillPalette(rfbClientPtr cl, int w, int h);
+
+static void FillPalette8(rfbClientPtr cl, int w, int h);
+static void FillPalette16(rfbClientPtr cl, int w, int h);
+static void FillPalette32(rfbClientPtr cl, int w, int h);
 
 static void PaletteReset(void);
 static int PaletteFind(CARD32 rgb);
-static int PaletteInsert(CARD32 rgb);
-static void PaletteReset8(void);
-static int PaletteInsert8(CARD8 value);
+static int PaletteInsert(CARD32 rgb, int numPixels);
 
 static void Pack24(char *buf, rfbPixelFormat *format, int count);
 
@@ -174,10 +175,19 @@ SendSubrect(cl, x, y, w, h)
                        &cl->format, fbptr, tightBeforeBuf,
                        rfbScreen.paddedWidthInBytes, w, h);
 
-    FillPalette(cl, w, h);
+    paletteMaxColors = w * h / 128;
+    switch (cl->format.bitsPerPixel) {
+    case 8:
+        FillPalette8(cl, w, h);
+        break;
+    case 16:
+        FillPalette16(cl, w, h);
+        break;
+    default:
+        FillPalette32(cl, w, h);
+    }
 
     switch (paletteNumColors) {
-
     case 1:
         /* Solid rectangle */
         success = SendSolidRect(cl, w, h);
@@ -188,10 +198,7 @@ SendSubrect(cl, x, y, w, h)
         break;
     default:
         /* Up to 256 different colors */
-        if (w * h >= paletteNumColors * 128)
-            success = SendIndexedRect(cl, w, h);
-        else
-            success = SendFullColorRect(cl, w, h);
+        success = SendIndexedRect(cl, w, h);
     }
     return success;
 }
@@ -220,7 +227,7 @@ SendSolidRect(cl, w, h)
 	    return FALSE;
     }
 
-    updateBuf[ublen++] = (char)0x80;
+    updateBuf[ublen++] = (char)(rfbTightFill << 4);
     memcpy (&updateBuf[ublen], tightBeforeBuf, len);
     ublen += len;
 
@@ -255,7 +262,7 @@ SendIndexedRect(cl, w, h)
         streamId = 3;
         dataLen = w * h;
     }
-    updateBuf[ublen++] = streamId << 4 | 0x40; /* 0x40: filter id follows */
+    updateBuf[ublen++] = (streamId | rfbTightExplicitFilter) << 4;
     updateBuf[ublen++] = rfbTightFilterPalette;
     updateBuf[ublen++] = (char)(paletteNumColors - 1);
 
@@ -406,42 +413,114 @@ CompressData(cl, streamId, dataLen)
 }
 
 
+/*
+ * Code to determine how many different colors used in rectangle.
+ */
+
 static void
-FillPalette(cl, w, h)
+FillPalette8(cl, w, h)
     rfbClientPtr cl;
     int w, h;
 {
-    int i, n;
-    CARD8 *data8 = (CARD8 *)tightBeforeBuf;
-    CARD16 *data16 = (CARD16 *)tightBeforeBuf;
-    CARD32 *data32 = (CARD32 *)tightBeforeBuf;
+    CARD8 *data = (CARD8 *)tightBeforeBuf;
+    CARD8 c0, c1;
+    int i, n0, n1;
 
-    /* Note: this function assumes that fb pointer is 4-byte aligned. */
+    paletteNumColors = 0;
 
-    switch (cl->format.bitsPerPixel) {
-    case 32:
-        PaletteReset();
-        for (i = 0; i <= w * h; i++) {
-            if (!PaletteInsert (data32[i]))
-                return;
+    c0 = data[0];
+    for (i = 1; i < w * h && data[i] == c0; i++);
+    if (i == w * h) {
+        paletteNumColors = 1;
+        return;                 /* Solid rectangle */
+    }
+
+    if (paletteMaxColors < 2)
+        return;
+
+    n0 = i;
+    c1 = data[i];
+    n1 = 0;
+    for (i++; i < w * h; i++) {
+        if (data[i] == c0) {
+            n0++;
+        } else if (data[i] == c1) {
+            n1++;
+        } else
+            break;
+    }
+    if (i == w * h) {
+        if (n1 > n0) {
+            palette8.pixelValue[0] = c0;
+            palette8.pixelValue[1] = c1;
+            palette8.colorIdx[c0] = 0;
+            palette8.colorIdx[c1] = 1;
+        } else {
+            palette8.pixelValue[0] = c1;
+            palette8.pixelValue[1] = c0;
+            palette8.colorIdx[c0] = 1;
+            palette8.colorIdx[c1] = 0;
         }
-        break;
-    case 16:
-        PaletteReset();
-        for (i = 0; i <= w * h; i++) {
-            if (!PaletteInsert ((CARD32)data16[i]))
-                return;
-        }
-        break;
-    default:                    /* bpp == 8 */
-        PaletteReset8();
-        for (i = 0; i <= w * h; i++) {
-            if (!PaletteInsert8 (data8[i]))
-                return;
-        }
-        break;
+        paletteNumColors = 2;   /* Two colors */
     }
 }
+
+#define DEFINE_FILL_PALETTE_FUNCTION(bpp)                               \
+                                                                        \
+static void                                                             \
+FillPalette##bpp(cl, w, h)                                              \
+    rfbClientPtr cl;                                                    \
+    int w, h;                                                           \
+{                                                                       \
+    CARD##bpp *data = (CARD##bpp *)tightBeforeBuf;                      \
+    CARD##bpp c0, c1, ci;                                               \
+    int i, n0, n1, ni;                                                  \
+                                                                        \
+    PaletteReset();                                                     \
+                                                                        \
+    c0 = data[0];                                                       \
+    for (i = 1; i < w * h && data[i] == c0; i++);                       \
+    if (i == w * h) {                                                   \
+        paletteNumColors = 1;                                           \
+        return;                 /* Solid rectangle */                   \
+    }                                                                   \
+                                                                        \
+    if (paletteMaxColors < 2)                                           \
+        return;                                                         \
+                                                                        \
+    n0 = i;                                                             \
+    c1 = data[i];                                                       \
+    n1 = 0;                                                             \
+    for (i++; i < w * h; i++) {                                         \
+        ci = data[i];                                                   \
+        if (ci == c0) {                                                 \
+            n0++;                                                       \
+        } else if (ci == c1) {                                          \
+            n1++;                                                       \
+        } else                                                          \
+            break;                                                      \
+    }                                                                   \
+    PaletteInsert (c0, (CARD32)n0);                                     \
+    PaletteInsert (c1, (CARD32)n1);                                     \
+    if (i == w * h)                                                     \
+        return;                 /* Two colors */                        \
+                                                                        \
+    ni = 1;                                                             \
+    for (i++; i < w * h; i++) {                                         \
+        if (data[i] == ci) {                                            \
+            ni++;                                                       \
+        } else {                                                        \
+            if (!PaletteInsert (ci, (CARD32)ni))                        \
+                return;                                                 \
+            ci = data[i];                                               \
+            ni = 1;                                                     \
+        }                                                               \
+    }                                                                   \
+    PaletteInsert (ci, (CARD32)ni);                                     \
+}
+
+DEFINE_FILL_PALETTE_FUNCTION(16)
+DEFINE_FILL_PALETTE_FUNCTION(32)
 
 
 /*
@@ -465,7 +544,7 @@ PaletteFind(rgb)
     COLOR_LIST *pnode;
     CARD8 *crgb = (CARD8 *)&rgb;
 
-    pnode = palette.hash[(int)(crgb[0] + crgb[1] + crgb[2]) & 0xFF];
+    pnode = palette.hash[(int)(crgb[0]+crgb[1]+crgb[2]+crgb[3]) & 0xFF];
 
     while (pnode != NULL) {
         if (pnode->rgb == rgb)
@@ -476,51 +555,56 @@ PaletteFind(rgb)
 }
 
 static int
-PaletteInsert(rgb)
+PaletteInsert(rgb, numPixels)
     CARD32 rgb;
+    int numPixels;
 {
-    COLOR_LIST *pnode, *new_pnode;
+    COLOR_LIST *pnode;
     COLOR_LIST *prev_pnode = NULL;
     int hash_key, idx, new_idx, count;
     CARD8 *crgb = (CARD8 *)&rgb;
 
-    hash_key = (int)(crgb[0] + crgb[1] + crgb[2]) & 0xFF;
+    hash_key = (int)(crgb[0]+crgb[1]+crgb[2]+crgb[3]) & 0xFF;
     pnode = palette.hash[hash_key];
 
     while (pnode != NULL) {
         if (pnode->rgb == rgb) {
             /* Such palette entry already exists. */
             new_idx = idx = pnode->idx;
-            count = palette.entry[idx].numPixels;
-            if (new_idx && count == palette.entry[new_idx-1].numPixels) {
+            count = palette.entry[idx].numPixels + numPixels;
+            if (new_idx && palette.entry[new_idx-1].numPixels < count) {
                 do {
+                    palette.entry[new_idx] = palette.entry[new_idx-1];
+                    palette.entry[new_idx].listNode->idx = new_idx;
                     new_idx--;
                 }
-                while (new_idx &&
-                       count == palette.entry[new_idx-1].numPixels);
-                /* Preserve sort order */
-                new_pnode = palette.entry[new_idx].listNode;
-                palette.entry[idx].listNode = new_pnode;
+                while (new_idx && palette.entry[new_idx-1].numPixels < count);
                 palette.entry[new_idx].listNode = pnode;
                 pnode->idx = new_idx;
-                new_pnode->idx = idx;
             }
-            palette.entry[new_idx].numPixels++;
+            palette.entry[new_idx].numPixels = count;
             return paletteNumColors;
         }
         prev_pnode = pnode;
         pnode = pnode->next;
     }
 
-    if (paletteNumColors == 256) {
+    /* Check if palette is full. */
+    if (paletteNumColors == 256 || paletteNumColors == paletteMaxColors) {
         paletteNumColors = 0;
         return 0;
     }
 
-    /* Add new palette entry. */
+    /* Move palette entries with lesser pixel counts. */
+    for ( idx = paletteNumColors;
+          idx > 0 && palette.entry[idx-1].numPixels < numPixels;
+          idx-- ) {
+        palette.entry[idx] = palette.entry[idx-1];
+        palette.entry[idx].listNode->idx = idx;
+    }
 
-    idx = paletteNumColors;
-    pnode = &palette.list[idx];
+    /* Add new palette entry into the freed slot. */
+    pnode = &palette.list[paletteNumColors];
     if (prev_pnode != NULL) {
         prev_pnode->next = pnode;
     } else {
@@ -530,59 +614,14 @@ PaletteInsert(rgb)
     pnode->idx = idx;
     pnode->rgb = rgb;
     palette.entry[idx].listNode = pnode;
-    palette.entry[idx].numPixels = 1;
-
-    return (++paletteNumColors);
-}
-
-static void
-PaletteReset8(void)
-{
-    int i;
-
-    paletteNumColors = 0;
-    for (i = 0; i < 256; i++)
-        palette8.colorIdx[i] = 0xFF;
-}
-
-static int
-PaletteInsert8(CARD8 value)
-{
-    int idx;
-
-    idx = palette8.colorIdx[value];
-    if (idx != 0xFF) {
-        /* Such palette entry already exists. */
-        palette8.numPixels[idx]++;
-        if (idx && palette8.numPixels[1] > palette8.numPixels[0]) {
-            /* Preserve sort order */
-            palette8.numPixels[0]++;
-            palette8.numPixels[1]--;
-            palette8.pixelValue[1] = palette8.pixelValue[0];
-            palette8.pixelValue[0] = value;
-            palette8.colorIdx[value] = 0;
-            palette8.colorIdx[palette8.pixelValue[1]] = 1;
-        }
-        return paletteNumColors;
-    }
-    if (paletteNumColors == 2) {
-        paletteNumColors = 0;
-        return 0;
-    }
-
-    /* Add new palette entry. */
-
-    idx = paletteNumColors;
-    palette8.colorIdx[value] = idx;
-    palette8.pixelValue[idx] = value;
-    palette8.numPixels[idx] = 1;
+    palette.entry[idx].numPixels = numPixels;
 
     return (++paletteNumColors);
 }
 
 
 /*
- * Converting from 32-bit color samples to 24-bit colors.
+ * Converting 32-bit color samples into 24-bit colors.
  * Should be called only when redMax, greenMax and blueMax are 256.
  */
 
@@ -604,41 +643,42 @@ static void Pack24(buf, format, count)
 
 
 /*
- * Most ugly part.
+ * Converting truecolor samples into palette indices.
  */
 
 #define PaletteFind8(c)  palette8.colorIdx[(c)]
 #define PaletteFind16    PaletteFind
 #define PaletteFind32    PaletteFind
 
-#define DEFINE_IDX_ENCODE_FUNCTION(bpp)					     \
-									     \
-static void								     \
-EncodeIndexedRect##bpp(buf, w, h)					     \
-    CARD8 *buf;								     \
-    int w, h;								     \
-{									     \
-    int x, y, i, width_bytes;						     \
-									     \
-    if (paletteNumColors != 2) {					     \
-      for (i = 0; i < w * h; i++)					     \
-        buf[i] = (CARD8)PaletteFind(((CARD##bpp *)buf)[i]);		     \
-      return;								     \
-    }									     \
-									     \
-    width_bytes = (w + 7) / 8;						     \
-    for (y = 0; y < h; y++) {						     \
-      for (x = 0; x < w / 8; x++) {					     \
-        for (i = 0; i < 8; i++)						     \
-          buf[y*width_bytes+x] = (buf[y*width_bytes+x] << 1) |		     \
-            (PaletteFind##bpp (((CARD##bpp *)buf)[y*w+x*8+i]) & 1);	     \
-      }									     \
-      buf[y*width_bytes+x] = 0;						     \
-      for (i = 0; i < w % 8; i++) {					     \
-        buf[y*width_bytes+x] |=						     \
-          (PaletteFind##bpp (((CARD##bpp *)buf)[y*w+x*8+i]) & 1) << (7 - i); \
-      }									     \
-    }									     \
+#define DEFINE_IDX_ENCODE_FUNCTION(bpp)                                 \
+                                                                        \
+static void                                                             \
+EncodeIndexedRect##bpp(buf, w, h)                                       \
+    CARD8 *buf;                                                         \
+    int w, h;                                                           \
+{                                                                       \
+    int x, y, i, width_bytes;                                           \
+                                                                        \
+    if (paletteNumColors != 2) {                                        \
+      for (i = 0; i < w * h; i++)                                       \
+        buf[i] = (CARD8)PaletteFind(((CARD##bpp *)buf)[i]);             \
+      return;                                                           \
+    }                                                                   \
+                                                                        \
+    width_bytes = (w + 7) / 8;                                          \
+    for (y = 0; y < h; y++) {                                           \
+      for (x = 0; x < w / 8; x++) {                                     \
+        for (i = 0; i < 8; i++)                                         \
+          buf[y*width_bytes+x] = (buf[y*width_bytes+x] << 1) |          \
+            (PaletteFind##bpp (((CARD##bpp *)buf)[y*w+x*8+i]) & 1);     \
+      }                                                                 \
+      buf[y*width_bytes+x] = 0;                                         \
+      for (i = 0; i < w % 8; i++) {                                     \
+        buf[y*width_bytes+x] |=                                         \
+          (PaletteFind##bpp (((CARD##bpp *)buf)[y*w+x*8+i]) & 1) <<     \
+            (7 - i);                                                    \
+      }                                                                 \
+    }                                                                   \
 }
 
 DEFINE_IDX_ENCODE_FUNCTION(8)

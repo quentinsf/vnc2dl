@@ -442,8 +442,8 @@ typedef struct {
  * ``Tight'' Encoding.  FIXME: Add more documentation.
  */
 
-/* FIXME: either remove this or add other constants */
-#define rfbTightFill  0x08
+#define rfbTightFill                   0x08
+#define rfbTightExplicitFilter         0x04
 
 /* Filters to improve compression efficiency */
 #define rfbTightFilterCopy             0x00
