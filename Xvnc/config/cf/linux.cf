@@ -259,6 +259,13 @@ XCOMM binutils:	(LinuxBinUtilsMajorVersion)
 #define ServerExtraDefines	-DGCCUSESGAS XFree86ServerDefines
 #endif /* Mc68020Architecture */
 
+#ifdef PowerPCArchitecture
+#define OptimizedCDebugFlags   -O2
+#define LinuxMachineDefines    -D__powerpc__
+#define ServerOSDefines                XFree86ServerOSDefines -DDDXTIME -DPART_NET
+#define ServerExtraDefines     -DGCCUSESGAS XFree86ServerDefines
+#endif /* PowerPCArchitecture */
+
 /*================================================================
    BEGIN ORL VNC modification
    Always define _REENTRANT since we may use threaded libraries */
