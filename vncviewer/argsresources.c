@@ -290,8 +290,8 @@ usage(void)
 	  "        -owncmap\n"
 	  "        -truecolour\n"
 	  "        -depth <depth>\n"
-	  "        -compresslevel <compress-value> (0-9)\n"
-	  "        -quality <image-quality-value> (0-9)\n"
+	  "        -compresslevel <compress-value> (0..9: 0-least, 9-best)\n"
+	  "        -quality <jpeg-quality-value> (0..9: 0-least, 9-best)\n"
 	  "        -nocursorshape\n"
 	  "\n", programName, programName, programName);
   exit(1);
