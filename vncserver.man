@@ -15,7 +15,6 @@
 .SH NAME
 vncserver \- a wrapper to launch an X server for VNC.
 .SH SYNOPSIS
-.B vncserver 
 \fBvncserver\fR
 [:\fIdisplay\fR] [\-geometry \fIwidth\fRx\fIheight\fR] [\-depth \fIdepth\fR]
 [\-pixelformat rgb\fINNN\fR|bgr\fINNN\fR] [\-name \fIdesktop\-name\fR]
