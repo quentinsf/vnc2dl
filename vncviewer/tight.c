@@ -92,6 +92,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
   /* Flush zlib streams if we are told by the server to do so. */
   for (stream_id = 0; stream_id < 4; stream_id++) {
     if ((comp_ctl & 1) && zlibStreamActive[stream_id]) {
+      fprintf(stderr, "DEBUG: Resetting zlib stream #%d.\n", stream_id);
       if (inflateEnd (&zlibStream[stream_id]) != Z_OK)
         fprintf(stderr, "inflateEnd: %s\n",
                 zlibStream[stream_id].msg); /* DEBUG */
@@ -100,6 +101,8 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
     comp_ctl >>= 1;
   }
 
+  fprintf(stderr, "DEBUG: Subencoding value %d.\n", (int)comp_ctl);
+
   /* Handle solid rectangles. */
   if (comp_ctl == rfbTightFill) {
 #if BPP == 32
@@ -107,7 +110,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
         myFormat.greenMax == 0xFF && myFormat.blueMax == 0xFF) {
       if (!ReadFromRFBServer(buffer, 3))
         return False;
-      fill_colour = RGB24_TO_PIXEL32(buffer[1], buffer[2], buffer[3]);
+      fill_colour = RGB24_TO_PIXEL32(buffer[0], buffer[1], buffer[2]);
     } else {
       if (!ReadFromRFBServer((char*)&fill_colour, sizeof(fill_colour)))
         return False;
@@ -123,8 +126,11 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
   }
 
   /* Quit on unsupported subencoding value. */
-  if (comp_ctl >=8)
+  if (comp_ctl >=8) {
+    /* DEBUG: Text of the message should be changed. */
+    fprintf(stderr, "Tight encoding: bad subencoding value received.\n");
     return False;
+  }
 
   /*
    * Here primary compression mode handling begins.
@@ -135,6 +141,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
   if (comp_ctl >= 4) {
     if (!ReadFromRFBServer((char*)&filter_id, 1))
       return False;
+    fprintf(stderr, "DEBUG: Filter id %d.\n", (int)filter_id);
     switch (filter_id) {
     case rfbTightFilterCopy:
       filterFn = FilterCopyBPP;
@@ -149,19 +156,27 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
       bitsPixel = InitFilterGradientBPP(rw, rh);
       break;
     delault:
+      /* DEBUG: Text of the message should be changed. */
+      fprintf(stderr, "Tight encoding: unknown filter code received.\n");
       return False;
     }
   } else {
     filterFn = FilterCopyBPP;
     bitsPixel = InitFilterCopyBPP(rw, rh);
   }
-  if (bitsPixel == 0)
-    return False;               /* Filter initialization failed. */
+  if (bitsPixel == 0) {
+    /* DEBUG: Text of the message should be changed. */
+    fprintf(stderr, "Tight encoding: error receiving palette.\n");
+    return False;
+  }
 
   /* Read the length (1..3 bytes) of compressed data following. */
   compressedLen = ReadCompactLen();
-  if (compressedLen < 0)
+  fprintf(stderr, "DEBUG: Compressed size is %d.\n", compressedLen);
+  if (compressedLen < 0) {
+    fprintf(stderr, "Incorrect data received from the server.\n");
     return False;
+  }
 
   /* Now let's initialize compression stream if needed. */
   stream_id = comp_ctl & 0x03;
@@ -171,8 +186,10 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
     zs->zfree = Z_NULL;
     zs->opaque = Z_NULL;
     err = inflateInit(zs);
-    if (err != Z_OK)
+    if (err != Z_OK) {
+      fprintf(stderr, "InflateInit error: %s.\n", zs->msg);
       return False;
+    }
     zlibStreamActive[stream_id] = True;
   }
 
@@ -181,8 +198,11 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
   bufferSize = BUFFER_SIZE * bitsPixel / (bitsPixel + BPP) & 0xFFFFFFFC;
   buffer2 = &buffer[bufferSize];
   rowSize = (rw * bitsPixel + 7) / 8;
-  if (rowSize > bufferSize)
-    return False;               /* Impossible when BUFFER_SIZE >= 16384 */
+  if (rowSize > bufferSize) {
+    /* Should be impossible when BUFFER_SIZE >= 16384 */
+    fprintf(stderr, "Internal error: incorrect buffer size.\n");
+    return False;
+  }
 
   rowsProcessed = 0;
   extraBytes = 0;
@@ -207,7 +227,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
 
       err = inflate(zs, Z_SYNC_FLUSH);
       if (err != Z_OK && err != Z_STREAM_END) {
-        fprintf(stderr, "inflate: %s\n", zs->msg);
+        fprintf(stderr, "Inflate error: %s.\n", zs->msg);
         return False;
       }
 
@@ -225,8 +245,10 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
     while (zs->avail_out == 0);
   }
 
-  if (rowsProcessed != rh)
+  if (rowsProcessed != rh) {
+    fprintf(stderr, "Incorrect number of scan lines after decompression.\n");
     return False;
+  }
 
   return True;
 }
@@ -400,14 +422,16 @@ FilterGradientBPP (int numRows, CARDBPP *dst)
 static int
 InitFilterPaletteBPP (int rw, int rh)
 {
-  CARD8 numColors;
-  CARDBPP *palette;
   int i;
+  CARD8 numColors;
+  CARDBPP *palette = (CARDBPP *)tightPalette;
 
   rectWidth = rw;
 
   if (!ReadFromRFBServer((char*)&numColors, 1))
     return 0;
+
+  fprintf(stderr, "DEBUG: Palette size is %d.\n", (int)numColors + 1);
 
   rectColors = (int)numColors;
   if (++rectColors < 2)
@@ -418,7 +442,6 @@ InitFilterPaletteBPP (int rw, int rh)
       myFormat.greenMax == 0xFF && myFormat.blueMax == 0xFF) {
     if (!ReadFromRFBServer((char*)&tightPalette, rectColors * 3))
       return 0;
-    palette = (CARDBPP *)tightPalette;
     for (i = rectColors - 1; i >= 0; i--) {
       palette[i] = RGB24_TO_PIXEL32(tightPalette[i*3],
                                     tightPalette[i*3+1],
@@ -439,22 +462,23 @@ FilterPaletteBPP (int numRows, CARDBPP *dst)
 {
   int x, y, b, w;
   CARD8 *src = (CARD8 *)buffer;
+  CARDBPP *palette = (CARDBPP *)tightPalette;
 
   if (rectColors == 2) {
     w = (rectWidth + 7) / 8;
     for (y = 0; y < numRows; y++) {
       for (x = 0; x < rectWidth / 8; x++) {
         for (b = 7; b >= 0; b--)
-          dst[y*rectWidth+x] = tightPalette[src[y*w+x] >> b & 1];
+          dst[y*rectWidth+x*8+7-b] = palette[src[y*w+x] >> b & 1];
       }
       for (b = 7; b >= 8 - rectWidth % 8; b--) {
-        dst[y*rectWidth+x] = tightPalette[src[y*w+x] >> b & 1];
+        dst[y*rectWidth+x*8+7-b] = palette[src[y*w+x] >> b & 1];
       }
     }
   } else {
     for (y = 0; y < numRows; y++)
       for (x = 0; x < rectWidth; x++)
-        dst[y*rectWidth+x] = tightPalette[(int)src[y*rectWidth+x]];
+        dst[y*rectWidth+x] = palette[(int)src[y*rectWidth+x]];
   }
 }
 
