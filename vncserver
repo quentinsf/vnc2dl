@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 #
+#  Copyright (C) 2002 Constantin Kaplinsky.  All Rights Reserved.
 #  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
 #
 #  This is free software; you can redistribute it and/or modify
@@ -36,6 +37,7 @@ $geometry = "1024x768";
 $depth = 24;
 $desktopName = "X";
 $vncClasses = "/usr/local/vnc/classes";
+$vncUserDir = "$ENV{HOME}/.vnc";
 $fontPath = "unix/:7100";
 
 # Here is another example of setting the font path:
@@ -44,36 +46,33 @@ $fontPath = "unix/:7100";
 # X colors database path is optional, uncomment and edit to use:
 # $colorPath = "/usr/lib/X11/rgb";
 
-# Set to non-zero to enable user directories and .Xauthority under /tmp.
-$vncUserDirUnderTmp = 0;
+# You might wish to make your vnc directory under /tmp, to make sure
+# passwords are always kept on the local filesystem. To do that, just
+# uncomment the line below. Note that in this case Xvnc's .Xauthority
+# file will be searched in the same $vncUserDir directory by default,
+# and $ENV{HOME}/.vncstartup will be executed instead of usual
+# $vncUserDir/xstartup.
+#
+# $vncUserDir = "/tmp/$ENV{USER}-vnc";
 
-# Do not change the $vncUserDir directly, vncpasswd uses default values!.
-$vncUserDir = ($vncUserDirUnderTmp) ?
-  "/tmp/$ENV{USER}-vnc" : "$ENV{HOME}/.vnc";
-
-unless ($xauthorityFile = "$ENV{XAUTHORITY}") {
-  $xauthorityFile = "$ENV{HOME}/.Xauthority";
-}
-
-if ($vncUserDirUnderTmp) {
-  $xauthorityFile = "$vncUserDir/.Xauthority";
-  $defaultXStartup
-    = ("#!/bin/sh\n\n".
-       "XAUTHORITY=$xauthorityFile; export XAUTHORITY\n".
-       "if [ -x \$HOME/.vncxsession ]; then\n".
-       "  exec \$HOME/.vncxsession\n".
-       "fi\n".
-       "xrdb \$HOME/.Xresources\n".
-       "xsetroot -solid grey\n".
-       "xterm -geometry 80x24+10+10 -ls -title \"\$VNCDESKTOP Desktop\" &\n".
-       "twm &\n");
-} else {
-  $defaultXStartup
+$defaultXStartup
     = ("#!/bin/sh\n\n".
        "xrdb \$HOME/.Xresources\n".
        "xsetroot -solid grey\n".
        "xterm -geometry 80x24+10+10 -ls -title \"\$VNCDESKTOP Desktop\" &\n".
        "twm &\n");
+
+$xauthorityFile = "$ENV{XAUTHORITY}";
+
+$vncUserDirUnderTmp = ($vncUserDir =~ m|^/tmp/.+|) ? 1 : 0;
+$xstartup = ($vncUserDirUnderTmp) ?
+  "$ENV{HOME}/.vncstartup" : "$vncUserDir/xstartup";
+if (!xauthorityFile) {
+    if ($vncUserDirUnderTmp) {
+        $xauthorityFile = "$vncUserDir/.Xauthority";
+    } else {
+        $xauthorityFile = "$ENV{HOME}/.Xauthority";
+    }
 }
 
 chop($host = `uname -n`);
@@ -109,23 +108,28 @@ if ($opt{'-name'}) {
     $desktopName = $opt{'-name'};
 }
 
+# Create the user's vnc directory if necessary.
 
-# Make sure the user's directory exists and the user has a password.
-
-$needPasswd = 0;
-if (!(-e $vncUserDir)) {
-    $needPasswd = 1;
-} else {
-    ($z,$z,$mode) = stat("$vncUserDir/passwd");
-    if (!(-e "$vncUserDir/passwd") || ($mode & 077)) {
-        $needPasswd = 1;
+if (!-e $vncUserDir) {
+    if (!mkdir($vncUserDir, 0700)) {
+        die "$prog: Could not create $vncUserDir.\n";
     }
 }
-if ($needPasswd) {
-    $vncpasswdOptions = ($vncUserDirUnderTmp) ? '-t' : '';
+($z,$z,$mode) = lstat("$vncUserDir");
+if (!-d _ || !-o _ || ($vncUserDirUnderTmp && ($mode & 0777) != 0700)) {
+    die "$prog: Wrong type or access mode of $vncUserDir.\n";
+}
+
+# Make sure the user has a password.
+
+($z,$z,$mode) = lstat("$vncUserDir/passwd");
+if (-e _ && (!-f _ || !-o _)) {
+    die "$prog: Wrong type or ownership on $vncUserDir/passwd.\n";
+}
+if (!-e _ || ($mode & 077) != 0) {
     warn "\nYou will require a password to access your desktops.\n\n";
-    system("vncpasswd $vncpasswdOptions");
-    if (($? >> 8) != 0) {
+    system("vncpasswd $vncUserDir/passwd");
+    if (($? & 0xFF00) != 0) {
         exit 1;
     }
 }
@@ -209,17 +213,17 @@ warn "\nNew '$desktopName' desktop is $host:$displayNumber\n\n";
 
 # Create the user's xstartup script if necessary.
 
-if (!(-e "$vncUserDir/xstartup")) {
-    warn "Creating default startup script $vncUserDir/xstartup\n";
-    open(XSTARTUP, ">$vncUserDir/xstartup");
+if (!-e "$xstartup") {
+    warn "Creating default startup script $xstartup\n";
+    open(XSTARTUP, ">$xstartup");
     print XSTARTUP $defaultXStartup;
     close(XSTARTUP);
-    chmod 0755, "$vncUserDir/xstartup";
+    chmod 0755, "$xstartup";
 }
 
 # Run the X startup script.
 
-warn "Starting applications specified in $vncUserDir/xstartup\n";
+warn "Starting applications specified in $xstartup\n";
 warn "Log file is $desktopLog\n\n";
 
 # If the unix domain socket exists then use that (DISPLAY=:n) otherwise use
@@ -232,7 +236,7 @@ if (-e "/tmp/.X11-unix/X$displayNumber") {
 }
 $ENV{VNCDESKTOP}= $desktopName;
 
-system("$vncUserDir/xstartup >> " . &quotedString($desktopLog) . " 2>&1 &");
+system("$xstartup >> " . &quotedString($desktopLog) . " 2>&1 &");
 
 exit;
 
