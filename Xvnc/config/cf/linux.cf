@@ -269,17 +269,17 @@ XCOMM binutils:	(LinuxBinUtilsMajorVersion)
 #endif /* Mc68020Architecture */
 
 #ifdef s390Architecture
-#define OptimzedCDebugFlags     -O2
-#define LinuxMachineDefines     -D__s390__
-#define ServerOSDefines     XFree86ServerOSDefines -DDDXTIME -DPART_NET
-#define ServerExtraDefines  -DGCCUSESGAS XFree86ServerDefines
+#define OptimzedCDebugFlags	-O2
+#define LinuxMachineDefines	-D__s390__
+#define ServerOSDefines		XFree86ServerOSDefines -DDDXTIME -DPART_NET
+#define ServerExtraDefines	-DGCCUSESGAS XFree86ServerDefines
 #endif /* s390Architecture */
 
 #ifdef s390xArchitecture
-#define OptimzedCDebugFlags     -O2
-#define LinuxMachineDefines     -D__s390x__
-#define ServerOSDefines     XFree86ServerOSDefines -DDDXTIME -DPART_NET
-#define ServerExtraDefines  -DGCCUSESGAS XFree86ServerDefines
+#define OptimzedCDebugFlags	-O2
+#define LinuxMachineDefines	-D__s390x__
+#define ServerOSDefines		XFree86ServerOSDefines -DDDXTIME -DPART_NET
+#define ServerExtraDefines	-DGCCUSESGAS XFree86ServerDefines
 #endif /* s390xArchitecture */
 
 #ifdef PowerPCArchitecture
@@ -291,11 +291,11 @@ XCOMM binutils:	(LinuxBinUtilsMajorVersion)
 #endif /* PowerPCArchitecture */
 
 #ifdef ArmArchitecture
-#define DefaultCCOptions        -fsigned-char
-#define OptimizedCDebugFlags   -O2
-#define LinuxMachineDefines    -D__arm__
-#define ServerOSDefines                XFree86ServerOSDefines -DDDXTIME -DPART_NET
-#define ServerExtraDefines     -DGCCUSESGAS XFree86ServerDefines
+#define DefaultCCOptions	-fsigned-char
+#define OptimizedCDebugFlags	-O2
+#define LinuxMachineDefines	-D__arm__
+#define ServerOSDefines		XFree86ServerOSDefines -DDDXTIME -DPART_NET
+#define ServerExtraDefines	-DGCCUSESGAS XFree86ServerDefines
 #endif /* Arm */
 
 #ifdef SparcArchitecture
