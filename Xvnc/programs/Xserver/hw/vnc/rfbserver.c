@@ -143,6 +143,7 @@ rfbNewClient(sock)
     cl->sock = sock;
     getpeername(sock, (struct sockaddr *)&addr, &addrlen);
     cl->host = strdup(inet_ntoa(addr.sin_addr));
+    cl->login = NULL;
 
     /* Dispatch client input to rfbProcessClientProtocolVersion(). */
     cl->state = RFB_PROTOCOL_VERSION;
@@ -231,7 +232,12 @@ rfbClientConnectionGone(sock)
 	return;
     }
 
-    rfbLog("Client %s gone\n",cl->host);
+    if (cl->login != NULL) {
+	rfbLog("Client %s (%s) gone\n", cl->login, cl->host);
+	free(cl->login);
+    } else {
+	rfbLog("Client %s gone\n", cl->host);
+    }
     free(cl->host);
 
     /* Release the compression state structures if any. */

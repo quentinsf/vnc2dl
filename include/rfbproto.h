@@ -327,6 +327,14 @@ typedef struct _rfbConnFailedMsg {
 
 
 /*-----------------------------------------------------------------------------
+ * Alternate login-style Unix authentication (protocol version 3.130).
+ */
+
+#define rfbUnixLoginAuth 129
+#define sig_rfbUnixLoginAuth "ULGNAUTH"
+
+
+/*-----------------------------------------------------------------------------
  * Client Initialisation Message
  *
  * Once the client and server are sure that they're happy to talk to one

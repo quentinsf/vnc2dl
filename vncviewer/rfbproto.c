@@ -35,6 +35,7 @@ static Bool SetupTunneling(void);
 static Bool PerformAuthenticationNew(void);
 static Bool PerformAuthenticationOld(void);
 static Bool AuthenticateVNC(void);
+static Bool AuthenticateUnixLogin(void);
 static Bool ReadInteractionCaps(void);
 static Bool ReadCapabilityList(CapsContainer *caps, int count);
 
@@ -143,6 +144,8 @@ InitCapabilities(void)
   /* Supported authentication methods */
   CapsAdd(authCaps, rfbVncAuth, rfbStandardVendor, sig_rfbVncAuth,
 	  "Standard VNC password authentication");
+  CapsAdd(authCaps, rfbUnixLoginAuth, rfbTightVncVendor, sig_rfbUnixLoginAuth,
+	  "Login-style Unix authentication");
 
   /* Supported encoding types */
   CapsAdd(encodingCaps, rfbEncodingCopyRect, rfbStandardVendor,
@@ -246,14 +249,13 @@ InitialiseRFBConnection(void)
   if (!WriteExact(rfbsock, pv, sz_rfbProtocolVersionMsg))
     return False;
 
-  /* Setup tunneling, only for protocol version 3.130 */
   if (viewer_minor >= 130) {
-    if (!SetupTunneling())
+    if (!SetupTunneling())      /* setup tunneling in protocol 3.130 */
       return False;
-    if (!PerformAuthenticationNew())
+    if (!PerformAuthenticationNew()) /* authentication in protocol 3.130 */
       return False;
   } else {
-    if (!PerformAuthenticationOld())
+    if (!PerformAuthenticationOld()) /* authentication in protocol 3.3 */
       return False;
   }
 
@@ -345,6 +347,7 @@ PerformAuthenticationNew(void)
 {
   rfbAuthenticationCapsMsg caps;
   CARD32 authScheme;
+  int i;
 
   /* In the protocol version 3.130, the server informs us about supported
      authentication schemes supported. Here we read this information. */
@@ -360,20 +363,43 @@ PerformAuthenticationNew(void)
   }
 
   if (!caps.nAuthTypes) {
-    fprintf(stderr,"No authentication needed\n");
-  } else {
-    if (!ReadCapabilityList(authCaps, caps.nAuthTypes))
-      return False;
-
-    /* Request standard VNC authentication. */
-    authScheme = Swap32IfLE(rfbVncAuth);
-    if (!WriteExact(rfbsock, (char *)&authScheme, sizeof(authScheme)))
-      return False;
-    if (!AuthenticateVNC())
-      return False;
+    fprintf(stderr, "No authentication needed\n");
+    return True;
   }
 
-  return True;
+  if (!ReadCapabilityList(authCaps, caps.nAuthTypes))
+    return False;
+
+  /* Prefer Unix login authentication if a user name was given. */
+  if (appData.userLogin && CapsIsEnabled(authCaps, rfbUnixLoginAuth)) {
+    authScheme = Swap32IfLE(rfbUnixLoginAuth);
+    if (!WriteExact(rfbsock, (char *)&authScheme, sizeof(authScheme)))
+      return False;
+    return AuthenticateUnixLogin();
+  }
+
+  /* Otherwise, try server's preferred authentication scheme. */
+  for (i = 0; i < CapsNumEnabled(authCaps); i++) {
+    authScheme = CapsGetByOrder(authCaps, i);
+    if (authScheme != rfbUnixLoginAuth && authScheme != rfbVncAuth)
+      continue;                 /* unknown scheme - cannot use it */
+    authScheme = Swap32IfLE(authScheme);
+    if (!WriteExact(rfbsock, (char *)&authScheme, sizeof(authScheme)))
+      return False;
+    authScheme = Swap32IfLE(authScheme); /* convert it back */
+    if (authScheme == rfbUnixLoginAuth) {
+      return AuthenticateUnixLogin();
+    } else if (authScheme == rfbVncAuth) {
+      return AuthenticateVNC();
+    } else {
+      /* Should never happen. */
+      fprintf(stderr, "Assertion failed: unknown authentication scheme\n");
+      return False;
+    }
+  }
+
+  fprintf(stderr, "No suitable authentication schemes offered by server\n");
+  return False;
 }
 
 
@@ -481,6 +507,78 @@ AuthenticateVNC(void)
 
   return True;
 }
+
+/*
+ * Unix login-style authentication.
+ */
+
+static Bool
+AuthenticateUnixLogin(void)
+{
+  CARD32 loginLen, passwdLen, authResult;
+  char *login;
+  char *passwd;
+  struct passwd *ps;
+
+  fprintf(stderr, "Performing Unix login-style authentication\n");
+
+  if (appData.userLogin) {
+    login = appData.userLogin;
+  } else {
+    ps = getpwuid(getuid());
+    login = ps->pw_name;
+  }
+
+  fprintf(stderr, "Using user name \"%s\"\n", login);
+
+  if (appData.passwordDialog) {
+    passwd = DoPasswordDialog();
+  } else {
+    passwd = getpass("Password: ");
+  }
+  if (!passwd || strlen(passwd) == 0) {
+    fprintf(stderr, "Reading password failed\n");
+    return False;
+  }
+
+  loginLen = Swap32IfLE((CARD32)strlen(login));
+  passwdLen = Swap32IfLE((CARD32)strlen(passwd));
+
+  if (!WriteExact(rfbsock, (char *)&loginLen, sizeof(loginLen)) ||
+      !WriteExact(rfbsock, (char *)&passwdLen, sizeof(passwdLen)))
+    return False;
+
+  if (!WriteExact(rfbsock, login, strlen(login)) ||
+      !WriteExact(rfbsock, passwd, strlen(passwd)))
+    return False;
+
+  /* Lose the password from memory */
+  memset(passwd, '\0', strlen(passwd));
+
+  if (!ReadFromRFBServer((char *)&authResult, sizeof(authResult)))
+    return False;
+
+  authResult = Swap32IfLE(authResult);
+
+  switch (authResult) {
+  case rfbVncAuthOK:
+    fprintf(stderr, "Authentication succeeded\n");
+    break;
+  case rfbVncAuthFailed:
+    fprintf(stderr, "Authentication failed\n");
+    return False;
+  case rfbVncAuthTooMany:
+    fprintf(stderr, "Authentication failed - too many tries\n");
+    return False;
+  default:
+    fprintf(stderr, "Unknown authentication result: %d\n",
+	    (int)authResult);
+    return False;
+  }
+
+  return True;
+}
+
 
 /*
  * In the protocol version 3.130, the server informs us about supported
@@ -1211,6 +1309,7 @@ ReadCompactLen (void)
   }
   return len;
 }
+
 
 /*
  * JPEG source manager functions for JPEG decompression in Tight decoder.

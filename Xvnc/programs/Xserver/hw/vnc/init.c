@@ -54,6 +54,7 @@ from the X Consortium.
 /* Use ``#define CORBA'' to enable CORBA control interface */
 
 #include <stdio.h>
+#include <unistd.h>
 #include <stdarg.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -246,6 +247,14 @@ ddxProcessArgument (argc, argv, i)
 	if (i + 1 >= argc) UseMsg();
 	rfbAuthPasswdFile = argv[i+1];
 	return 2;
+    }
+
+    if (strcmp(argv[i], "-loginauth") == 0) {
+	if (geteuid() == 0) {
+	    /* Only when run as root! */
+	    loginAuthEnabled = TRUE;
+	}
+	return 1;
     }
 
     if (strcmp(argv[i], "-httpd") == 0) {

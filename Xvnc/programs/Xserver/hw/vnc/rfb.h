@@ -127,6 +127,7 @@ typedef struct rfbClientRec {
 
     int sock;
     char *host;
+    char *login;
 
     int protocol_minor_ver;	/* RFB protocol minor version in use. */
 
@@ -136,7 +137,7 @@ typedef struct rfbClientRec {
 	RFB_PROTOCOL_VERSION,	/* establishing protocol version */
 	RFB_TUNNELING_TYPE,	/* establishing tunneling (RFB v.3.130) */
 	RFB_AUTH_TYPE,		/* negotiating authentication (RFB v.3.130) */
-	RFB_AUTHENTICATION,	/* authenticating */
+	RFB_AUTHENTICATION,	/* authenticating (VNC authentication) */
 	RFB_INITIALISATION,	/* sending initialisation messages */
 	RFB_NORMAL		/* normal protocol messages */
     } state;
@@ -497,6 +498,12 @@ extern Bool rfbAuthConsiderBlocking(void);
 extern void rfbAuthUnblock(void);
 extern Bool rfbAuthIsBlocked(void);
 
+
+/* loginauth.c */
+
+extern Bool loginAuthEnabled;
+
+extern void rfbLoginAuthProcessClientMessage(rfbClientPtr cl);
 
 /* rre.c */
 

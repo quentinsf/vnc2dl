@@ -27,7 +27,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <unistd.h>
+#include <pwd.h>
 #include <X11/IntrinsicP.h>
 #include <X11/StringDefs.h>
 #include <X11/Shell.h>
@@ -85,6 +87,8 @@ typedef struct {
 
   int wmDecorationWidth;
   int wmDecorationHeight;
+
+  char *userLogin;
 
   char *passwordFile;
   Bool passwordDialog;

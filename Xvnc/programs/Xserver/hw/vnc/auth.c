@@ -42,7 +42,8 @@ static void rfbAuthSendChallenge(rfbClientPtr cl);
  * rfbNoAuth.  Otherwise we send rfbVncAuth plus the challenge.
  *
  * NOTE: In the protocol version 3.130, the things are a little bit more
- * complicated.
+ * complicated. Also, new rfbUnixLoginAuth scheme is supported in the
+ * protocol version 3.130 (see loginauth.c).
  */
 
 void
@@ -52,22 +53,32 @@ rfbAuthNewClient(cl)
     Bool authRequired;
     CARD32 scheme;
 
-    if (rfbAuthPasswdFile && !cl->reverseConnection) {
+    if ((!rfbAuthPasswdFile && !loginAuthEnabled) || cl->reverseConnection) {
+	authRequired = FALSE;
+	scheme = Swap32IfLE(rfbNoAuth);
+    } else {
 	if (rfbAuthIsBlocked()) {
 	    rfbLog("Too many authentication failures - client rejected\n");
 	    rfbClientConnFailed(cl, "Too many authentication failures");
 	    return;
 	}
 	authRequired = TRUE;
-	scheme = Swap32IfLE(rfbVncAuth);
-    } else {
-	authRequired = FALSE;
-	scheme = Swap32IfLE(rfbNoAuth);
+	if (rfbAuthPasswdFile) {
+	    scheme = Swap32IfLE(rfbVncAuth);
+	} else {
+	    scheme = Swap32IfLE(rfbUnixLoginAuth);
+	}
     }
 
     if (cl->protocol_minor_ver >= 130) {
 	rfbAuthSendCaps(cl, authRequired);
     } else {
+	if (authRequired && scheme != Swap32IfLE(rfbVncAuth)) {
+	    rfbLog("VNC authentication disabled - RFB3.3 client rejected\n");
+	    rfbClientConnFailed(cl, "VNC authentication disabled, "
+				"please use an RFB 3.130 compatible viewer");
+	    return;
+	}
 	if (WriteExact(cl->sock, (char *)&scheme, sizeof(scheme)) < 0) {
 	    rfbLogPerror("rfbAuthNewClient: write");
 	    rfbCloseSock(cl->sock);
@@ -94,20 +105,33 @@ rfbAuthSendCaps(cl, authRequired)
     Bool authRequired;
 {
     rfbAuthenticationCapsMsg caps;
-    rfbCapabilityInfo cap;
+    rfbCapabilityInfo caplist[2];
+    int count = 0;
+
+    if (authRequired) {
+	if (loginAuthEnabled)
+	    SetCapInfo(&caplist[count++], rfbUnixLoginAuth, rfbTightVncVendor);
+	if (rfbAuthPasswdFile != NULL)
+	    SetCapInfo(&caplist[count++], rfbVncAuth, rfbStandardVendor);
+	if (count == 0) {
+	    /* Should never happen. */
+	    rfbLog("rfbAuthSendCaps: assertion failed\n");
+	    rfbCloseSock(cl->sock);
+	    return;
+	}
+    }
 
     caps.connFailed = FALSE;
-    caps.nAuthTypes = Swap16IfLE(!!authRequired);
+    caps.nAuthTypes = Swap16IfLE(count);
     if (WriteExact(cl->sock, (char *)&caps, sz_rfbAuthenticationCapsMsg) < 0) {
 	rfbLogPerror("rfbAuthSendCaps: write");
 	rfbCloseSock(cl->sock);
 	return;
     }
 
-    if (authRequired) {
-	/* Inform the client that we support standard VNC authentication. */
-	SetCapInfo(&cap, rfbVncAuth, rfbStandardVendor);
-	if (WriteExact(cl->sock, (char *)&cap, sz_rfbCapabilityInfo) < 0) {
+    if (count) {
+	if (WriteExact(cl->sock, (char *)&caplist[0],
+		       count * sz_rfbCapabilityInfo) < 0) {
 	    rfbLogPerror("rfbAuthSendCaps: write");
 	    rfbCloseSock(cl->sock);
 	    return;
@@ -141,17 +165,20 @@ rfbAuthProcessType(cl)
 	rfbCloseSock(cl->sock);
 	return;
     }
-
     auth_type = Swap32IfLE(auth_type);
 
-    /* Currently, we support only the standard VNC authentication. */
-    if (auth_type != rfbVncAuth) {
+    switch (auth_type) {
+    case rfbVncAuth:
+	rfbAuthSendChallenge(cl);
+	break;
+    case rfbUnixLoginAuth:
+	/* FIXME: Do (cl->state = RFB_LOGIN_AUTH) instead? */
+	rfbLoginAuthProcessClientMessage(cl);
+	break;
+    default:
 	rfbLog("rfbAuthProcessType: unknown authentication scheme\n");
 	rfbCloseSock(cl->sock);
-	return;
     }
-
-    rfbAuthSendChallenge(cl);
 }
 
 
