@@ -405,8 +405,6 @@ SelectSecurityType(void)
           free(secTypes);
           return rfbSecTypeInvalid;
         }
-        fprintf(stderr, "Choosing security type %s(%d)\n",
-                secTypeNames[i], (int)secType); /* DEBUG: too much output. */
         break;
       }
     }
