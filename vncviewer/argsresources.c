@@ -279,7 +279,7 @@ usage(void)
   fprintf(stderr,
 	  "TightVNC viewer version 1.2.2 (based on VNC 3.3.3r2)\n"
 	  "\n"
-	  "Usage: %s [<OPTIONS>] [<HOST>]:<DISPLAY#>\n"
+	  "Usage: %s [<OPTIONS>] [<HOST>][:<DISPLAY#>]\n"
 	  "       %s [<OPTIONS>] -listen [<DISPLAY#>]\n"
 	  "\n"
 	  "<OPTIONS> are standard Xt options, or:\n"
