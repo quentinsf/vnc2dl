@@ -36,7 +36,6 @@ $geometry = "1024x768";
 $depth = 24;
 $desktopName = "X";
 $vncClasses = "/usr/local/vnc/classes";
-$vncUserDir = "$ENV{HOME}/.vnc";
 $fontPath = "unix/:7100";
 
 # Here is another example of setting the font path:
@@ -45,16 +44,37 @@ $fontPath = "unix/:7100";
 # X colors database path is optional, uncomment and edit to use:
 # $colorPath = "/usr/lib/X11/rgb";
 
+# Set to non-zero to enable user directories and .Xauthority under /tmp.
+$vncUserDirUnderTmp = 0;
+
+# Do not change the $vncUserDir directly, vncpasswd uses default values!.
+$vncUserDir = ($vncUserDirUnderTmp) ?
+  "/tmp/$ENV{USER}-vnc" : "$ENV{HOME}/.vnc";
+
 unless ($xauthorityFile = "$ENV{XAUTHORITY}") {
   $xauthorityFile = "$ENV{HOME}/.Xauthority";
 }
 
-$defaultXStartup
+if ($vncUserDirUnderTmp) {
+  $xauthorityFile = "$vncUserDir/.Xauthority";
+  $defaultXStartup
+    = ("#!/bin/sh\n\n".
+       "XAUTHORITY=$xauthorityFile; export XAUTHORITY\n".
+       "if [ -x \$HOME/.vncxsession ]; then\n".
+       "  exec \$HOME/.vncxsession\n".
+       "fi\n".
+       "xrdb \$HOME/.Xresources\n".
+       "xsetroot -solid grey\n".
+       "xterm -geometry 80x24+10+10 -ls -title \"\$VNCDESKTOP Desktop\" &\n".
+       "twm &\n");
+} else {
+  $defaultXStartup
     = ("#!/bin/sh\n\n".
        "xrdb \$HOME/.Xresources\n".
        "xsetroot -solid grey\n".
        "xterm -geometry 80x24+10+10 -ls -title \"\$VNCDESKTOP Desktop\" &\n".
        "twm &\n");
+}
 
 chop($host = `uname -n`);
 
@@ -90,22 +110,23 @@ if ($opt{'-name'}) {
 }
 
 
-# Create the user's vnc directory if necessary.
+# Make sure the user's directory exists and the user has a password.
 
+$needPasswd = 0;
 if (!(-e $vncUserDir)) {
-    if (!mkdir($vncUserDir,0755)) {
-	die "$prog: Could not create $vncUserDir.\n";
+    $needPasswd = 1;
+} else {
+    ($z,$z,$mode) = stat("$vncUserDir/passwd");
+    if (!(-e "$vncUserDir/passwd") || ($mode & 077)) {
+        $needPasswd = 1;
     }
 }
-    
-# Make sure the user has a password.
-
-($z,$z,$mode) = stat("$vncUserDir/passwd");
-if (!(-e "$vncUserDir/passwd") || ($mode & 077)) {
+if ($needPasswd) {
+    $vncpasswdOptions = ($vncUserDirUnderTmp) ? '-t' : '';
     warn "\nYou will require a password to access your desktops.\n\n";
-    system("vncpasswd $vncUserDir/passwd"); 
+    system("vncpasswd $vncpasswdOptions");
     if (($? >> 8) != 0) {
-	exit 1;
+        exit 1;
     }
 }
 
@@ -542,11 +563,14 @@ sub SanityCheck
     }
 
     #
-    # Check the HOME environment variable is set
+    # Check the HOME and USER environment variables are both set.
     #
 
     if (!defined($ENV{HOME})) {
 	die "$prog: The HOME environment variable is not set.\n";
+    }
+    if (!defined($ENV{USER})) {
+	die "$prog: The USER environment variable is not set.\n";
     }
 
     #
