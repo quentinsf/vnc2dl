@@ -343,7 +343,7 @@ cfbCreateDefColormap(pScreen)
 
 extern int defaultColorVisualClass;
 
-#define _RZ(d) ((d + 2) / 3)
+#define _RZ(d) ((d + 1) / 3)
 #define _RS(d) 0
 #define _RM(d) ((1 << _RZ(d)) - 1)
 #define _GZ(d) ((d - _RZ(d) + 1) / 2)
@@ -352,7 +352,7 @@ extern int defaultColorVisualClass;
 #define _BZ(d) (d - _RZ(d) - _GZ(d))
 #define _BS(d) (_RZ(d) + _GZ(d))
 #define _BM(d) (((1 << _BZ(d)) - 1) << _BS(d))
-#define _CE(d) (1 << _RZ(d))
+#define _CE(d) (1 << _GZ(d))
 
 #define MAX_PSEUDO_DEPTH    10	    /* largest DAC size I know */
 
