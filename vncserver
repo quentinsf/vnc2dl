@@ -67,7 +67,7 @@ $xauthorityFile = "$ENV{XAUTHORITY}";
 $vncUserDirUnderTmp = ($vncUserDir =~ m|^/tmp/.+|) ? 1 : 0;
 $xstartup = ($vncUserDirUnderTmp) ?
   "$ENV{HOME}/.vncstartup" : "$vncUserDir/xstartup";
-if (!$xauthorityFile) {
+unless ($xauthorityFile) {
     if ($vncUserDirUnderTmp) {
         $xauthorityFile = "$vncUserDir/.Xauthority";
     } else {
@@ -110,8 +110,8 @@ if ($opt{'-name'}) {
 
 # Create the user's vnc directory if necessary.
 
-if (!-e $vncUserDir) {
-    if (!mkdir($vncUserDir, 0700)) {
+unless (-e $vncUserDir) {
+    unless (mkdir($vncUserDir, 0700)) {
         die "$prog: Could not create $vncUserDir.\n";
     }
 }
@@ -139,7 +139,7 @@ if (!-e _ || ($mode & 077) != 0) {
 if ((@ARGV > 0) && ($ARGV[0] =~ /^:(\d+)$/)) {
     $displayNumber = $1;
     shift(@ARGV);
-    if (!&CheckDisplayNumber($displayNumber)) {
+    unless (&CheckDisplayNumber($displayNumber)) {
 	die "A VNC server is already running as :$displayNumber\n";
     }
 } elsif ((@ARGV > 0) && ($ARGV[0] !~ /^-/)) {
@@ -213,7 +213,7 @@ warn "\nNew '$desktopName' desktop is $host:$displayNumber\n\n";
 
 # Create the user's xstartup script if necessary.
 
-if (!-e "$xstartup") {
+unless (-e "$xstartup") {
     warn "Creating default startup script $xstartup\n";
     open(XSTARTUP, ">$xstartup");
     print XSTARTUP $defaultXStartup;
@@ -305,7 +305,7 @@ sub CheckDisplayNumber
 
     socket(S, $AF_INET, $SOCK_STREAM, 0) || die "$prog: socket failed: $!\n";
     eval 'setsockopt(S, &SOL_SOCKET, &SO_REUSEADDR, pack("l", 1))';
-    if (!bind(S, pack('S n x12', $AF_INET, 6000 + $n))) {
+    unless (bind(S, pack('S n x12', $AF_INET, 6000 + $n))) {
 	close(S);
 	return 0;
     }
@@ -313,7 +313,7 @@ sub CheckDisplayNumber
 
     socket(S, $AF_INET, $SOCK_STREAM, 0) || die "$prog: socket failed: $!\n";
     eval 'setsockopt(S, &SOL_SOCKET, &SO_REUSEADDR, pack("l", 1))';
-    if (!bind(S, pack('S n x12', $AF_INET, 5900 + $n))) {
+    unless (bind(S, pack('S n x12', $AF_INET, 5900 + $n))) {
 	close(S);
 	return 0;
     }
@@ -353,7 +353,7 @@ sub GetXDisplayDefaults
     $wmDecorationWidth = 4;	# a guess at typical size for window manager
     $wmDecorationHeight = 24;	# decoration size
 
-    return if (!defined($ENV{DISPLAY}));
+    return unless (defined($ENV{DISPLAY}));
 
     @lines = `xdpyinfo 2>/dev/null`;
 
@@ -480,7 +480,7 @@ sub Kill
 	$pidFile = "$vncUserDir/$opt{'-kill'}.pid";
     }
 
-    if (! -r $pidFile) {
+    unless (-r $pidFile) {
 	die "\nCan't find file $pidFile\n".
 	    "You'll have to kill the Xvnc process manually\n\n";
     }
@@ -570,10 +570,10 @@ sub SanityCheck
     # Check the HOME and USER environment variables are both set.
     #
 
-    if (!defined($ENV{HOME})) {
+    unless (defined($ENV{HOME})) {
 	die "$prog: The HOME environment variable is not set.\n";
     }
-    if (!defined($ENV{USER})) {
+    unless (defined($ENV{USER})) {
 	die "$prog: The USER environment variable is not set.\n";
     }
 
