@@ -1,0 +1,48 @@
+'\" t
+.\" ** The above line should force tbl to be a preprocessor **
+.\" Man page for X vncviewer
+.\"
+.\" Copyright (C) 1998 Marcus.Brinkmann@ruhr-uni-bochum.de
+.\" Copyright (C) 2000 Red Hat, Inc.
+.\" Copyright (C) 2001 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
+.\"
+.\" You may distribute under the terms of the GNU General Public
+.\" License as specified in the file LICENCE.TXT that comes with the
+.\" TightVNC distribution.
+.\"
+.TH vncpasswd 1 "March 2002" "" "TightVNC"
+.SH NAME
+vncpasswd \- set password for VNC server
+.SH SYNOPSIS
+.B vncpasswd
+.RI [\| file \|]
+.br
+.SH DESCRIPTION
+.B vncpasswd
+should be used to create and change passwords for the VNC (Virtual
+Network Computing) server authentification. \fBXvnc\fR uses such
+password when started with the \fB\-rfbauth\fR command-line option (or
+when started from the \fBvncserver\fR script).
+
+The password file name defaults to \fB$HOME/.vnc/passwd\fR.
+
+The password has to be longer than five characters. Only the first
+eight characters are significant. If the password is too short or if
+the password file can't be opened for writing, the program will abort
+and exit with error code 1.
+.br
+.SH SEE ALSO
+\fBvncserver\fR(1), \fBXvnc\fR(1), \fBvncviewer\fR(1),
+\fBvncconnect\fR(1)
+.SH AUTHORS
+Original VNC was developed in AT&T Laboratories Cambridge. TightVNC
+additions was implemented by Constantin Kaplinsky. Many other people
+participated in development, testing and support.
+
+\fBMan page authors:\fR
+.br
+Marcus Brinkmann <Marcus.Brinkmann@ruhr-uni-bochum.de>,
+.br
+Tim Waugh <twaugh@redhat.com>,
+.br
+Constantin Kaplinsky <const@ce.cctpu.edu.ru>
