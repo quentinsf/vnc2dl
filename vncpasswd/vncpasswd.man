@@ -17,6 +17,9 @@ vncpasswd \- set password for VNC server
 .B vncpasswd
 .RI [\| file \|]
 .br
+.B vncpasswd
+.IR \-t
+.br
 .SH DESCRIPTION
 .B vncpasswd
 should be used to create and change passwords for the VNC (Virtual
@@ -24,13 +27,28 @@ Network Computing) server authentification. \fBXvnc\fR uses such
 password when started with the \fB\-rfbauth\fR command-line option (or
 when started from the \fBvncserver\fR script).
 
-The password file name defaults to \fB$HOME/.vnc/passwd\fR.
+The password file name defaults to \fB$HOME/.vnc/passwd\fR unless the
+\fB\-t\fR command-line option was used (see the OPTIONS section
+below). The \fB$HOME/.vnc/\fR directory will be created if it does not
+exist.
 
 The password has to be longer than five characters. Only the first
 eight characters are significant. If the password is too short or if
 the password file can't be opened for writing, the program will abort
 and exit with error code 1.
+
+Unless a file name was provided in the command-line explicitly, this
+utility may perform certain sanity checks to prevent writing a
+password file into some hazardous place.
 .br
+.SH OPTIONS
+.TP
+\fB\-t\fR
+Write passwords into \fB/tmp/$USER-vnc/passwd\fR, creating the
+\fB/tmp/$USER-vnc/\fR directory if it does not exist, and checking the
+permissions on that directory (the mode must be 700). This option can
+help to improve security when your home partition may be shared via
+network (e.g. when using NFS).
 .SH SEE ALSO
 \fBvncserver\fR(1), \fBXvnc\fR(1), \fBvncviewer\fR(1),
 \fBvncconnect\fR(1)

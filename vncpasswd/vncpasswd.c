@@ -1,4 +1,5 @@
 /*
+ *  Copyright (C) 2002 Constantin Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -31,15 +32,16 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <errno.h>
 #include "vncauth.h"
 
-static void usage(char *argv[]) {
-  fprintf(stderr,"Usage: %s [file]\n",argv[0]);
-  exit(1);
-}
+static void usage(char *argv[]);
+static char *getenv_safe(char *name, size_t maxlen);
+static void mkdir_and_check(char *dirname, int be_strict);
 
 int main(int argc, char *argv[]) {
-  char *home_env;
+  int make_directory = 0;
+  int check_strictly = 0;
   char *passwd;
   char *passwd1;
   char passwdDir[256];
@@ -47,24 +49,31 @@ int main(int argc, char *argv[]) {
   int i;
 
   if (argc == 1) {
-    home_env = getenv("HOME");
-    if (home_env == NULL) {
-      fprintf(stderr,"Error: no HOME environment variable\n");
-      exit(1);
-    }
-    if (strlen(home_env) > 240) {
-      fprintf(stderr,"Error: HOME environment variable string too long\n");
-      exit(1);
-    }
-    sprintf(passwdDir, "%s/.vnc", home_env);
+
+    sprintf(passwdDir, "%s/.vnc", getenv_safe("HOME", 240));
     sprintf(passwdFile, "%s/passwd", passwdDir);
+    make_directory = 1;
+    check_strictly = 0;
 
   } else if (argc == 2) {
-    strcpy(passwdFile,argv[1]);
+
+    if (strcmp(argv[1], "-t") == 0) {
+      sprintf(passwdDir, "/tmp/%s-vnc", getenv_safe("USER", 32));
+      sprintf(passwdFile, "%s/passwd", passwdDir);
+      make_directory = 1;
+      check_strictly = 1;
+    } else {
+      strcpy(passwdFile, argv[1]);
+      make_directory = 0;
+      check_strictly = 0;
+    }
 
   } else {
     usage(argv);
   }
+
+  if (make_directory)
+    fprintf(stderr, "Using password file %s\n", passwdFile);
 
   while (1) {  
     passwd = getpass("Password: ");
@@ -88,24 +97,82 @@ int main(int argc, char *argv[]) {
     }
 
     if (strcmp(passwd1, passwd) == 0) {
-      if (argc == 1 &&
-	  mkdir(passwdDir, (S_IRWXU | S_IRGRP | S_IXGRP |
-			    S_IROTH | S_IXOTH)) == -1 &&
-	  errno != EEXIST) {
-	perror(passwdDir);
-	exit(1);
+      if (make_directory) {
+        mkdir_and_check(passwdDir, check_strictly);
       }
       if (vncEncryptAndStorePasswd(passwd, passwdFile) != 0) {
 	fprintf(stderr,"Cannot write password file %s\n",passwdFile);
 	exit(1);
       }
-      for (i = 0; i < strlen(passwd); i++)
+      for (i = 0; i < strlen(passwd); i++) {
 	passwd[i] = passwd1[i] = '\0';
-      exit(0);
+      }
+      return 0;
     }
 
     fprintf(stderr,"Passwords do not match. Please try again.\n\n");
   }
 
   return 2;                     /* never executed */
+}
+
+static void usage(char *argv[]) {
+  fprintf(stderr,
+          "Usage: %s [FILE]\n"
+          "       %s -t\n",
+          argv[0], argv[0], argv[0]);
+  exit(1);
+}
+
+static char *getenv_safe(char *name, size_t maxlen) {
+  char *result;
+
+  result = getenv(name);
+  if (result == NULL) {
+    fprintf(stderr, "Error: no %s environment variable\n", name);
+    exit(1);
+  }
+  if (strlen(result) > maxlen) {
+    fprintf(stderr, "Error: %s environment variable string too long\n", name);
+    exit(1);
+  }
+  return result;
+}
+
+/*
+ * Check if the specified vnc directory exists, create it if
+ * necessary, and perform a number of sanity checks.
+ */
+
+static void mkdir_and_check(char *dirname, int be_strict) {
+  struct stat stbuf;
+
+  if (lstat(dirname, &stbuf) != 0) {
+    if (errno != ENOENT) {
+      fprintf(stderr, "lstat() failed for %s: %s\n", dirname, strerror(errno));
+      exit(1);
+    }
+    fprintf(stderr, "VNC directory %s does not exist, creating.\n", dirname);
+    if (mkdir(dirname, S_IRWXU) == -1) {
+      perror(dirname);
+      exit(1);
+    }
+  }
+
+  if (lstat(dirname, &stbuf) != 0) {
+    fprintf(stderr, "Error in lstat() for %s: %s\n", dirname, strerror(errno));
+    exit(1);
+  }
+  if (!S_ISDIR(stbuf.st_mode)) {
+    fprintf(stderr, "Error: %s is not a directory\n", dirname);
+    exit(1);
+  }
+  if (stbuf.st_uid != getuid()) {
+    fprintf(stderr, "Error: bad ownership on %s\n", dirname);
+    exit(1);
+  }
+  if (be_strict && ((S_IRWXG|S_IRWXO) & stbuf.st_mode)){
+    fprintf(stderr, "Error: bad access modes on %s\n", dirname);
+    exit(1);
+  }
 }
