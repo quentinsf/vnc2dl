@@ -88,11 +88,12 @@ int main(int argc, char *argv[]) {
     }
 
     if (strcmp(passwd1, passwd) == 0) {
-      if (mkdir (passwdDir, (S_IRWXU | S_IRGRP | S_IXGRP |
-			     S_IROTH | S_IXOTH)) == -1 &&
+      if (argc == 1 &&
+	  mkdir(passwdDir, (S_IRWXU | S_IRGRP | S_IXGRP |
+			    S_IROTH | S_IXOTH)) == -1 &&
 	  errno != EEXIST) {
-	perror ("~/.vnc");
-	exit (1);
+	perror(passwdDir);
+	exit(1);
       }
       if (vncEncryptAndStorePasswd(passwd, passwdFile) != 0) {
 	fprintf(stderr,"Cannot write password file %s\n",passwdFile);
@@ -103,6 +104,6 @@ int main(int argc, char *argv[]) {
       return;
     }
 
-    fprintf(stderr,"They don't match. Try again.\n\n");
+    fprintf(stderr,"Passwords do not match. Please try again.\n\n");
   }
 }
