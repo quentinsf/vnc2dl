@@ -281,10 +281,9 @@ usage(void)
 	  "\n"
 	  "Usage: %s [<OPTIONS>] [<HOST>]:<DISPLAY#>\n"
 	  "       %s [<OPTIONS>] -listen [<DISPLAY#>]\n"
-	  "       %s [<OPTIONS>] -tunnel <HOST>:<DISPLAY#>\n"
-	  "       %s [<OPTIONS>] -via <GATEWAY> [<HOST>]:<DISPLAY#>\n"
 	  "\n"
 	  "<OPTIONS> are standard Xt options, or:\n"
+	  "        -via <GATEWAY>\n"
 	  "        -shared (set by default)\n"
 	  "        -noshared\n"
 	  "        -viewonly\n"
@@ -299,6 +298,8 @@ usage(void)
 	  "        -compresslevel <COMPRESS-VALUE> (0..9: 0-fast, 9-best)\n"
 	  "        -quality <JPEG-QUALITY-VALUE> (0..9: 0-low, 9-high)\n"
 	  "        -nocursorshape\n"
+	  "\n"
+	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233.\n"
 	  "\n", programName, programName, programName, programName);
   exit(1);
 }
