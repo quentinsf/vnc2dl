@@ -3,14 +3,14 @@
 .\" Man page for X vncviewer
 .\"
 .\" Copyright (C) 1998 Marcus.Brinkmann@ruhr-uni-bochum.de
-.\" Copyright (C) 2000, 2001 Red Hat, Inc.
-.\" Copyright (C) 2001, 2002 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
+.\" Copyright (C) 2000,2001 Red Hat, Inc.
+.\" Copyright (C) 2001-2003 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
 .\"
 .\" You may distribute under the terms of the GNU General Public
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH vncviewer 1 "November 2002" "" "TightVNC"
+.TH vncviewer 1 "January 2003" "" "TightVNC"
 .SH NAME
 vncviewer \- an X viewer client for VNC
 .SH SYNOPSIS
@@ -152,6 +152,12 @@ Disable cursor shape updates, protocol extensions used to handle
 remote cursor movements locally on the client side
 (TightVNC\-specific). Using cursor shape updates decreases delays with
 remote cursor movements, and can improve bandwidth usage dramatically. 
+.TP
+\fB\-x11cursor\fR
+Use a real X11 cursor with X-style cursor shape updates, instead of
+drawing the remote cursor on the framebuffer. This option also
+disables the dot cursor, and disables cursor position updates in
+non-fullscreen mode.
 .SH ENCODINGS
 The server supplies information in whatever format is desired by the
 client, in order to make the client as easy as possible to implement. 

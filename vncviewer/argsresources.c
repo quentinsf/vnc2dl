@@ -210,6 +210,9 @@ static XtResource appDataResourceList[] = {
   {"useRemoteCursor", "UseRemoteCursor", XtRBool, sizeof(Bool),
    XtOffsetOf(AppData, useRemoteCursor), XtRImmediate, (XtPointer) True},
 
+  {"useX11Cursor", "UseX11Cursor", XtRBool, sizeof(Bool),
+   XtOffsetOf(AppData, useX11Cursor), XtRImmediate, (XtPointer) False},
+
   {"grabKeyboard", "GrabKeyboard", XtRBool, sizeof(Bool),
    XtOffsetOf(AppData, grabKeyboard), XtRImmediate, (XtPointer) False},
 };
@@ -237,6 +240,8 @@ XrmOptionDescRec cmdLineOptions[] = {
   {"-quality",       "*qualityLevel",       XrmoptionSepArg, 0},
   {"-nojpeg",        "*enableJPEG",         XrmoptionNoArg,  "False"},
   {"-nocursorshape", "*useRemoteCursor",    XrmoptionNoArg,  "False"},
+  {"-x11cursor",     "*useX11Cursor",       XrmoptionNoArg,  "True"},
+
 };
 
 int numCmdLineOptions = XtNumber(cmdLineOptions);
@@ -309,6 +314,7 @@ usage(void)
 	  "        -quality <JPEG-QUALITY-VALUE> (0..9: 0-low, 9-high)\n"
 	  "        -nojpeg\n"
 	  "        -nocursorshape\n"
+	  "        -x11cursor\n"
 	  "\n"
 	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233.\n"
 	  "See the manual page for more information."

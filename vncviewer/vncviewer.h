@@ -102,6 +102,7 @@ typedef struct {
   int qualityLevel;
   Bool enableJPEG;
   Bool useRemoteCursor;
+  Bool useX11Cursor;
 
 } AppData;
 

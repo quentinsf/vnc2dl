@@ -493,7 +493,10 @@ SendPointerEvent(int x, int y, int buttonMask)
   pe.buttonMask = buttonMask;
   if (x < 0) x = 0;
   if (y < 0) y = 0;
-  SoftCursorMove(x, y);
+
+  if (!appData.useX11Cursor)
+    SoftCursorMove(x, y);
+
   pe.x = Swap16IfLE(x);
   pe.y = Swap16IfLE(y);
   return WriteExact(rfbsock, (char *)&pe, sz_rfbPointerEventMsg);

@@ -116,6 +116,7 @@ DesktopInitAfterRealization()
 {
   XGCValues gcv;
   XSetWindowAttributes attr;
+  unsigned long valuemask;
 
   desktopWin = XtWindow(desktop);
 
@@ -132,11 +133,16 @@ DesktopInitAfterRealization()
 
   XtVaGetApplicationResources(desktop, (XtPointer)&attr.backing_store,
 			      desktopBackingStoreResources, 1, NULL);
+  valuemask = CWBackingStore;
 
-  dotCursor = CreateDotCursor();
-  attr.cursor = dotCursor;
+  if (!appData.useX11Cursor) {
+    dotCursor = CreateDotCursor();
+    attr.cursor = dotCursor;    
+    valuemask |= CWCursor;
+  }
 
-  XChangeWindowAttributes(dpy, desktopWin, CWBackingStore|CWCursor, &attr);
+  XChangeWindowAttributes(dpy, desktopWin, valuemask, &attr);
+
 }
 
 
