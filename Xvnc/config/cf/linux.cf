@@ -371,5 +371,9 @@ XCOMM binutils:	(LinuxBinUtilsMajorVersion)
 #define MakeNamedTargetSubdir(dir,flags,subname)\
 	$(MAKE) -C dir $(MFLAGS) $(PARALLELMFLAGS) flags subname
 
+#ifndef HasZlib
+# define HasZlib	YES
+#endif
+
 #include <lnxLib.rules>
 #include <xfree86.cf>
