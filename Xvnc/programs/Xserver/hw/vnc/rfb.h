@@ -127,9 +127,15 @@ typedef struct rfbClientRec {
 
     int sock;
     char *host;
-				/* Possible client states: */
+
+    int protocol_minor_ver;	/* RFB protocol minor version in use. */
+
+    /* Possible client states: */
+
     enum {
 	RFB_PROTOCOL_VERSION,	/* establishing protocol version */
+	RFB_TUNNELING_TYPE,	/* establishing tunneling (RFB v.3.130) */
+	RFB_AUTH_TYPE,		/* negotiating authentication (RFB v.3.130) */
 	RFB_AUTHENTICATION,	/* authenticating */
 	RFB_INITIALISATION,	/* sending initialisation messages */
 	RFB_NORMAL		/* normal protocol messages */

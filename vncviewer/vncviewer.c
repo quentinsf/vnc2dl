@@ -75,6 +75,10 @@ main(int argc, char **argv)
 
   GetArgsAndResources(argc, argv);
 
+  /* Initialize our capability lists */
+
+  InitCapabilities();
+
   /* Unless we accepted an incoming connection, make a TCP connection to the
      given VNC server */
 

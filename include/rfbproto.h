@@ -1,7 +1,7 @@
 /*
- *  Copyright (C) 2000-2002 Constantin Kaplinsky.  All Rights Reserved.
- *  Copyright (C) 2000 Tridia Corporation.  All Rights Reserved.
- *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
+ *  Copyright (C) 2000-2003 Constantin Kaplinsky. All Rights Reserved.
+ *  Copyright (C) 2000 Tridia Corporation. All Rights Reserved.
+ *  Copyright (C) 1999 AT&T Laboratories Cambridge. All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
  */
 
 /*
- * rfbproto.h - header file for the RFB protocol version 3.3
+ * rfbproto.h - header file for the RFB protocol, versions 3.130 and 3.3
  *
  * Uses types CARD<n> for an n-bit unsigned integer, INT<n> for an n-bit signed
  * integer (for n = 8, 16 and 32).
@@ -56,7 +56,7 @@
  * affecting alignment.
  */
 
-typedef struct {
+typedef struct _rfbRectangle {
     CARD16 x;
     CARD16 y;
     CARD16 w;
@@ -70,7 +70,7 @@ typedef struct {
  * Structure used to specify pixel format.
  */
 
-typedef struct {
+typedef struct _rfbPixelFormat {
 
     CARD8 bitsPerPixel;		/* 8,16,32 only */
 
@@ -121,6 +121,31 @@ typedef struct {
 #define sz_rfbPixelFormat 16
 
 
+/*-----------------------------------------------------------------------------
+ * Structure used to describe protocol options such as tunneling methods,
+ * authentication schemes and message types (protocol version 3.130).
+ */
+
+typedef struct _rfbCapabilityInfo {
+
+    CARD32 code;				/* numeric identifier */
+    CARD8 vendorSignature[4];	/* vendor identification */
+    CARD8 nameSignature[8];		/* abbreviated option name */
+
+} rfbCapabilityInfo;
+
+#define sz_rfbCapabilityInfoVendor 4
+#define sz_rfbCapabilityInfoName 8
+#define sz_rfbCapabilityInfo 16
+
+/*
+ * Vendors known by TightVNC: standard VNC/RealVNC, TridiaVNC, and TightVNC.
+ */
+
+#define rfbStandardVendor "STDV"
+#define rfbTridiaVncVendor "TRDV"
+#define rfbTightVncVendor "TGHT"
+
 
 /*****************************************************************************
  *
@@ -134,8 +159,8 @@ typedef struct {
  * The server always sends 12 bytes to start which identifies the latest RFB
  * protocol version number which it supports.  These bytes are interpreted
  * as a string of 12 ASCII characters in the format "RFB xxx.yyy\n" where
- * xxx and yyy are the major and minor version numbers (for version 3.3
- * this is "RFB 003.003\n").
+ * xxx and yyy are the major and minor version numbers (for version 3.5
+ * this is "RFB 003.005\n").
  *
  * The client then replies with a similar 12-byte message giving the version
  * number of the protocol which should actually be used (which may be different
@@ -155,7 +180,8 @@ typedef struct {
 
 #define rfbProtocolVersionFormat "RFB %03d.%03d\n"
 #define rfbProtocolMajorVersion 3
-#define rfbProtocolMinorVersion 3
+#define rfbProtocolMinorVersion 130
+#define rfbProtocolFallbackMinorVersion 3
 
 typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
 
@@ -163,7 +189,28 @@ typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
 
 
 /*-----------------------------------------------------------------------------
- * Authentication
+ * Negotiation of Handshaking Capabilities
+ *
+ * Once the protocol version has been decided, the server then sends two lists
+ * of supported protocol extensions. First list tells the client what tunneling
+ * methods can be used, the second list provides information about supported
+ * authentication schemes. Each list is an array of rfbCapabilityInfo structures.
+ * Before sending the lists, the server sends two 16-bit words with number of
+ * elements in each one.
+ */
+
+typedef struct _rfbHandshakingCapsMsg {
+    CARD16 nTunnelTypes;
+    CARD16 nAuthenticationTypes;
+    /* followed by nTunnelTypes * rfbCapabilityInfo structures */
+    /* followed by nAuthenticationTypes * rfbCapabilityInfo structures */
+} rfbHandshakingCapsMsg;
+
+#define sz_rfbHandshakingCapsMsg 4
+
+
+/*-----------------------------------------------------------------------------
+ * Authentication (protocol versions 3.0 - 3.3).
  *
  * Once the protocol version has been decided, the server then sends a 32-bit
  * word indicating whether any authentication is needed on the connection.
@@ -174,6 +221,8 @@ typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
 #define rfbConnFailed 0
 #define rfbNoAuth 1
 #define rfbVncAuth 2
+
+#define sig_rfbVncAuth "VNCAUTH_"
 
 /*
  * rfbConnFailed:	For some reason the connection failed (e.g. the server
@@ -212,7 +261,7 @@ typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
  * access to this client by disconnecting all other clients.
  */
 
-typedef struct {
+typedef struct _rfbClientInitMsg {
     CARD8 shared;
 } rfbClientInitMsg;
 
@@ -227,7 +276,7 @@ typedef struct {
  * its pixel format and the name associated with the desktop.
  */
 
-typedef struct {
+typedef struct _rfbServerInitMsg {
     CARD16 framebufferWidth;
     CARD16 framebufferHeight;
     rfbPixelFormat format;	/* the server's preferred pixel format */
@@ -236,6 +285,30 @@ typedef struct {
 } rfbServerInitMsg;
 
 #define sz_rfbServerInitMsg (8 + sz_rfbPixelFormat)
+
+
+/*-----------------------------------------------------------------------------
+ * Server Interaction Capabilities Message (protocol version 3.130)
+ *
+ * In the protocol version 3.130, the server informs the client what message
+ * types it supports in addition to ones defined in the protocol version 3.3.
+ * Also, the server sends the list of all supported encodings (note that it's
+ * not necessary to advertise the "raw" encoding sinse it MUST be supported in
+ * RFB 3.x protocols).
+ *
+ * This data immediately follows the server initialisation message.
+ */
+
+typedef struct _rfbInteractionCapsMsg {
+    CARD16 nServerMessageTypes;
+    CARD16 nClientMessageTypes;
+    CARD16 nEncodingTypes;
+    CARD16 pad;	/* reserved, must be 0 */
+    /* followed by nServerMessageTypes * rfbCapabilityInfo structures */
+    /* followed by nClientMessageTypes * rfbCapabilityInfo structures */
+} rfbInteractionCapsMsg;
+
+#define sz_rfbInteractionCapsMsg 8
 
 
 /*
@@ -266,6 +339,17 @@ typedef struct {
 #define rfbBell 2
 #define rfbServerCutText 3
 
+#define rfbFileListData 130
+#define rfbFileDownloadData 131
+#define rfbFileUploadCancel 132
+#define rfbFileDownloadFailed 133
+
+/* signatures for non-standard messages */
+#define sig_rfbFileListData "FTS_LSDT"
+#define sig_rfbFileDownloadData "FTS_DNDT"
+#define sig_rfbFileUploadCancel "FTS_UPCN"
+#define sig_rfbFileDownloadFailed "FTS_DNFL"
+
 
 /* client -> server */
 
@@ -277,8 +361,20 @@ typedef struct {
 #define rfbPointerEvent 5
 #define rfbClientCutText 6
 
+#define rfbFileListRequest 130
+#define rfbFileDownloadRequest 131
+#define rfbFileUploadRequest 132
+#define rfbFileUploadData 133
+#define rfbFileDownloadCancel 134
+#define rfbFileUploadFailed 135
 
-
+/* signatures for non-standard messages */
+#define sig_rfbFileListRequest "FTC_LSRQ"
+#define sig_rfbFileDownloadRequest "FTC_DNRQ"
+#define sig_rfbFileUploadRequest "FTC_UPRQ"
+#define sig_rfbFileUploadData "FTC_UPDT"
+#define sig_rfbFileDownloadCancel "FTC_DNCN"
+#define sig_rfbFileUploadFailed "FTC_UPFL"
 
 /*****************************************************************************
  *
@@ -286,14 +382,24 @@ typedef struct {
  *
  *****************************************************************************/
 
-#define rfbEncodingRaw 0
-#define rfbEncodingCopyRect 1
-#define rfbEncodingRRE 2
-#define rfbEncodingCoRRE 4
-#define rfbEncodingHextile 5
-#define rfbEncodingZlib 6
-#define rfbEncodingTight 7
-#define rfbEncodingZlibHex 8
+#define rfbEncodingRaw       0
+#define rfbEncodingCopyRect  1
+#define rfbEncodingRRE       2
+#define rfbEncodingCoRRE     4
+#define rfbEncodingHextile   5
+#define rfbEncodingZlib      6
+#define rfbEncodingTight     7
+#define rfbEncodingZlibHex   8
+
+/* signatures for basic encoding types */
+#define sig_rfbEncodingRaw       "RAW_____"
+#define sig_rfbEncodingCopyRect  "COPYRECT"
+#define sig_rfbEncodingRRE       "RRE_____"
+#define sig_rfbEncodingCoRRE     "CORRE___"
+#define sig_rfbEncodingHextile   "HEXTILE_"
+#define sig_rfbEncodingZlib      "ZLIB____"
+#define sig_rfbEncodingTight     "TIGHT___"
+#define sig_rfbEncodingZlibHex   "ZLIBHEX_"
 
 /*
  * Special encoding numbers:
@@ -302,7 +408,7 @@ typedef struct {
  *   0xFFFFFF20 .. 0xFFFFFF2F -- various protocol extensions;
  *   0xFFFFFF30 .. 0xFFFFFFDF -- not allocated yet;
  *   0xFFFFFFE0 .. 0xFFFFFFEF -- quality level for JPEG compressor;
- *   0xFFFFFFF0 .. 0xFFFFFFFF -- cross-encoding compression levels.
+ *   0xFFFFFFF0 .. 0xFFFFFFFF -- not allocated yet.
  */
 
 #define rfbEncodingCompressLevel0  0xFFFFFF00
@@ -321,6 +427,7 @@ typedef struct {
 #define rfbEncodingPointerPos      0xFFFFFF18
 
 #define rfbEncodingLastRect        0xFFFFFF20
+#define rfbEncodingNewFBSize       0xFFFFFF21
 
 #define rfbEncodingQualityLevel0   0xFFFFFFE0
 #define rfbEncodingQualityLevel1   0xFFFFFFE1
@@ -332,6 +439,15 @@ typedef struct {
 #define rfbEncodingQualityLevel7   0xFFFFFFE7
 #define rfbEncodingQualityLevel8   0xFFFFFFE8
 #define rfbEncodingQualityLevel9   0xFFFFFFE9
+
+/* signatures for "fake" encoding types */
+#define sig_rfbEncodingCompressLevel0  "COMPRLVL"
+#define sig_rfbEncodingXCursor         "X11CURSR"
+#define sig_rfbEncodingRichCursor      "RCHCURSR"
+#define sig_rfbEncodingPointerPos      "POINTPOS"
+#define sig_rfbEncodingLastRect        "LASTRECT"
+#define sig_rfbEncodingNewFBSize       "NEWFBSIZ"
+#define sig_rfbEncodingQualityLevel0   "JPEGQLVL"
 
 
 /*****************************************************************************
@@ -350,7 +466,7 @@ typedef struct {
  * with alignment of 32-bit pixels):
  */
 
-typedef struct {
+typedef struct _rfbFramebufferUpdateMsg {
     CARD8 type;			/* always rfbFramebufferUpdate */
     CARD8 pad;
     CARD16 nRects;
@@ -367,7 +483,7 @@ typedef struct {
  * Also note again that this structure is a multiple of 4 bytes.
  */
 
-typedef struct {
+typedef struct _rfbFramebufferUpdateRectHeader {
     rfbRectangle r;
     CARD32 encoding;	/* one of the encoding types rfbEncoding... */
 } rfbFramebufferUpdateRectHeader;
@@ -386,7 +502,7 @@ typedef struct {
  * of the source rectangle.
  */
 
-typedef struct {
+typedef struct _rfbCopyRect {
     CARD16 srcX;
     CARD16 srcY;
 } rfbCopyRect;
@@ -401,7 +517,7 @@ typedef struct {
  * [<pixel><rfbRectangle>].
  */
 
-typedef struct {
+typedef struct _rfbRREHeader {
     CARD32 nSubrects;
 } rfbRREHeader;
 
@@ -416,7 +532,7 @@ typedef struct {
  * the whole rectangle must be at most 255x255 pixels.
  */
 
-typedef struct {
+typedef struct _rfbCoRRERectangle {
     CARD8 x;
     CARD8 y;
     CARD8 w;
@@ -478,14 +594,13 @@ typedef struct {
 #define rfbHextileExtractW(byte) (((byte) >> 4) + 1)
 #define rfbHextileExtractH(byte) (((byte) & 0xf) + 1)
 
-
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
- * zlib - zlib compressed Encoding.  We have an rfbZlibHeader structure
- * giving the number of bytes following.  Finally the data follows is
- * zlib compressed version of the raw pixel data as negotiated.
+ * ZLIB - zlib compression Encoding.  We have an rfbZlibHeader structure
+ * giving the number of bytes to follow.  Finally the data follows in
+ * zlib compressed format.
  */
 
-typedef struct {
+typedef struct _rfbZlibHeader {
     CARD32 nBytes;
 } rfbZlibHeader;
 
@@ -629,6 +744,20 @@ typedef struct {
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ * ZLIBHEX - zlib compressed Hextile Encoding.  Essentially, this is the
+ * hextile encoding with zlib compression on the tiles that can not be
+ * efficiently encoded with one of the other hextile subencodings.  The
+ * new zlib subencoding uses two bytes to specify the length of the
+ * compressed tile and then the compressed data follows.  As with the
+ * raw sub-encoding, the zlib subencoding invalidates the other
+ * values, if they are also set.
+ */
+
+#define rfbHextileZlibRaw		(1 << 5)
+#define rfbHextileZlibHex		(1 << 6)
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
  * XCursor encoding. This is a special encoding used to transmit X-style
  * cursor shapes from server to clients. Note that for this encoding,
  * coordinates in rfbFramebufferUpdateRectHeader structure hold hotspot
@@ -647,7 +776,7 @@ typedef struct {
  * should be hidden (or default local cursor should be set by the client).
  */
 
-typedef struct {
+typedef struct _rfbXCursorColors {
     CARD8 foreRed;
     CARD8 foreGreen;
     CARD8 foreBlue;
@@ -682,7 +811,7 @@ typedef struct {
  * trueColour then it never needs to process this type of message.
  */
 
-typedef struct {
+typedef struct _rfbSetColourMapEntriesMsg {
     CARD8 type;			/* always rfbSetColourMapEntries */
     CARD8 pad;
     CARD16 firstColour;
@@ -701,7 +830,7 @@ typedef struct {
  * Bell - ring a bell on the client if it has one.
  */
 
-typedef struct {
+typedef struct _rfbBellMsg {
     CARD8 type;			/* always rfbBell */
 } rfbBellMsg;
 
@@ -713,7 +842,7 @@ typedef struct {
  * ServerCutText - the server has new text in its cut buffer.
  */
 
-typedef struct {
+typedef struct _rfbServerCutTextMsg {
     CARD8 type;			/* always rfbServerCutText */
     CARD8 pad1;
     CARD16 pad2;
@@ -723,17 +852,78 @@ typedef struct {
 
 #define sz_rfbServerCutTextMsg 8
 
+/*-----------------------------------------------------------------------------
+ * FileListData
+ */
+
+typedef struct {
+    CARD8 type;
+    CARD8 fnamesize;
+    CARD16 amount;
+    CARD16 num;
+    CARD16 attr;
+    CARD32 size;
+    /* Followed by Filename[fmamesize] */
+} rfbFileListDataMsg;
+
+#define sz_rfbFileListDataMsg 12
+
+/*-----------------------------------------------------------------------------
+ * FileDownloadData
+ */
+
+typedef struct {
+    CARD8 type;
+    CARD8 unused;
+    CARD16 amount;
+    CARD16 num;
+    CARD16 size;
+    /* Followed by File[size] */
+} rfbFileDownloadDataMsg;
+
+#define sz_rfbFileDownloadDataMsg 8
+
+
+/*-----------------------------------------------------------------------------
+ * FileUploadCancel
+ */
+
+typedef struct {
+    CARD8 type;
+    CARD8 unused;
+    CARD16 reasonlen;
+    /* Followed by reason[reasonsize] */
+} rfbFileUploadCancelMsg;
+
+#define sz_rfbFileUploadCancelMsg 4
+
+/*-----------------------------------------------------------------------------
+ * FileDownloadFailed
+ */
+
+typedef struct {
+    CARD8 type;
+    CARD8 unused;
+    CARD16 reasonlen;
+    /* Followed by reason[reasonsize] */
+} rfbFileDownloadFailedMsg;
+
+#define sz_rfbFileServerCancelMsg 4
 
 /*-----------------------------------------------------------------------------
  * Union of all server->client messages.
  */
 
-typedef union {
+typedef union _rfbServerToClientMsg {
     CARD8 type;
     rfbFramebufferUpdateMsg fu;
     rfbSetColourMapEntriesMsg scme;
     rfbBellMsg b;
     rfbServerCutTextMsg sct;
+    rfbFileListDataMsg fld;
+    rfbFileDownloadDataMsg fdd;
+    rfbFileUploadCancelMsg fuc;
+    rfbFileDownloadFailedMsg fdf;
 } rfbServerToClientMsg;
 
 
@@ -750,7 +940,7 @@ typedef union {
  * pixels sent.
  */
 
-typedef struct {
+typedef struct _rfbSetPixelFormatMsg {
     CARD8 type;			/* always rfbSetPixelFormat */
     CARD8 pad1;
     CARD16 pad2;
@@ -767,7 +957,7 @@ typedef struct {
  *    ***************** NOT CURRENTLY SUPPORTED *****************
  */
 
-typedef struct {
+typedef struct _rfbFixColourMapEntriesMsg {
     CARD8 type;			/* always rfbFixColourMapEntries */
     CARD8 pad;
     CARD16 firstColour;
@@ -787,7 +977,7 @@ typedef struct {
  * encoding, even if we don't specify it here.
  */
 
-typedef struct {
+typedef struct _rfbSetEncodingsMsg {
     CARD8 type;			/* always rfbSetEncodings */
     CARD8 pad;
     CARD16 nEncodings;
@@ -803,7 +993,7 @@ typedef struct {
  * false then it wants the whole of the specified rectangle.
  */
 
-typedef struct {
+typedef struct _rfbFramebufferUpdateRequestMsg {
     CARD8 type;			/* always rfbFramebufferUpdateRequest */
     CARD8 incremental;
     CARD16 x;
@@ -846,7 +1036,7 @@ typedef struct {
  * Alt			0xffe9
  */
 
-typedef struct {
+typedef struct _rfbKeyEventMsg {
     CARD8 type;			/* always rfbKeyEvent */
     CARD8 down;			/* true if down (press), false if up */
     CARD16 pad;
@@ -860,7 +1050,7 @@ typedef struct {
  * PointerEvent - mouse/pen move and/or button press.
  */
 
-typedef struct {
+typedef struct _rfbPointerEventMsg {
     CARD8 type;			/* always rfbPointerEvent */
     CARD8 buttonMask;		/* bits 0-7 are buttons 1-8, 0=up, 1=down */
     CARD16 x;
@@ -870,6 +1060,8 @@ typedef struct {
 #define rfbButton1Mask 1
 #define rfbButton2Mask 2
 #define rfbButton3Mask 4
+#define rfbButton4Mask 8
+#define rfbButton5Mask 16
 
 #define sz_rfbPointerEventMsg 6
 
@@ -879,7 +1071,7 @@ typedef struct {
  * ClientCutText - the client has new text in its cut buffer.
  */
 
-typedef struct {
+typedef struct _rfbClientCutTextMsg {
     CARD8 type;			/* always rfbClientCutText */
     CARD8 pad1;
     CARD16 pad2;
@@ -889,13 +1081,85 @@ typedef struct {
 
 #define sz_rfbClientCutTextMsg 8
 
+/*-----------------------------------------------------------------------------
+ * FileListRequest
+ */
+
+typedef struct {
+    CARD8 type;
+    CARD8 dnamesize;
+    /* Followed by char Dirname[dnamesize] */
+} rfbFileListRequestMsg;
+
+#define sz_rfbFileListRequestMsg 2
+
+/*-----------------------------------------------------------------------------
+ * FileDownloadRequest
+ */
+
+typedef struct {
+    CARD8 type;
+    CARD8 fnamesize;
+    /* Followed by char Filename[size] */
+} rfbFileDownloadRequestMsg;
+
+#define sz_rfbFileDownloadRequestMsg 2
+
+/*-----------------------------------------------------------------------------
+ * FileUploadRequest
+ */
+
+typedef struct {
+    CARD8 type;
+    CARD8 fnamesize;
+    /* Followed by char Filename[size] */
+} rfbFileUploadRequestMsg;
+
+#define sz_rfbFileUploadRequestMsg 2
+
+
+/*-----------------------------------------------------------------------------
+ * FileUploadData
+ */
+
+typedef struct {
+    CARD8 type;
+    CARD8 unused;
+    CARD16 size;
+    CARD16 amount;
+    CARD16 num;
+    /* Followed by File[size]   */
+} rfbFileUploadDataMsg;
+
+#define sz_rfbFileUploadDataMsg 8
+
+/*-----------------------------------------------------------------------------
+ * FileDownloadCancel
+ */
+
+typedef struct {
+    CARD8 type;
+} rfbFileDownloadCancelMsg;
+
+#define sz_rfbFileDownloadCancelMsg 1
+
+/*-----------------------------------------------------------------------------
+ * FileUploadFailed
+ */
+
+typedef struct {
+    CARD8 type;
+} rfbFileUploadFailedMsg;
+
+#define sz_rfbFileUploadFailedMsg 1
+
 
 
 /*-----------------------------------------------------------------------------
  * Union of all client->server messages.
  */
 
-typedef union {
+typedef union _rfbClientToServerMsg {
     CARD8 type;
     rfbSetPixelFormatMsg spf;
     rfbFixColourMapEntriesMsg fcme;
@@ -904,4 +1168,10 @@ typedef union {
     rfbKeyEventMsg ke;
     rfbPointerEventMsg pe;
     rfbClientCutTextMsg cct;
+    rfbFileListRequestMsg flr;
+    rfbFileDownloadRequestMsg fdr;
+    rfbFileUploadRequestMsg fupr;
+    rfbFileUploadDataMsg fud;
+    rfbFileDownloadCancelMsg fdc;
+    rfbFileUploadFailedMsg fcc;
 } rfbClientToServerMsg;

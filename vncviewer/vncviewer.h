@@ -36,6 +36,7 @@
 #include <X11/Xatom.h>
 #include <X11/Xmu/StdSel.h>
 #include "rfbproto.h"
+#include "caps.h"
 
 extern int endianTest;
 
@@ -211,6 +212,14 @@ extern rfbPixelFormat myFormat;
 extern rfbServerInitMsg si;
 extern char *serverCutText;
 extern Bool newServerCutText;
+
+extern CapsContainer *tunnelCaps;    /* known tunneling/encryption methods */
+extern CapsContainer *authCaps;      /* known authentication schemes       */
+extern CapsContainer *serverMsgCaps; /* known non-standard server messages */
+extern CapsContainer *clientMsgCaps; /* known non-standard client messages */
+extern CapsContainer *encodingCaps;  /* known encodings besides Raw        */
+
+extern void InitCapabilities(void);
 
 extern Bool ConnectToRFBServer(const char *hostname, int port);
 extern Bool InitialiseRFBConnection();

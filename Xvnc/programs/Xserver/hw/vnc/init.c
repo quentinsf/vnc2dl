@@ -372,8 +372,8 @@ ddxProcessArgument (argc, argv, i)
     }
 
     if (strcmp(argv[i], "-version") == 0) {
-	ErrorF("Xvnc version %d.%d.%s\n", rfbProtocolMajorVersion,
-	       rfbProtocolMinorVersion, XVNCRELEASE);
+	ErrorF("Xvnc version %s, protocol %d.%d\n", XVNCRELEASE,
+	       rfbProtocolMajorVersion, rfbProtocolMinorVersion);
 	exit(0);
     }
 
@@ -399,16 +399,15 @@ InitOutput(screenInfo, argc, argv)
 {
     initOutputCalled = TRUE;
 
-    rfbLog("Xvnc version %d.%d.%s\n", rfbProtocolMajorVersion,
-	   rfbProtocolMinorVersion, XVNCRELEASE);
-    rfbLog("Copyright (C) 1999 AT&T Laboratories Cambridge.\n");
-    rfbLog("Copyright (C) 2000-2002 Constantin Kaplinsky.\n");
+    rfbLog("Xvnc version %s\n", XVNCRELEASE);
+    rfbLog("Copyright (C) 2000-2003 Constantin Kaplinsky\n");
+    rfbLog("Copyright (C) 1999 AT&T Laboratories Cambridge\n");
     rfbLog("All Rights Reserved.\n");
-    rfbLog("See http://www.uk.research.att.com/vnc for information on VNC\n");
-    rfbLog("See http://www.tightvnc.com for TightVNC-specific information\n");
+    rfbLog("See http://www.tightvnc.com/ for information on TightVNC\n");
     rfbLog("Desktop name '%s' (%s:%s)\n",desktopName,rfbThisHost,display);
-    rfbLog("Protocol version supported %d.%d\n", rfbProtocolMajorVersion,
-	   rfbProtocolMinorVersion);
+    rfbLog("Protocol versions supported: %d.%d, %d.%d\n",
+	   rfbProtocolMajorVersion, rfbProtocolMinorVersion,
+	   rfbProtocolMajorVersion, rfbProtocolFallbackMinorVersion);
 
     VNC_LAST_CLIENT_ID = MakeAtom("VNC_LAST_CLIENT_ID",
 				  strlen("VNC_LAST_CLIENT_ID"), TRUE);

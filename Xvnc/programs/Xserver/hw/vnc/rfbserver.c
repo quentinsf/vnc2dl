@@ -56,10 +56,32 @@ Bool rfbViewOnly = FALSE; /* run server in view only mode - Ehud Karni SW */
 
 static rfbClientPtr rfbNewClient(int sock);
 static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
+static void rfbSendHandshakingCaps(rfbClientPtr cl);
+static void rfbSendInteractionCaps(rfbClientPtr cl);
+static void rfbProcessClientTunnelingType(rfbClientPtr cl);
+static void rfbProcessClientAuthType(rfbClientPtr cl);
 static void rfbProcessClientNormalMessage(rfbClientPtr cl);
 static void rfbProcessClientInitMessage(rfbClientPtr cl);
 static Bool rfbSendCopyRegion(rfbClientPtr cl, RegionPtr reg, int dx, int dy);
 static Bool rfbSendLastRectMarker(rfbClientPtr cl);
+
+
+/*
+ * Normally, using macros is no good, but this macro saves us from
+ * writing constants twice -- it constructs signature names from codes.
+ * Note that "code_sym" argument should be a single symbol, not an expression.
+ */
+
+#define SetCapInfo(cap_ptr, code_sym, vendor)		\
+{							\
+    rfbCapabilityInfo *pcap;				\
+    pcap = (cap_ptr);					\
+    pcap->code = Swap32IfLE(code_sym);			\
+    memcpy(pcap->vendorSignature, (vendor),		\
+	   sz_rfbCapabilityInfoVendor);			\
+    memcpy(pcap->nameSignature, sig_##code_sym,		\
+	   sz_rfbCapabilityInfoName);			\
+}
 
 
 /*
@@ -297,6 +319,12 @@ rfbProcessClientMessage(sock)
     case RFB_PROTOCOL_VERSION:
 	rfbProcessClientProtocolVersion(cl);
 	return;
+    case RFB_TUNNELING_TYPE:	/* protocol 3.130 */
+	rfbProcessClientTunnelingType(cl);
+	return;
+    case RFB_AUTH_TYPE:		/* protocol 3.130 */
+	rfbProcessClientAuthType(cl);
+	return;
     case RFB_AUTHENTICATION:
 	rfbAuthProcessClientMessage(cl);
 	return;
@@ -351,11 +379,204 @@ rfbProcessClientProtocolVersion(cl)
 	return;
     }
 
-    if (minor != rfbProtocolMinorVersion) {
+    if ( minor != rfbProtocolMinorVersion &&
+	 minor != rfbProtocolFallbackMinorVersion ) {
 	/* Minor version mismatch - warn but try to continue */
 	rfbLog("Ignoring minor version mismatch\n");
     }
 
+    cl->protocol_minor_ver = minor;
+
+    if (cl->protocol_minor_ver >= 130) {
+	rfbSendHandshakingCaps(cl); /* protocol 3.130 */
+    } else {
+	rfbAuthNewClient(cl);
+    }
+}
+
+
+/*
+ * rfbSendHandshakingCaps is called after deciding the protocol version,
+ * and only if the protocol version is 3.130.  In this function, we send
+ * the lists of our tunneling and authentication capabilities.
+ */
+
+static void
+rfbSendHandshakingCaps(cl)
+    rfbClientPtr cl;
+{
+    rfbHandshakingCapsMsg init_caps;
+    rfbCapabilityInfo cap;
+
+    init_caps.nTunnelTypes = Swap16IfLE(0);
+    init_caps.nAuthenticationTypes = Swap16IfLE(1);
+    if (WriteExact(cl->sock, (char *)&init_caps,
+		   sz_rfbHandshakingCapsMsg) < 0) {
+	rfbLogPerror("rfbSendHandshakingCaps: write");
+	rfbCloseSock(cl->sock);
+	return;
+    }
+
+    /* Inform the client that we support the standard VNC authentication. */
+    SetCapInfo(&cap, rfbVncAuth, rfbStandardVendor);
+    if (WriteExact(cl->sock, (char *)&cap, sz_rfbCapabilityInfo) < 0) {
+	rfbLogPerror("rfbSendHandshakingCaps: write");
+	rfbCloseSock(cl->sock);
+	return;
+    }
+
+    cl->state = RFB_TUNNELING_TYPE;
+}
+
+
+/*
+ * rfbSendInteractionCaps is called after sending the server
+ * initialisation message, only if the protocol version is 3.130.
+ * In this function, we send the lists of supported protocol messages
+ * and encodings.
+ */
+
+/* Update these constants on changing capability lists below! */
+#define N_SMSG_CAPS  0
+#define N_CMSG_CAPS  0
+#define N_ENC_CAPS  12
+
+void
+rfbSendInteractionCaps(cl)
+    rfbClientPtr cl;
+{
+    rfbInteractionCapsMsg intr_caps;
+    rfbCapabilityInfo enc_list[N_ENC_CAPS];
+    int i;
+
+    /* Fill in the header structure sent prior to capability lists. */
+    intr_caps.nServerMessageTypes = Swap16IfLE(N_SMSG_CAPS);
+    intr_caps.nClientMessageTypes = Swap16IfLE(N_CMSG_CAPS);
+    intr_caps.nEncodingTypes = Swap16IfLE(N_ENC_CAPS);
+    intr_caps.pad = 0;
+
+    /* Supported server->client message types. */
+    /* For future file transfer support:
+    i = 0;
+    SetCapInfo(&smsg_list[i++], rfbFileListData,           rfbTightVncVendor);
+    SetCapInfo(&smsg_list[i++], rfbFileDownloadData,       rfbTightVncVendor);
+    SetCapInfo(&smsg_list[i++], rfbFileUploadCancel,       rfbTightVncVendor);
+    SetCapInfo(&smsg_list[i++], rfbFileDownloadFailed,     rfbTightVncVendor);
+    if (i != N_SMSG_CAPS) {
+	rfbLog("rfbSendHandshakingCaps: assertion failed, i != N_SMSG_CAPS\n");
+	rfbCloseSock(cl->sock);
+	return;
+    }
+    */
+
+    /* Supported client->server message types. */
+    /* For future file transfer support:
+    i = 0;
+    SetCapInfo(&cmsg_list[i++], rfbFileListRequest,        rfbTightVncVendor);
+    SetCapInfo(&cmsg_list[i++], rfbFileDownloadRequest,    rfbTightVncVendor);
+    SetCapInfo(&cmsg_list[i++], rfbFileUploadRequest,      rfbTightVncVendor);
+    SetCapInfo(&cmsg_list[i++], rfbFileUploadData,         rfbTightVncVendor);
+    SetCapInfo(&cmsg_list[i++], rfbFileDownloadCancel,     rfbTightVncVendor);
+    SetCapInfo(&cmsg_list[i++], rfbFileUploadFailed,       rfbTightVncVendor);
+    if (i != N_CMSG_CAPS) {
+	rfbLog("rfbSendHandshakingCaps: assertion failed, i != N_CMSG_CAPS\n");
+	rfbCloseSock(cl->sock);
+	return;
+    }
+    */
+
+    /* Encoding types. */
+    i = 0;
+    SetCapInfo(&enc_list[i++],  rfbEncodingCopyRect,       rfbStandardVendor);
+    SetCapInfo(&enc_list[i++],  rfbEncodingRRE,            rfbStandardVendor);
+    SetCapInfo(&enc_list[i++],  rfbEncodingCoRRE,          rfbStandardVendor);
+    SetCapInfo(&enc_list[i++],  rfbEncodingHextile,        rfbStandardVendor);
+    SetCapInfo(&enc_list[i++],  rfbEncodingZlib,           rfbTridiaVncVendor);
+    SetCapInfo(&enc_list[i++],  rfbEncodingTight,          rfbTightVncVendor);
+    SetCapInfo(&enc_list[i++],  rfbEncodingCompressLevel0, rfbTightVncVendor);
+    SetCapInfo(&enc_list[i++],  rfbEncodingQualityLevel0,  rfbTightVncVendor);
+    SetCapInfo(&enc_list[i++],  rfbEncodingXCursor,        rfbTightVncVendor);
+    SetCapInfo(&enc_list[i++],  rfbEncodingRichCursor,     rfbTightVncVendor);
+    SetCapInfo(&enc_list[i++],  rfbEncodingPointerPos,     rfbTightVncVendor);
+    SetCapInfo(&enc_list[i++],  rfbEncodingLastRect,       rfbTightVncVendor);
+    if (i != N_ENC_CAPS) {
+	rfbLog("rfbSendHandshakingCaps: assertion failed, i != N_ENC_CAPS\n");
+	rfbCloseSock(cl->sock);
+	return;
+    }
+
+    /* Send header and capability lists */
+    if (WriteExact(cl->sock, (char *)&intr_caps,
+		   sz_rfbInteractionCapsMsg) < 0 ||
+	WriteExact(cl->sock, (char *)&enc_list[0],
+		   sz_rfbCapabilityInfo * N_ENC_CAPS) < 0) {
+	rfbLogPerror("rfbSendInteractionCaps: write");
+	rfbCloseSock(cl->sock);
+	return;
+    }
+
+    cl->state = RFB_NORMAL;
+}
+
+
+/*
+ * Read tunneling type requested by the client (protocol 3.130).
+ */
+
+static void
+rfbProcessClientTunnelingType(cl)
+    rfbClientPtr cl;
+{
+    CARD32 tunnel_type;
+    int n;
+
+    if ((n = ReadExact(cl->sock, (char *)&tunnel_type,
+		       sizeof(tunnel_type))) <= 0) {
+	if (n == 0)
+	    rfbLog("rfbProcessClientTunnelingType: client gone\n");
+	else
+	    rfbLogPerror("rfbProcessClientTunnelingType: read");
+	rfbCloseSock(cl->sock);
+	return;
+    }
+
+    tunnel_type = Swap32IfLE(tunnel_type);
+    cl->state = RFB_AUTH_TYPE;
+
+    /* We cannot do tunneling yet. */
+    if (tunnel_type != 0) {
+	rfbLog("Unsupported tunneling type requested by client %s\n",
+	       cl->host);
+	rfbCloseSock(cl->sock);
+	return;
+    }
+}
+
+
+/*
+ * Read client's preferred authentication type (protocol 3.130).
+ */
+
+static void
+rfbProcessClientAuthType(cl)
+    rfbClientPtr cl;
+{
+    CARD32 auth_type;
+    int n;
+
+    if ((n = ReadExact(cl->sock, (char *)&auth_type,
+		       sizeof(auth_type))) <= 0) {
+	if (n == 0)
+	    rfbLog("rfbProcessClientAuthType: client gone\n");
+	else
+	    rfbLogPerror("rfbProcessClientAuthType: read");
+	rfbCloseSock(cl->sock);
+	return;
+    }
+
+    auth_type = Swap32IfLE(auth_type);
+
+    /* Currently, we always fallback to the standard VNC authentication. */
     rfbAuthNewClient(cl);
 }
 
@@ -438,6 +659,9 @@ rfbProcessClientInitMessage(cl)
 	return;
     }
 
+    if (cl->protocol_minor_ver >= 130) {
+	rfbSendInteractionCaps(cl); /* protocol 3.130 */
+    }
     cl->state = RFB_NORMAL;
 
     if (!cl->reverseConnection &&
