@@ -52,18 +52,12 @@ typedef struct PALETTE_s {
     COLOR_LIST list[256];
 } PALETTE;
 
-typedef struct PALETTE8_s {
-    CARD8 pixelValue[2];
-    CARD8 colorIdx[256];
-} PALETTE8;
-
 
 static BOOL usePixelFormat24;
 
-static int paletteMaxColors;
-static int paletteNumColors;
+static int paletteNumColors, paletteMaxColors;
+static CARD32 monoBackground, monoForeground;
 static PALETTE palette;
-static PALETTE8 palette8;
 
 static int tightBeforeBufSize = 0;
 static char *tightBeforeBuf = NULL;
@@ -81,19 +75,21 @@ static BOOL SendFullColorRect(rfbClientPtr cl, int w, int h);
 static BOOL SendGradientRect(rfbClientPtr cl, int w, int h);
 static BOOL CompressData(rfbClientPtr cl, int streamId, int dataLen);
 
-static void FillPalette8(int w, int h);
-static void FillPalette16(int w, int h);
-static void FillPalette32(int w, int h);
+static void FillPalette8(int count);
+static void FillPalette16(int count);
+static void FillPalette32(int count);
 
 static void PaletteReset(void);
-static int PaletteFind(CARD32 rgb);
-static int PaletteInsert(CARD32 rgb, int numPixels);
+static int PaletteInsert(CARD32 rgb, int numPixels, int bpp);
 
 static void Pack24(char *buf, rfbPixelFormat *fmt, int count);
 
-static void EncodeIndexedRect8(CARD8 *buf, int w, int h);
-static void EncodeIndexedRect16(CARD8 *buf, int w, int h);
-static void EncodeIndexedRect32(CARD8 *buf, int w, int h);
+static void EncodeIndexedRect16(CARD8 *buf, int count);
+static void EncodeIndexedRect32(CARD8 *buf, int count);
+
+static void EncodeMonoRect8(CARD8 *buf, int w, int h);
+static void EncodeMonoRect16(CARD8 *buf, int w, int h);
+static void EncodeMonoRect32(CARD8 *buf, int w, int h);
 
 static void FilterGradient24(char *buf, rfbPixelFormat *fmt, int w, int h);
 static void FilterGradient16(CARD16 *buf, rfbPixelFormat *fmt, int w, int h);
@@ -203,13 +199,13 @@ SendSubrect(cl, x, y, w, h)
     paletteMaxColors = w * h / 128;
     switch (cl->format.bitsPerPixel) {
     case 8:
-        FillPalette8(w, h);
+        FillPalette8(w * h);
         break;
     case 16:
-        FillPalette16(w, h);
+        FillPalette16(w * h);
         break;
     default:
-        FillPalette32(w, h);
+        FillPalette32(w * h);
     }
 
     switch (paletteNumColors) {
@@ -287,18 +283,26 @@ SendIndexedRect(cl, w, h)
         streamId = 2;
         dataLen = w * h;
     }
+
     updateBuf[ublen++] = (streamId | rfbTightExplicitFilter) << 4;
     updateBuf[ublen++] = rfbTightFilterPalette;
     updateBuf[ublen++] = (char)(paletteNumColors - 1);
 
     /* Prepare palette, convert image. */
     switch (cl->format.bitsPerPixel) {
-    case 32:
-        for (i = 0; i < paletteNumColors; i++) {
-            ((CARD32 *)tightAfterBuf)[i] =
-                palette.entry[i].listNode->rgb;
-        }
 
+    case 32:
+        if (paletteNumColors == 2) {
+            ((CARD32 *)tightAfterBuf)[0] = monoBackground;
+            ((CARD32 *)tightAfterBuf)[1] = monoForeground;
+            EncodeMonoRect32((CARD8 *)tightBeforeBuf, w, h);
+        } else {
+            for (i = 0; i < paletteNumColors; i++) {
+                ((CARD32 *)tightAfterBuf)[i] =
+                    palette.entry[i].listNode->rgb;
+            }
+            EncodeIndexedRect32((CARD8 *)tightBeforeBuf, w * h);
+        }
         if (usePixelFormat24) {
             Pack24(tightAfterBuf, &cl->format, paletteNumColors);
             entryLen = 3;
@@ -308,28 +312,32 @@ SendIndexedRect(cl, w, h)
         memcpy(&updateBuf[ublen], tightAfterBuf, paletteNumColors * entryLen);
         ublen += paletteNumColors * entryLen;
         cl->rfbBytesSent[rfbEncodingTight] += paletteNumColors * entryLen + 3;
-
-        EncodeIndexedRect32((CARD8 *)tightBeforeBuf, w, h);
         break;
 
     case 16:
-        for (i = 0; i < paletteNumColors; i++) {
-            ((CARD16 *)tightAfterBuf)[i] =
-                (CARD16)palette.entry[i].listNode->rgb;
+        if (paletteNumColors == 2) {
+            ((CARD16 *)tightAfterBuf)[0] = (CARD16)monoBackground;
+            ((CARD16 *)tightAfterBuf)[1] = (CARD16)monoForeground;
+            EncodeMonoRect16((CARD8 *)tightBeforeBuf, w, h);
+        } else {
+            for (i = 0; i < paletteNumColors; i++) {
+                ((CARD16 *)tightAfterBuf)[i] =
+                    (CARD16)palette.entry[i].listNode->rgb;
+            }
+            EncodeIndexedRect16((CARD8 *)tightBeforeBuf, w * h);
         }
+
         memcpy(&updateBuf[ublen], tightAfterBuf, paletteNumColors * 2);
         ublen += paletteNumColors * 2;
         cl->rfbBytesSent[rfbEncodingTight] += paletteNumColors * 2 + 3;
-
-        EncodeIndexedRect16((CARD8 *)tightBeforeBuf, w, h);
         break;
 
     default:
-        memcpy (&updateBuf[ublen], palette8.pixelValue, paletteNumColors);
-        ublen += paletteNumColors;
-        cl->rfbBytesSent[rfbEncodingTight] += paletteNumColors + 3;
+        EncodeMonoRect8((CARD8 *)tightBeforeBuf, w, h);
 
-        EncodeIndexedRect8((CARD8 *)tightBeforeBuf, w, h);
+        updateBuf[ublen++] = (char)monoBackground;
+        updateBuf[ublen++] = (char)monoForeground;
+        cl->rfbBytesSent[rfbEncodingTight] += 5;
     }
 
     return CompressData(cl, streamId, dataLen);
@@ -484,8 +492,8 @@ CompressData(cl, streamId, dataLen)
  */
 
 static void
-FillPalette8(w, h)
-    int w, h;
+FillPalette8(count)
+    int count;
 {
     CARD8 *data = (CARD8 *)tightBeforeBuf;
     CARD8 c0, c1;
@@ -494,8 +502,8 @@ FillPalette8(w, h)
     paletteNumColors = 0;
 
     c0 = data[0];
-    for (i = 1; i < w * h && data[i] == c0; i++);
-    if (i == w * h) {
+    for (i = 1; i < count && data[i] == c0; i++);
+    if (i == count) {
         paletteNumColors = 1;
         return;                 /* Solid rectangle */
     }
@@ -506,7 +514,7 @@ FillPalette8(w, h)
     n0 = i;
     c1 = data[i];
     n1 = 0;
-    for (i++; i < w * h; i++) {
+    for (i++; i < count; i++) {
         if (data[i] == c0) {
             n0++;
         } else if (data[i] == c1) {
@@ -514,17 +522,13 @@ FillPalette8(w, h)
         } else
             break;
     }
-    if (i == w * h) {
-        if (n1 > n0) {
-            palette8.pixelValue[0] = c0;
-            palette8.pixelValue[1] = c1;
-            palette8.colorIdx[c0] = 0;
-            palette8.colorIdx[c1] = 1;
+    if (i == count) {
+        if (n0 > n1) {
+            monoBackground = (CARD32)c0;
+            monoForeground = (CARD32)c1;
         } else {
-            palette8.pixelValue[0] = c1;
-            palette8.pixelValue[1] = c0;
-            palette8.colorIdx[c0] = 1;
-            palette8.colorIdx[c1] = 0;
+            monoBackground = (CARD32)c1;
+            monoForeground = (CARD32)c0;
         }
         paletteNumColors = 2;   /* Two colors */
     }
@@ -533,8 +537,8 @@ FillPalette8(w, h)
 #define DEFINE_FILL_PALETTE_FUNCTION(bpp)                               \
                                                                         \
 static void                                                             \
-FillPalette##bpp(w, h)                                                  \
-    int w, h;                                                           \
+FillPalette##bpp(count)                                                 \
+    int count;                                                          \
 {                                                                       \
     CARD##bpp *data = (CARD##bpp *)tightBeforeBuf;                      \
     CARD##bpp c0, c1, ci;                                               \
@@ -543,10 +547,10 @@ FillPalette##bpp(w, h)                                                  \
     PaletteReset();                                                     \
                                                                         \
     c0 = data[0];                                                       \
-    for (i = 1; i < w * h && data[i] == c0; i++);                       \
-    if (i == w * h) {                                                   \
-        paletteNumColors = 1;                                           \
-        return;                 /* Solid rectangle */                   \
+    for (i = 1; i < count && data[i] == c0; i++);                       \
+    if (i == count) {                                                   \
+        paletteNumColors = 1;   /* Solid rectangle */                   \
+        return;                                                         \
     }                                                                   \
                                                                         \
     if (paletteMaxColors < 2)                                           \
@@ -555,7 +559,7 @@ FillPalette##bpp(w, h)                                                  \
     n0 = i;                                                             \
     c1 = data[i];                                                       \
     n1 = 0;                                                             \
-    for (i++; i < w * h; i++) {                                         \
+    for (i++; i < count; i++) {                                         \
         ci = data[i];                                                   \
         if (ci == c0) {                                                 \
             n0++;                                                       \
@@ -564,23 +568,33 @@ FillPalette##bpp(w, h)                                                  \
         } else                                                          \
             break;                                                      \
     }                                                                   \
-    PaletteInsert (c0, (CARD32)n0);                                     \
-    PaletteInsert (c1, (CARD32)n1);                                     \
-    if (i == w * h)                                                     \
-        return;                 /* Two colors */                        \
+    if (i == count) {                                                   \
+        if (n0 > n1) {                                                  \
+            monoBackground = (CARD32)c0;                                \
+            monoForeground = (CARD32)c1;                                \
+        } else {                                                        \
+            monoBackground = (CARD32)c1;                                \
+            monoForeground = (CARD32)c0;                                \
+        }                                                               \
+        paletteNumColors = 2;   /* Two colors */                        \
+        return;                                                         \
+    }                                                                   \
+                                                                        \
+    PaletteInsert (c0, (CARD32)n0, bpp);                                \
+    PaletteInsert (c1, (CARD32)n1, bpp);                                \
                                                                         \
     ni = 1;                                                             \
-    for (i++; i < w * h; i++) {                                         \
+    for (i++; i < count; i++) {                                         \
         if (data[i] == ci) {                                            \
             ni++;                                                       \
         } else {                                                        \
-            if (!PaletteInsert (ci, (CARD32)ni))                        \
+            if (!PaletteInsert (ci, (CARD32)ni, bpp))                   \
                 return;                                                 \
             ci = data[i];                                               \
             ni = 1;                                                     \
         }                                                               \
     }                                                                   \
-    PaletteInsert (ci, (CARD32)ni);                                     \
+    PaletteInsert (ci, (CARD32)ni, bpp);                                \
 }
 
 DEFINE_FILL_PALETTE_FUNCTION(16)
@@ -590,6 +604,9 @@ DEFINE_FILL_PALETTE_FUNCTION(32)
 /*
  * Functions to operate with palette structures.
  */
+
+#define HASH_FUNC16(rgb) ((int)((rgb >> 8) + rgb & 0xFF))
+#define HASH_FUNC32(rgb) ((int)((rgb >> 16) + (rgb >> 8) & 0xFF))
 
 static void
 PaletteReset(void)
@@ -602,39 +619,17 @@ PaletteReset(void)
 }
 
 static int
-PaletteFind(rgb)
-    CARD32 rgb;
-{
-    COLOR_LIST *pnode;
-
-    if (rgb & 0xFF000000) {
-        pnode = palette.hash[(int)((rgb >> 24) + (rgb >> 16) & 0xFF)];
-    } else {
-        pnode = palette.hash[(int)((rgb >> 8) + rgb & 0xFF)];
-    }
-
-    while (pnode != NULL) {
-        if (pnode->rgb == rgb)
-            return pnode->idx;
-        pnode = pnode->next;
-    }
-    return -1;
-}
-
-static int
-PaletteInsert(rgb, numPixels)
+PaletteInsert(rgb, numPixels, bpp)
     CARD32 rgb;
     int numPixels;
+    int bpp;
 {
     COLOR_LIST *pnode;
     COLOR_LIST *prev_pnode = NULL;
     int hash_key, idx, new_idx, count;
 
-    if (rgb & 0xFF000000) {
-        hash_key = (int)((rgb >> 24) + (rgb >> 16) & 0xFF);
-    } else {
-        hash_key = (int)((rgb >> 8) + rgb & 0xFF);
-    }
+    hash_key = (bpp == 16) ? HASH_FUNC16(rgb) : HASH_FUNC32(rgb);
+
     pnode = palette.hash[hash_key];
 
     while (pnode != NULL) {
@@ -728,44 +723,99 @@ static void Pack24(buf, fmt, count)
  * Converting truecolor samples into palette indices.
  */
 
-#define PaletteFind8(c)  palette8.colorIdx[(c)]
-#define PaletteFind16    PaletteFind
-#define PaletteFind32    PaletteFind
-
 #define DEFINE_IDX_ENCODE_FUNCTION(bpp)                                 \
                                                                         \
 static void                                                             \
-EncodeIndexedRect##bpp(buf, w, h)                                       \
+EncodeIndexedRect##bpp(buf, count)                                      \
     CARD8 *buf;                                                         \
-    int w, h;                                                           \
+    int count;                                                          \
 {                                                                       \
-    int x, y, i, width_bytes;                                           \
+    COLOR_LIST *pnode;                                                  \
+    CARD##bpp *src;                                                     \
+    CARD##bpp rgb;                                                      \
+    int rep = 0;                                                        \
                                                                         \
-    if (paletteNumColors != 2) {                                        \
-      for (i = 0; i < w * h; i++)                                       \
-        buf[i] = (CARD8)PaletteFind(((CARD##bpp *)buf)[i]);             \
-      return;                                                           \
-    }                                                                   \
+    src = (CARD##bpp *) buf;                                            \
                                                                         \
-    width_bytes = (w + 7) / 8;                                          \
-    for (y = 0; y < h; y++) {                                           \
-      for (x = 0; x < w / 8; x++) {                                     \
-        for (i = 0; i < 8; i++)                                         \
-          buf[y*width_bytes+x] = (buf[y*width_bytes+x] << 1) |          \
-            (PaletteFind##bpp (((CARD##bpp *)buf)[y*w+x*8+i]) & 1);     \
-      }                                                                 \
-      buf[y*width_bytes+x] = 0;                                         \
-      for (i = 0; i < w % 8; i++) {                                     \
-        buf[y*width_bytes+x] |=                                         \
-          (PaletteFind##bpp (((CARD##bpp *)buf)[y*w+x*8+i]) & 1) <<     \
-            (7 - i);                                                    \
-      }                                                                 \
+    while (count--) {                                                   \
+        rgb = *src++;                                                   \
+        while (count && *src == rgb) {                                  \
+            rep++, src++, count--;                                      \
+        }                                                               \
+        pnode = palette.hash[HASH_FUNC##bpp(rgb)];                      \
+        while (pnode != NULL) {                                         \
+            if ((CARD##bpp)pnode->rgb == rgb) {                         \
+                *buf++ = (CARD8)pnode->idx;                             \
+                while (rep) {                                           \
+                    *buf++ = (CARD8)pnode->idx;                         \
+                    rep--;                                              \
+                }                                                       \
+                break;                                                  \
+            }                                                           \
+            pnode = pnode->next;                                        \
+        }                                                               \
     }                                                                   \
 }
 
-DEFINE_IDX_ENCODE_FUNCTION(8)
 DEFINE_IDX_ENCODE_FUNCTION(16)
 DEFINE_IDX_ENCODE_FUNCTION(32)
+
+#define DEFINE_MONO_ENCODE_FUNCTION(bpp)                                \
+                                                                        \
+static void                                                             \
+EncodeMonoRect##bpp(buf, w, h)                                          \
+    CARD8 *buf;                                                         \
+    int w, h;                                                           \
+{                                                                       \
+    CARD##bpp *ptr;                                                     \
+    CARD##bpp bg, sample;                                               \
+    unsigned int value, mask;                                           \
+    int aligned_width;                                                  \
+    int x, y, bg_bits;                                                  \
+                                                                        \
+    ptr = (CARD##bpp *) buf;                                            \
+    bg = (CARD##bpp) monoBackground;                                    \
+    aligned_width = w - w % 8;                                          \
+                                                                        \
+    for (y = 0; y < h; y++) {                                           \
+        for (x = 0; x < aligned_width; x += 8) {                        \
+            for (bg_bits = 0; bg_bits < 8; bg_bits++) {                 \
+                if (*ptr++ != bg)                                       \
+                    break;                                              \
+            }                                                           \
+            if (bg_bits == 8) {                                         \
+                *buf++ = 0;                                             \
+                continue;                                               \
+            }                                                           \
+            mask = 0x80 >> bg_bits;                                     \
+            value = mask;                                               \
+            for (bg_bits++; bg_bits < 8; bg_bits++) {                   \
+                mask >>= 1;                                             \
+                if (*ptr++ != bg) {                                     \
+                    value |= mask;                                      \
+                }                                                       \
+            }                                                           \
+            *buf++ = (CARD8)value;                                      \
+        }                                                               \
+                                                                        \
+        mask = 0x80;                                                    \
+        value = 0;                                                      \
+        if (x >= w)                                                     \
+            continue;                                                   \
+                                                                        \
+        for (; x < w; x++) {                                            \
+            if (*ptr++ != bg) {                                         \
+                value |= mask;                                          \
+            }                                                           \
+            mask >>= 1;                                                 \
+        }                                                               \
+        *buf++ = (CARD8)value;                                          \
+    }                                                                   \
+}
+
+DEFINE_MONO_ENCODE_FUNCTION(8)
+DEFINE_MONO_ENCODE_FUNCTION(16)
+DEFINE_MONO_ENCODE_FUNCTION(32)
 
 
 /*
