@@ -305,6 +305,8 @@ extern int rfbGCIndex;
 
 extern int inetdSock;
 
+extern unsigned long interface;
+
 extern int rfbBitsPerPixel(int depth);
 extern void rfbLog(char *format, ...);
 extern void rfbLogPerror(char *str);
@@ -320,7 +322,6 @@ extern Bool udpSockConnected;
 
 extern int rfbPort;
 extern int rfbListenSock;
-extern Bool rfbLocalhostOnly;
 
 extern void rfbInitSockets();
 extern void rfbDisconnectUDPSock();

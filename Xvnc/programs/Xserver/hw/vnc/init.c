@@ -132,6 +132,9 @@ static miPointerScreenFuncRec rfbPointerCursorFuncs = {
 int inetdSock = -1;
 static char inetdDisplayNumStr[10];
 
+/* Interface address to bind to. */
+unsigned long interface;
+
 
 /*
  * ddxProcessArgument is our first entry point and will be called at the
@@ -155,7 +158,8 @@ ddxProcessArgument (argc, argv, i)
 	rfbScreen.whitePixel = RFB_DEFAULT_WHITEPIXEL;
 	rfbScreen.pfbMemory = NULL;
 	gethostname(rfbThisHost, 255);
-        firstTime = FALSE;
+	interface = htonl (INADDR_ANY);
+	firstTime = FALSE;
     }
 
     if (strcmp (argv[i], "-geometry") == 0)	/* -geometry WxH */
@@ -294,8 +298,40 @@ ddxProcessArgument (argc, argv, i)
     }
 
     if (strcmp(argv[i], "-localhost") == 0) {
-	rfbLocalhostOnly = TRUE;
+	interface = htonl (INADDR_LOOPBACK);
 	return 1;
+    }
+
+    if (strcmp(argv[i], "-interface") == 0) {	/* -interface ipaddr */
+	unsigned long got;
+	unsigned long octet;
+	char *p, *end;
+	int q;
+	if (i + 1 >= argc) {
+		UseMsg();
+		return 2;
+	}
+	if (interface != htonl (INADDR_ANY)) {
+		/* Already set (-localhost?). */
+		return 2;
+	}
+	p = argv[i + 1];
+	for (q = 0; q < 4; q++) {
+		octet = strtoul (p, &end, 10);
+		if (p == end || octet > 255) {
+			UseMsg ();
+			return 2;
+		}
+		if (q < 3 && *end != '.' ||
+		    q == 3 && *end != '\0') {
+			UseMsg ();
+			return 2;
+		}
+		got = (got << 8) | octet;
+		p = end + 1;
+	}
+	interface = htonl (got);
+	return 2;
     }
 
     if (strcmp(argv[i], "-inetd") == 0) {	/* -inetd */ 
@@ -855,7 +891,7 @@ ddxUseMsg()
 							     "(default 40)\n");
     ErrorF("-economictranslate     less memory-hungry translation\n");
     ErrorF("-lazytight             disable \"gradient\" filter in tight "
-                                                                "encoding\n");
+								"encoding\n");
     ErrorF("-desktop name          VNC desktop name (default x11)\n");
     ErrorF("-alwaysshared          always treat new clients as shared\n");
     ErrorF("-nevershared           never treat new clients as shared\n");
@@ -864,6 +900,8 @@ ddxUseMsg()
 	   "                       connection comes in (refuse new connection "
 								 "instead)\n");
     ErrorF("-localhost             only allow connections from localhost\n");
+    ErrorF("-interface ipaddr      only bind to specified interface "
+								"address\n");
     ErrorF("-inetd                 Xvnc is launched by inetd\n");
     exit(1);
 }

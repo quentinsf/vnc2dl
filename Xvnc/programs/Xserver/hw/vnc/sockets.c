@@ -55,7 +55,6 @@ int rfbMaxClientWait = 20000;	/* time (ms) after which we decide client has
 
 int rfbPort = 0;
 int rfbListenSock = -1;
-Bool rfbLocalhostOnly = FALSE;
 
 int udpPort = 0;
 int udpSock = -1;
@@ -473,10 +472,7 @@ ListenOnTCPPort(port)
 
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    if (rfbLocalhostOnly)
-        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    else
-        addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_addr.s_addr = interface;
 
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 	return -1;
@@ -543,7 +539,7 @@ ListenOnUDPPort(port)
 
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_addr.s_addr = interface;
 
     if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 	return -1;
