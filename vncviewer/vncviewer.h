@@ -94,8 +94,6 @@ typedef struct {
 
   int compressLevel;
 
-  Bool disableLocalCursor;
-
 } AppData;
 
 extern AppData appData;
