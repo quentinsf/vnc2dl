@@ -315,7 +315,8 @@ not set, this environment variable defaults to "/usr/bin/ssh -f -L
 %L:%H:%R %G sleep 20".
 
 The following patterns are recognized in the \fBVNC_VIA_CMD\fR (note
-that all these patterns must be present in the command template):
+that all the patterns %G, %H, %L and %R must be present in the command
+template):
 .TP
 .B %%
 A literal "%";
