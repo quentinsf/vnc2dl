@@ -377,11 +377,6 @@ FilterGradient24 (int numRows, CARD32 *dst)
 
 #endif
 
-/* The following filter implementation is not very efficient, and in fact
-   it's currently not used. For now, this filter appies only to 24-bit
-   color samples, see FilterGradient24() above. The version below is
-   provided for compatibility with possible future implementations. */
-
 static void
 FilterGradientBPP (int numRows, CARDBPP *dst)
 {
