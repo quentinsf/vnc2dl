@@ -139,6 +139,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
     err = inflateInit(&zlibStream[stream_id]);
     if (err != Z_OK)
       return False;
+    zlibStreamActive[stream_id] = True;
   }
 
   /* Read compressed data, restore and draw the whole rectangle. */
@@ -189,7 +190,7 @@ HandleTightDataBPP(int compressedLen, int stream_id, filterPtrBPP filterFn,
 
   /* Prepare compression stream */
   zs->next_out = (Bytef *)rgbBuffer;
-  zs->avail_out = rgbBufferSize;
+  zs->avail_out = rgbLen;
 
   /* Read compressed stream and decompress it with zlib */
   while (compressedLen > 0) {
@@ -204,8 +205,10 @@ HandleTightDataBPP(int compressedLen, int stream_id, filterPtrBPP filterFn,
     zs->avail_in = readLen;
 
     err = inflate (zs, Z_SYNC_FLUSH);
-    if (err != Z_OK && err != Z_STREAM_END)
+    if (err != Z_OK && err != Z_STREAM_END) {
+      fprintf(stderr, "inflate: %s\n", zs->msg);
       return False;
+    }
     if (err == Z_STREAM_END)    /* DEBUG */
       fprintf(stderr, "inflate: %s\n", zs->msg);
 
@@ -274,9 +277,9 @@ FilterCopyBPP (char *rgb, CARDBPP *clientData, int w, int h)
 
   for (y = 0; y < h; y++) {
     for (x = 0; x < w; x++)
-      clientData[y*w] = TransFnBPP(rgb[(y*w+x)*3],
-                                   rgb[(y*w+x)*3+1],
-                                   rgb[(y*w+x)*3+2]);
+      clientData[y*w+x] = TransFnBPP(rgb[(y*w+x)*3],
+                                     rgb[(y*w+x)*3+1],
+                                     rgb[(y*w+x)*3+2]);
   }
 }
 
