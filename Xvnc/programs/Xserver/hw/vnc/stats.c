@@ -39,6 +39,8 @@ rfbResetStats(rfbClientPtr cl)
 	cl->rfbBytesSent[i] = 0;
 	cl->rfbRectanglesSent[i] = 0;
     }
+    cl->rfbLastRectMarkersSent = 0;
+    cl->rfbLastRectBytesSent = 0;
     cl->rfbCursorBytesSent = 0;
     cl->rfbCursorUpdatesSent = 0;
     cl->rfbFramebufferUpdateMessagesSent = 0;
@@ -64,12 +66,17 @@ rfbPrintStats(rfbClientPtr cl)
 	totalRectanglesSent += cl->rfbRectanglesSent[i];
 	totalBytesSent += cl->rfbBytesSent[i];
     }
-    totalRectanglesSent += cl->rfbCursorUpdatesSent;
-    totalBytesSent += cl->rfbCursorBytesSent;
+    totalRectanglesSent += (cl->rfbCursorUpdatesSent +
+			    cl->rfbLastRectMarkersSent);
+    totalBytesSent += (cl->rfbCursorBytesSent + cl->rfbLastRectBytesSent);
 
     rfbLog("  framebuffer updates %d, rectangles %d, bytes %d\n",
 	    cl->rfbFramebufferUpdateMessagesSent, totalRectanglesSent,
 	    totalBytesSent);
+
+    if (cl->rfbLastRectMarkersSent != 0)
+	rfbLog("    LastRect markers %d, bytes %d\n",
+		cl->rfbLastRectMarkersSent, cl->rfbLastRectBytesSent);
 
     if (cl->rfbCursorUpdatesSent != 0)
 	rfbLog("    cursor shape updates %d, bytes %d\n",

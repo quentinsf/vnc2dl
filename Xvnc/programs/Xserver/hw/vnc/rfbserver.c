@@ -58,6 +58,7 @@ static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
 static void rfbProcessClientNormalMessage(rfbClientPtr cl);
 static void rfbProcessClientInitMessage(rfbClientPtr cl);
 static Bool rfbSendCopyRegion(rfbClientPtr cl, RegionPtr reg, int dx, int dy);
+static Bool rfbSendLastRectMarker(rfbClientPtr cl);
 
 
 /*
@@ -172,6 +173,7 @@ rfbNewClient(sock)
         cl->zsActive[i] = FALSE;
 
     cl->enableCursorShapeUpdates = FALSE;
+    cl->enableLastRectEncoding = FALSE;
 
     cl->next = rfbClientHead;
     rfbClientHead = cl;
@@ -542,6 +544,7 @@ rfbProcessClientNormalMessage(cl)
 	cl->preferredEncoding = -1;
 	cl->useCopyRect = FALSE;
 	cl->enableCursorShapeUpdates = FALSE;
+	cl->enableLastRectEncoding = FALSE;
 
 	for (i = 0; i < msg.se.nEncodings; i++) {
 	    if ((n = ReadExact(cl->sock, (char *)&enc, 4)) <= 0) {
@@ -613,6 +616,13 @@ rfbProcessClientNormalMessage(cl)
 		    cl->enableCursorShapeUpdates = TRUE;
 		    cl->useRichCursorEncoding = TRUE;
 		    cl->cursorWasChanged = TRUE;
+		}
+		break;
+	    case rfbEncodingLastRect:
+		if (!cl->enableLastRectEncoding) {
+		    rfbLog("Enabling LastRect protocol extension for client "
+			   "%s\n", cl->host);
+		    cl->enableLastRectEncoding = TRUE;
 		}
 		break;
 	    default:
@@ -920,22 +930,30 @@ rfbSendFramebufferUpdate(cl)
 	    nUpdateRegionRects += (((h-1) / (ZLIB_MAX_SIZE( w ) / w)) + 1);
 	}
     } else if (cl->preferredEncoding == rfbEncodingTight) {
-	nUpdateRegionRects = 0;
+	if (cl->enableLastRectEncoding) {
+	    nUpdateRegionRects = 0xFFFF;
+	} else {
+	    nUpdateRegionRects = 0;
 
-	for (i = 0; i < REGION_NUM_RECTS(&updateRegion); i++) {
-	    int x = REGION_RECTS(&updateRegion)[i].x1;
-	    int y = REGION_RECTS(&updateRegion)[i].y1;
-	    int w = REGION_RECTS(&updateRegion)[i].x2 - x;
-	    int h = REGION_RECTS(&updateRegion)[i].y2 - y;
-	    nUpdateRegionRects += rfbNumCodedRectsTight(cl, x, y, w, h);
+	    for (i = 0; i < REGION_NUM_RECTS(&updateRegion); i++) {
+		int x = REGION_RECTS(&updateRegion)[i].x1;
+		int y = REGION_RECTS(&updateRegion)[i].y1;
+		int w = REGION_RECTS(&updateRegion)[i].x2 - x;
+		int h = REGION_RECTS(&updateRegion)[i].y2 - y;
+		nUpdateRegionRects += rfbNumCodedRectsTight(cl, x, y, w, h);
+	    }
 	}
     } else {
 	nUpdateRegionRects = REGION_NUM_RECTS(&updateRegion);
     }
 
     fu->type = rfbFramebufferUpdate;
-    fu->nRects = Swap16IfLE(REGION_NUM_RECTS(&updateCopyRegion)
-			    + nUpdateRegionRects + !!sendCursorShape);
+    if (nUpdateRegionRects != 0xFFFF) {
+	fu->nRects = Swap16IfLE(REGION_NUM_RECTS(&updateCopyRegion)
+				+ nUpdateRegionRects + !!sendCursorShape);
+    } else {
+	fu->nRects = 0xFFFF;
+    }
     ublen = sz_rfbFramebufferUpdateMsg;
 
     if (sendCursorShape) {
@@ -995,15 +1013,27 @@ rfbSendFramebufferUpdate(cl)
 	    }
 	    break;
 	case rfbEncodingTight:
-	    if (!rfbSendRectEncodingTight(cl, x, y, w, h)) {
-		REGION_UNINIT(pScreen,&updateRegion);
-		return FALSE;
+	    if (cl->enableLastRectEncoding) {
+		if (!rfbSendRectSmartTight(cl, x, y, w, h)) {
+		    REGION_UNINIT(pScreen,&updateRegion);
+		    return FALSE;
+		}
+	    } else {
+		if (!rfbSendRectEncodingTight(cl, x, y, w, h)) {
+		    REGION_UNINIT(pScreen,&updateRegion);
+		    return FALSE;
+		}
 	    }
 	    break;
 	}
     }
 
     REGION_UNINIT(pScreen,&updateRegion);
+
+    if ( cl->enableLastRectEncoding &&
+	 !rfbSendLastRectMarker(cl) ) {
+	return FALSE;
+    }
 
     if (!rfbSendUpdateBuf(cl))
 	return FALSE;
@@ -1173,6 +1203,40 @@ rfbSendRectEncodingRaw(cl, x, y, w, h)
 	    return FALSE;
 	}
     }
+}
+
+
+/*
+ * Send an empty rectangle with encoding field set to value of
+ * rfbEncodingLastRect to notify client that this is the last
+ * rectangle in framebuffer update ("LastRect" extension of RFB
+ * protocol).
+ */
+
+static Bool
+rfbSendLastRectMarker(cl)
+    rfbClientPtr cl;
+{
+    rfbFramebufferUpdateRectHeader rect;
+
+    if (ublen + sz_rfbFramebufferUpdateRectHeader > UPDATE_BUF_SIZE) {
+	if (!rfbSendUpdateBuf(cl))
+	    return FALSE;
+    }
+
+    rect.encoding = Swap32IfLE(rfbEncodingLastRect);
+    rect.r.x = 0;
+    rect.r.y = 0;
+    rect.r.w = 0;
+    rect.r.h = 0;
+
+    memcpy(&updateBuf[ublen], (char *)&rect,sz_rfbFramebufferUpdateRectHeader);
+    ublen += sz_rfbFramebufferUpdateRectHeader;
+
+    cl->rfbLastRectMarkersSent++;
+    cl->rfbLastRectBytesSent += sz_rfbFramebufferUpdateRectHeader;
+
+    return TRUE;
 }
 
 
