@@ -117,9 +117,16 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
     }
 #else
     if (!ReadFromRFBServer((char*)&fill_colour, sizeof(fill_colour)))
-      return False;
+        return False;
 #endif
+
+#if (BPP == 8)
+    gcv.foreground = (appData.useBGR233) ?
+        BGR233ToPixel[fill_colour] : fill_colour;
+#else
     gcv.foreground = fill_colour;
+#endif
+
     XChangeGC(dpy, gc, GCForeground, &gcv);
     XFillRectangle(dpy, desktopWin, gc, rx, ry, rw, rh);
     return True;

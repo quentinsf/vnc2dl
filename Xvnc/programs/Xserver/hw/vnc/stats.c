@@ -27,7 +27,7 @@
 
 static char* encNames[] = {
     "raw", "copyRect", "RRE", "[encoding 3]", "CoRRE", "hextile",
-    "[encoding 6]", "[encoding 7]", "[encoding 8]", "[encoding 9]"
+    "[encoding 6]", "tight", "[encoding 8]", "[encoding 9]"
 };
 
 

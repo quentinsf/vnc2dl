@@ -289,7 +289,6 @@ typedef struct {
 #define rfbEncodingRRE 2
 #define rfbEncodingCoRRE 4
 #define rfbEncodingHextile 5
-#define rfbEncodingZlib 6
 #define rfbEncodingTight 7
 
 

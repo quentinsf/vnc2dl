@@ -48,7 +48,7 @@ typedef struct PALETTE_s {
 typedef struct PALETTE8_s {
     CARD8 pixelValue[256];
     int numPixels[256];
-    CARD8 colorIdx[256];
+    int colorIdx[256];
 } PALETTE8;
 
 
@@ -75,6 +75,9 @@ static int PaletteInsert(CARD32 rgb);
 static void PaletteReset8(void);
 static int PaletteInsert8(CARD8 value);
 
+static void EncodeIndexedRect8(CARD8 *buf, int w, int h);
+static void EncodeIndexedRect16(CARD8 *buf, int w, int h);
+static void EncodeIndexedRect32(CARD8 *buf, int w, int h);
 
 /*
  * Tight encoding implementation.
@@ -124,7 +127,7 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
                 rw = (dx + TIGHT_MAX_RECT_WIDTH < w) ?
                     TIGHT_MAX_RECT_WIDTH : w - dx;
                 rh = (dy + TIGHT_MAX_RECT_WIDTH < h) ?
-                    TIGHT_MAX_RECT_WIDTH : w - dx;
+                    TIGHT_MAX_RECT_WIDTH : h - dy;
                 if (!SendSubrect(cl, x+dx, y+dy, rw, rh))
                     return FALSE;
             }
@@ -151,6 +154,8 @@ SendSubrect(cl, x, y, w, h)
 	    return FALSE;
     }
 
+    rfbLog("DEBUG: Sending rect (%d,%d) [%d*%d]\n", x, y, w, h);
+
     rect.r.x = Swap16IfLE(x);
     rect.r.y = Swap16IfLE(y);
     rect.r.w = Swap16IfLE(w);
@@ -173,7 +178,10 @@ SendSubrect(cl, x, y, w, h)
 
     FillPalette(cl, w, h);
 
+    rfbLog("DEBUG: Number of colors: %d\n", paletteNumColors);
+
     switch (paletteNumColors) {
+
     case 1:
         /* Solid rectangle */
         success = SendSolidRect(cl, w, h);
@@ -184,11 +192,9 @@ SendSubrect(cl, x, y, w, h)
         break;
     default:
         /* Up to 256 different colors */
-/*
         if (w * h >= paletteNumColors * 2)
             success = SendIndexedRect(cl, w, h);
         else
-*/
             success = SendFullColorRect(cl, w, h);
     }
     return success;
@@ -209,7 +215,7 @@ SendSolidRect(cl, w, h)
 	    return FALSE;
     }
 
-    updateBuf[ublen++] = 8;     /* Solid rectangle, color follows */
+    updateBuf[ublen++] = (char)0x80;
     memcpy (&updateBuf[ublen], tightBeforeBuf, cl->format.bitsPerPixel / 8);
     ublen += cl->format.bitsPerPixel / 8;
 
@@ -221,13 +227,16 @@ SendIndexedRect(cl, w, h)
     rfbClientPtr cl;
     int w, h;
 {
-    int i, streamId, dataLen;
+    int streamId, dataLen;
+    int x, y, i, width_bytes;
 
-    if ( ublen + 5 + paletteNumColors * cl->format.bitsPerPixel / 8 >
+    if ( ublen + 6 + paletteNumColors * cl->format.bitsPerPixel / 8 >
          UPDATE_BUF_SIZE ) {
 	if (!rfbSendUpdateBuf(cl))
 	    return FALSE;
     }
+
+    rfbLog("DEBUG: Sending rectangle using indexed colors.\n");
 
     /* Prepare tight encoding header. */
     if (paletteNumColors == 2) {
@@ -243,6 +252,7 @@ SendIndexedRect(cl, w, h)
     }
     updateBuf[ublen++] = streamId << 4 | 0x40; /* 0x40: filter id follows */
     updateBuf[ublen++] = rfbTightFilterPalette;
+    updateBuf[ublen++] = (char)(paletteNumColors - 1);
 
     /* Prepare palette, convert image. */
     switch (cl->format.bitsPerPixel) {
@@ -254,9 +264,7 @@ SendIndexedRect(cl, w, h)
         memcpy(&updateBuf[ublen], tightAfterBuf, paletteNumColors * 4);
         ublen += paletteNumColors * 4;
 
-        for (i = 0; i < w * h; i++)
-            tightBeforeBuf[i] =
-                (char)PaletteFind(((CARD32 *)tightBeforeBuf)[i]);
+        EncodeIndexedRect32((CARD8 *)tightBeforeBuf, w, h);
         break;
 
     case 16:
@@ -267,17 +275,14 @@ SendIndexedRect(cl, w, h)
         memcpy(&updateBuf[ublen], tightAfterBuf, paletteNumColors * 2);
         ublen += paletteNumColors * 2;
 
-        for (i = 0; i < w * h; i++)
-            tightBeforeBuf[i] =
-                (char)PaletteFind(((CARD16 *)tightBeforeBuf)[i]);
+        EncodeIndexedRect16((CARD8 *)tightBeforeBuf, w, h);
         break;
 
     default:
         memcpy (&updateBuf[ublen], palette8.pixelValue, paletteNumColors);
         ublen += paletteNumColors;
 
-        for (i = 0; i < w * h; i++)
-            tightBeforeBuf[i] = palette8.colorIdx[tightBeforeBuf[i & 0xFF]];
+        EncodeIndexedRect8((CARD8 *)tightBeforeBuf, w, h);
     }
 
     return CompressData(cl, streamId, dataLen);
@@ -294,6 +299,8 @@ SendFullColorRect(cl, w, h)
     }
 
     updateBuf[ublen++] = 0x00;  /* stream id = 0, no flushing, no filter */
+
+    rfbLog("DEBUG: Sending full-color rectangle.\n");
 
     return CompressData(cl, 0, w * h * (cl->format.bitsPerPixel / 8));
 }
@@ -319,7 +326,7 @@ CompressData(cl, streamId, dataLen)
                           MAX_MEM_LEVEL, Z_DEFAULT_STRATEGY) != Z_OK) {
             return FALSE;
         }
-        cl->zsActive[streamId] = 1;
+        cl->zsActive[streamId] = TRUE;
     }
 
     /* Actual compression. */
@@ -328,12 +335,17 @@ CompressData(cl, streamId, dataLen)
     pz->next_out = (Bytef *)tightAfterBuf;
     pz->avail_out = tightAfterBufSize;
 
+    rfbLog("DEBUG: Raw bytes: %d\n", dataLen);
+
     if ( deflate (pz, Z_SYNC_FLUSH) != Z_OK ||
          pz->avail_in != 0 || pz->avail_out == 0 ) {
+        rfbLog("DEBUG: deflate() error: %s.\n", pz->msg);
         return FALSE;
     }
 
     compressedLen = (size_t)(tightAfterBufSize - pz->avail_out);
+
+    rfbLog("DEBUG: Compressed bytes: %d\n", compressedLen);
 
     /* Prepare compressed data size for sending. */
     updateBuf[ublen++] = compressedLen & 0x7F;
@@ -370,7 +382,7 @@ FillPalette(cl, w, h)
     rfbClientPtr cl;
     int w, h;
 {
-    int i;
+    int i, n;
     CARD8 *data8 = (CARD8 *)tightBeforeBuf;
     CARD16 *data16 = (CARD16 *)tightBeforeBuf;
     CARD32 *data32 = (CARD32 *)tightBeforeBuf;
@@ -395,8 +407,11 @@ FillPalette(cl, w, h)
     default:                    /* bpp == 8 */
         PaletteReset8();
         for (i = 0; i <= w * h; i++) {
-            if (!PaletteInsert8 (data8[i]))
+            n = PaletteInsert8 (data8[i]);
+            if (n == 0 || n > 2) {
+                paletteNumColors = 0;
                 return;
+            }
         }
         break;
     }
@@ -544,4 +559,46 @@ PaletteInsert8(CARD8 value)
 
     return (++paletteNumColors);
 }
+
+/*
+ * Most ugly part.
+ */
+
+#define PaletteFind8(c)  palette8.colorIdx[(c)]
+#define PaletteFind16    PaletteFind
+#define PaletteFind32    PaletteFind
+
+#define DEFINE_IDX_ENCODE_FUNCTION(bpp)					     \
+									     \
+static void								     \
+EncodeIndexedRect##bpp(buf, w, h)					     \
+    CARD8 *buf;								     \
+    int w, h;								     \
+{									     \
+    int x, y, i, width_bytes;						     \
+									     \
+    if (paletteNumColors != 2) {					     \
+      for (i = 0; i < w * h; i++)					     \
+        buf[i] = (CARD8)PaletteFind(((CARD##bpp *)buf)[i]);		     \
+      return;								     \
+    }									     \
+									     \
+    width_bytes = (w + 7) / 8;						     \
+    for (y = 0; y < h; y++) {						     \
+      for (x = 0; x < w / 8; x++) {					     \
+        for (i = 0; i < 8; i++)						     \
+          buf[y*width_bytes+x] = (buf[y*width_bytes+x] << 1) |		     \
+            (PaletteFind##bpp (((CARD##bpp *)buf)[y*w+x*8+i]) & 1);	     \
+      }									     \
+      buf[y*width_bytes+x] = 0;						     \
+      for (i = 0; i < w % 8; i++) {					     \
+        buf[y*width_bytes+x] |=						     \
+          (PaletteFind##bpp (((CARD##bpp *)buf)[y*w+x*8+i]) & 1) << (7 - i); \
+      }									     \
+    }									     \
+}
+
+DEFINE_IDX_ENCODE_FUNCTION(8)
+DEFINE_IDX_ENCODE_FUNCTION(16)
+DEFINE_IDX_ENCODE_FUNCTION(32)
 
