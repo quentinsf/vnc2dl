@@ -26,6 +26,7 @@
 
 #include <stdio.h>
 #include "rfb.h"
+#include <jpeglib.h>
 
 
 /* Note: The following constant should not be changed. */
@@ -108,6 +109,7 @@ static BOOL SendFullColorRect(rfbClientPtr cl, int w, int h);
 static BOOL SendGradientRect(rfbClientPtr cl, int w, int h);
 static BOOL CompressData(rfbClientPtr cl, int streamId, int dataLen,
                          int zlibLevel, int zlibStrategy);
+static BOOL SendCompressedData(rfbClientPtr cl, int compressedLen);
 
 static void FillPalette8(int count);
 static void FillPalette16(int count);
@@ -129,10 +131,18 @@ static void FilterGradient24(char *buf, rfbPixelFormat *fmt, int w, int h);
 static void FilterGradient16(CARD16 *buf, rfbPixelFormat *fmt, int w, int h);
 static void FilterGradient32(CARD32 *buf, rfbPixelFormat *fmt, int w, int h);
 
-static int DetectStillImage (rfbPixelFormat *fmt, int w, int h);
-static int DetectStillImage24 (rfbPixelFormat *fmt, int w, int h);
-static int DetectStillImage16 (rfbPixelFormat *fmt, int w, int h);
-static int DetectStillImage32 (rfbPixelFormat *fmt, int w, int h);
+static int DetectStillImage(rfbPixelFormat *fmt, int w, int h);
+static int DetectStillImage24(rfbPixelFormat *fmt, int w, int h);
+static int DetectStillImage16(rfbPixelFormat *fmt, int w, int h);
+static int DetectStillImage32(rfbPixelFormat *fmt, int w, int h);
+
+static BOOL SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h,
+                         int quality);
+static void PrepareRowForJpeg(CARD8 *dst, int x, int y, int count);
+static void JpegInitDestination(j_compress_ptr cinfo);
+static boolean JpegEmptyOutputBuffer(j_compress_ptr cinfo);
+static void JpegTermDestination(j_compress_ptr cinfo);
+static void JpegSetDstManager(j_compress_ptr cinfo);
 
 
 /*
@@ -186,20 +196,20 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
     maxAfterSize = maxBeforeSize + (maxBeforeSize + 99) / 100 + 12;
 
     if (tightBeforeBufSize < maxBeforeSize) {
-	tightBeforeBufSize = maxBeforeSize;
-	if (tightBeforeBuf == NULL)
-	    tightBeforeBuf = (char *)xalloc(tightBeforeBufSize);
-	else
-	    tightBeforeBuf = (char *)xrealloc(tightBeforeBuf,
+        tightBeforeBufSize = maxBeforeSize;
+        if (tightBeforeBuf == NULL)
+            tightBeforeBuf = (char *)xalloc(tightBeforeBufSize);
+        else
+            tightBeforeBuf = (char *)xrealloc(tightBeforeBuf,
                                               tightBeforeBufSize);
     }
 
     if (tightAfterBufSize < maxAfterSize) {
-	tightAfterBufSize = maxAfterSize;
-	if (tightAfterBuf == NULL)
-	    tightAfterBuf = (char *)xalloc(tightAfterBufSize);
-	else
-	    tightAfterBuf = (char *)xrealloc(tightAfterBuf,
+        tightAfterBufSize = maxAfterSize;
+        if (tightAfterBuf == NULL)
+            tightAfterBuf = (char *)xalloc(tightAfterBufSize);
+        else
+            tightAfterBuf = (char *)xrealloc(tightAfterBuf,
                                              tightAfterBufSize);
     }
 
@@ -233,8 +243,8 @@ SendSubrect(cl, x, y, w, h)
     int success = 0;
 
     if (ublen + sz_rfbFramebufferUpdateRectHeader > UPDATE_BUF_SIZE) {
-	if (!rfbSendUpdateBuf(cl))
-	    return FALSE;
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
     }
 
     rect.r.x = Swap16IfLE(x);
@@ -244,7 +254,7 @@ SendSubrect(cl, x, y, w, h)
     rect.encoding = Swap32IfLE(rfbEncodingTight);
 
     memcpy(&updateBuf[ublen], (char *)&rect,
-	   sz_rfbFramebufferUpdateRectHeader);
+           sz_rfbFramebufferUpdateRectHeader);
     ublen += sz_rfbFramebufferUpdateRectHeader;
 
     cl->rfbRectanglesSent[rfbEncodingTight]++;
@@ -277,7 +287,8 @@ SendSubrect(cl, x, y, w, h)
     case 0:
         /* Truecolor image */
         if (!rfbTightDisableGradient && DetectStillImage(&cl->format, w, h)) {
-            success = SendGradientRect(cl, w, h);
+/*             success = SendGradientRect(cl, w, h); */
+            success = SendJpegRect(cl, x, y, w, h, 75);
         } else {
             success = SendFullColorRect(cl, w, h);
         }
@@ -316,8 +327,8 @@ SendSolidRect(cl, w, h)
         len = cl->format.bitsPerPixel / 8;
 
     if (ublen + 1 + len > UPDATE_BUF_SIZE) {
-	if (!rfbSendUpdateBuf(cl))
-	    return FALSE;
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
     }
 
     updateBuf[ublen++] = (char)(rfbTightFill << 4);
@@ -338,8 +349,8 @@ SendMonoRect(cl, w, h)
     int paletteLen, dataLen;
 
     if ( ublen + 6 + 2 * cl->format.bitsPerPixel / 8 > UPDATE_BUF_SIZE ) {
-	if (!rfbSendUpdateBuf(cl))
-	    return FALSE;
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
     }
 
     /* Prepare tight encoding header. */
@@ -403,8 +414,8 @@ SendIndexedRect(cl, w, h)
 
     if ( ublen + 6 + paletteNumColors * cl->format.bitsPerPixel / 8 >
          UPDATE_BUF_SIZE ) {
-	if (!rfbSendUpdateBuf(cl))
-	    return FALSE;
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
     }
 
     /* Prepare tight encoding header. */
@@ -464,8 +475,8 @@ SendFullColorRect(cl, w, h)
     int len;
 
     if (ublen + TIGHT_MIN_TO_COMPRESS + 1 > UPDATE_BUF_SIZE) {
-	if (!rfbSendUpdateBuf(cl))
-	    return FALSE;
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
     }
 
     updateBuf[ublen++] = 0x00;  /* stream id = 0, no flushing, no filter */
@@ -494,8 +505,8 @@ SendGradientRect(cl, w, h)
         return SendFullColorRect(cl, w, h);
 
     if (ublen + TIGHT_MIN_TO_COMPRESS + 2 > UPDATE_BUF_SIZE) {
-	if (!rfbSendUpdateBuf(cl))
-	    return FALSE;
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
     }
 
     if (prevRowBuf == NULL)
@@ -527,8 +538,7 @@ CompressData(cl, streamId, dataLen, zlibLevel, zlibStrategy)
     int streamId, dataLen, zlibLevel, zlibStrategy;
 {
     z_streamp pz;
-    int compressedLen, portionLen;
-    int i, err;
+    int err;
 
     if (dataLen < TIGHT_MIN_TO_COMPRESS) {
         memcpy(&updateBuf[ublen], tightBeforeBuf, dataLen);
@@ -574,11 +584,17 @@ CompressData(cl, streamId, dataLen, zlibLevel, zlibStrategy)
         return FALSE;
     }
 
-    compressedLen = (size_t)(tightAfterBufSize - pz->avail_out);
-    cl->rfbBytesSent[rfbEncodingTight] += compressedLen + 1;
+    return SendCompressedData(cl, tightAfterBufSize - pz->avail_out);
+}
 
-    /* Prepare compressed data size for sending. */
+static BOOL SendCompressedData(cl, compressedLen)
+    rfbClientPtr cl;
+    int compressedLen;
+{
+    int i, portionLen;
+
     updateBuf[ublen++] = compressedLen & 0x7F;
+    cl->rfbBytesSent[rfbEncodingTight]++;
     if (compressedLen > 0x7F) {
         updateBuf[ublen-1] |= 0x80;
         updateBuf[ublen++] = compressedLen >> 7 & 0x7F;
@@ -590,7 +606,6 @@ CompressData(cl, streamId, dataLen, zlibLevel, zlibStrategy)
         }
     }
 
-    /* Send update. */
     for (i = 0; i < compressedLen; ) {
         portionLen = compressedLen - i;
         if (portionLen > UPDATE_BUF_SIZE - ublen)
@@ -604,10 +619,9 @@ CompressData(cl, streamId, dataLen, zlibLevel, zlibStrategy)
         if (!rfbSendUpdateBuf(cl))
             return FALSE;
     }
-
+    cl->rfbBytesSent[rfbEncodingTight] += compressedLen;
     return TRUE;
 }
-
 
 /*
  * Code to determine how many different colors used in rectangle.
@@ -1239,4 +1253,135 @@ static int DetectStillImage##bpp (fmt, w, h)                                 \
 
 DEFINE_DETECT_FUNCTION(16)
 DEFINE_DETECT_FUNCTION(32)
+
+/*
+ * JPEG compression stuff.
+ */
+
+static struct jpeg_destination_mgr jpegDstManager;
+static BOOL jpegError;
+static int jpegDstDataLen;
+
+static BOOL
+SendJpegRect(cl, x, y, w, h, quality)
+    rfbClientPtr cl;
+    int x, y, w, h;
+    int quality;
+{
+    struct jpeg_compress_struct cinfo;
+    struct jpeg_error_mgr jerr;
+    CARD8 *srcBuf;
+    JSAMPROW rowPointer[1];
+    int dy;
+
+    if ( rfbServerFormat.bitsPerPixel != 32 ||
+         rfbServerFormat.redMax != 0xFF ||
+         rfbServerFormat.greenMax != 0xFF ||
+         rfbServerFormat.blueMax != 0xFF ) {
+        return SendFullColorRect(cl, w, h);
+    }
+
+    srcBuf = (CARD8 *)xalloc(w * 3);
+    if (srcBuf == NULL) {
+        return SendFullColorRect(cl, w, h);
+    }
+    rowPointer[0] = srcBuf;
+
+    cinfo.err = jpeg_std_error(&jerr);
+    jpeg_create_compress(&cinfo);
+
+    cinfo.image_width = w;
+    cinfo.image_height = h;
+    cinfo.input_components = 3;
+    cinfo.in_color_space = JCS_RGB;
+
+    jpeg_set_defaults(&cinfo);
+    jpeg_set_quality(&cinfo, quality, TRUE);
+
+    JpegSetDstManager (&cinfo);
+
+    jpeg_start_compress(&cinfo, TRUE);
+
+    for (dy = 0; dy < h; dy++) {
+        PrepareRowForJpeg(srcBuf, x, y + dy, w);
+        jpeg_write_scanlines(&cinfo, rowPointer, 1);
+        if (jpegError)
+            break;
+    }
+
+    if (!jpegError)
+        jpeg_finish_compress(&cinfo);
+
+    jpeg_destroy_compress(&cinfo);
+    free(srcBuf);
+
+    if (jpegError)
+        return SendFullColorRect(cl, w, h);
+
+    if (ublen + TIGHT_MIN_TO_COMPRESS + 1 > UPDATE_BUF_SIZE) {
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
+    }
+
+    updateBuf[ublen++] = (char)(rfbTightJpeg << 4);
+    cl->rfbBytesSent[rfbEncodingTight]++;
+
+    return SendCompressedData(cl, jpegDstDataLen);
+}
+
+static void
+PrepareRowForJpeg(dst, x, y, count)
+    CARD8 *dst;
+    int x, y, count;
+{
+    CARD32 *fbptr;
+    CARD32 pix;
+
+    fbptr = (CARD32 *)
+        &rfbScreen.pfbMemory[y * rfbScreen.paddedWidthInBytes + x * 4];
+
+    while (count--) {
+        pix = *fbptr++;
+        *dst++ = (CARD8)(pix >> rfbServerFormat.redShift);
+        *dst++ = (CARD8)(pix >> rfbServerFormat.greenShift);
+        *dst++ = (CARD8)(pix >> rfbServerFormat.blueShift);
+    }
+}
+
+/*
+ * Destination manager implementation for JPEG library.
+ */
+
+static void
+JpegInitDestination(j_compress_ptr cinfo)
+{
+    jpegError = FALSE;
+    jpegDstManager.next_output_byte = (JOCTET *)tightAfterBuf;
+    jpegDstManager.free_in_buffer = (size_t)tightAfterBufSize;
+}
+
+static boolean
+JpegEmptyOutputBuffer(j_compress_ptr cinfo)
+{
+    jpegError = TRUE;
+    jpegDstManager.next_output_byte = (JOCTET *)tightAfterBuf;
+    jpegDstManager.free_in_buffer = (size_t)tightAfterBufSize;
+
+    return TRUE;
+}
+
+static void
+JpegTermDestination(j_compress_ptr cinfo)
+{
+    jpegDstDataLen = tightAfterBufSize - jpegDstManager.free_in_buffer;
+}
+
+static void
+JpegSetDstManager(j_compress_ptr cinfo)
+{
+    jpegDstManager.init_destination = JpegInitDestination;
+    jpegDstManager.empty_output_buffer = JpegEmptyOutputBuffer;
+    jpegDstManager.term_destination = JpegTermDestination;
+    cinfo->dest = &jpegDstManager;
+}
 

@@ -5,5 +5,5 @@
  * and programs/Xserver/hw/vnc whenever you change this file.
  */
 
-VNCLIBS = $(TOP)/../libvncauth/libvncauth.a
+VNCLIBS = $(TOP)/../libvncauth/libvncauth.a /usr/lib/libjpeg.a
 VNCCPPFLAGS = -I$(TOP)/../include

@@ -16,9 +16,10 @@ DEFINES = -DMITSHM
 INCLUDES = -I../include -I. -I/usr/include
 VNCAUTH_LIB = ../libvncauth/libvncauth.a
 ZLIB_LIB = /usr/lib/libz.a
+JPEG_LIB = /usr/lib/libjpeg.a
 
-DEPLIBS = XawClientDepLibs $(VNCAUTH_LIB) $(ZLIB_LIB)
-LOCAL_LIBRARIES = XawClientLibs $(VNCAUTH_LIB) $(ZLIB_LIB)
+DEPLIBS = XawClientDepLibs $(VNCAUTH_LIB) $(ZLIB_LIB) $(JPEG_LIB)
+LOCAL_LIBRARIES = XawClientLibs $(VNCAUTH_LIB) $(ZLIB_LIB) $(JPEG_LIB)
 
 SRCS = \
   argsresources.c \

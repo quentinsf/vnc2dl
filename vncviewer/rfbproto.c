@@ -29,8 +29,7 @@
 #include <vncviewer.h>
 #include <vncauth.h>
 #include <zlib.h>
-
-static long ReadCompactLen (void);
+#include <jpeglib.h>
 
 static Bool HandleRRE8(int rx, int ry, int rw, int rh);
 static Bool HandleRRE16(int rx, int ry, int rw, int rh);
@@ -47,6 +46,16 @@ static Bool HandleZlib32(int rx, int ry, int rw, int rh);
 static Bool HandleTight8(int rx, int ry, int rw, int rh);
 static Bool HandleTight16(int rx, int ry, int rw, int rh);
 static Bool HandleTight32(int rx, int ry, int rw, int rh);
+
+static long ReadCompactLen (void);
+
+static void JpegInitSource(j_decompress_ptr cinfo);
+static boolean JpegFillInputBuffer(j_decompress_ptr cinfo);
+static void JpegSkipInputData(j_decompress_ptr cinfo, long num_bytes);
+static void JpegTermSource(j_decompress_ptr cinfo);
+static void JpegSetSrcManager(j_decompress_ptr cinfo, CARD8 *compressedData,
+                              int compressedLen);
+
 
 int rfbsock;
 char *desktopName;
@@ -99,6 +108,9 @@ static Bool cutZeros;
 static int rectWidth, rectColors;
 static char tightPalette[256*4];
 static CARD8 tightPrevRow[2048*3*sizeof(CARD16)];
+
+/* JPEG decoder state. */
+static Bool jpegError;
 
 
 /*
@@ -890,5 +902,66 @@ ReadCompactLen (void)
     }
   }
   return len;
+}
+
+/*
+ * JPEG source manager functions for JPEG decompression in Tight decoder.
+ */
+
+static struct jpeg_source_mgr jpegSrcManager;
+static JOCTET *jpegBufferPtr;
+static size_t jpegBufferLen;
+
+static void
+JpegInitSource(j_decompress_ptr cinfo)
+{
+  jpegError = False;
+}
+
+static boolean
+JpegFillInputBuffer(j_decompress_ptr cinfo)
+{
+  jpegError = True;
+  jpegSrcManager.bytes_in_buffer = jpegBufferLen;
+  jpegSrcManager.next_input_byte = (JOCTET *)jpegBufferPtr;
+
+  return TRUE;
+}
+
+static void
+JpegSkipInputData(j_decompress_ptr cinfo, long num_bytes)
+{
+  if (num_bytes < 0 || num_bytes > jpegSrcManager.bytes_in_buffer) {
+    jpegError = True;
+    jpegSrcManager.bytes_in_buffer = jpegBufferLen;
+    jpegSrcManager.next_input_byte = (JOCTET *)jpegBufferPtr;
+  } else {
+    jpegSrcManager.next_input_byte += (size_t) num_bytes;
+    jpegSrcManager.bytes_in_buffer -= (size_t) num_bytes;
+  }
+}
+
+static void
+JpegTermSource(j_decompress_ptr cinfo)
+{
+  /* No work necessary here. */
+}
+
+static void
+JpegSetSrcManager(j_decompress_ptr cinfo, CARD8 *compressedData,
+		  int compressedLen)
+{
+  jpegBufferPtr = (JOCTET *)compressedData;
+  jpegBufferLen = (size_t)compressedLen;
+
+  jpegSrcManager.init_source = JpegInitSource;
+  jpegSrcManager.fill_input_buffer = JpegFillInputBuffer;
+  jpegSrcManager.skip_input_data = JpegSkipInputData;
+  jpegSrcManager.resync_to_restart = jpeg_resync_to_restart;
+  jpegSrcManager.term_source = JpegTermSource;
+  jpegSrcManager.next_input_byte = jpegBufferPtr;
+  jpegSrcManager.bytes_in_buffer = jpegBufferLen;
+
+  cinfo->src = &jpegSrcManager;
 }
 

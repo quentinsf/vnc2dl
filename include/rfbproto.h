@@ -485,7 +485,8 @@ typedef struct {
 
 #define rfbTightExplicitFilter         0x04
 #define rfbTightFill                   0x08
-#define rfbTightMaxSubencoding         0x08
+#define rfbTightJpeg                   0x09
+#define rfbTightMaxSubencoding         0x09
 
 /* Filters to improve compression efficiency */
 #define rfbTightFilterCopy             0x00

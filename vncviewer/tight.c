@@ -32,8 +32,6 @@
 
 #define CARDBPP CONCAT2E(CARD,BPP)
 #define filterPtrBPP CONCAT2E(filterPtr,BPP)
-#define RGB_TO_PIXELBPP CONCAT2E(RGB_TO_PIXEL,BPP)
-#define RGB24_TO_PIXELBPP CONCAT2E(RGB24_TO_PIXEL,BPP)
 
 #define HandleTightBPP CONCAT2E(HandleTight,BPP)
 #define InitFilterCopyBPP CONCAT2E(InitFilterCopy,BPP)
@@ -42,6 +40,10 @@
 #define FilterCopyBPP CONCAT2E(FilterCopy,BPP)
 #define FilterPaletteBPP CONCAT2E(FilterPalette,BPP)
 #define FilterGradientBPP CONCAT2E(FilterGradient,BPP)
+
+#if BPP != 8
+#define DecompressJpegRectBPP CONCAT2E(DecompressJpegRect,BPP)
+#endif
 
 #ifndef RGB_TO_PIXEL
 
@@ -69,6 +71,8 @@ static int InitFilterGradientBPP (int rw, int rh);
 static void FilterCopyBPP (int numRows, CARDBPP *destBuffer);
 static void FilterPaletteBPP (int numRows, CARDBPP *destBuffer);
 static void FilterGradientBPP (int numRows, CARDBPP *destBuffer);
+
+static Bool DecompressJpegRectBPP(int x, int y, int w, int h);
 
 /* Definitions */
 
@@ -129,6 +133,17 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
     return True;
   }
 
+#if BPP == 8
+  if (comp_ctl == rfbTightJpeg) {
+    fprintf(stderr, "Tight encoding: JPEG is not supported in 8 bpp mode.\n");
+    return False;
+  }
+#else
+  if (comp_ctl == rfbTightJpeg) {
+    return DecompressJpegRectBPP(rx, ry, rw, rh);
+  }
+#endif
+
   /* Quit on unsupported subencoding value. */
   if (comp_ctl > rfbTightMaxSubencoding) {
     fprintf(stderr, "Tight encoding: bad subencoding value received.\n");
@@ -185,7 +200,7 @@ HandleTightBPP (int rx, int ry, int rw, int rh)
   }
 
   /* Read the length (1..3 bytes) of compressed data following. */
-  compressedLen = ReadCompactLen();
+  compressedLen = (int)ReadCompactLen();
   if (compressedLen <= 0) {
     fprintf(stderr, "Incorrect data received from the server.\n");
     return False;
@@ -496,4 +511,92 @@ FilterPaletteBPP (int numRows, CARDBPP *dst)
 	dst[y*rectWidth+x] = palette[(int)src[y*rectWidth+x]];
   }
 }
+
+#if BPP != 8
+
+/*----------------------------------------------------------------------------
+ *
+ * JPEG decompression.
+ *
+ */
+
+/*
+   The following variables are defined in rfbproto.c:
+     static Bool jpegError;
+     static struct jpeg_source_mgr jpegSrcManager;
+     static JOCTET *jpegBufferPtr;
+     static size_t *jpegBufferLen;
+*/
+
+static Bool
+DecompressJpegRectBPP(int x, int y, int w, int h)
+{
+  struct jpeg_decompress_struct cinfo;
+  struct jpeg_error_mgr jerr;
+  int compressedLen;
+  CARD8 *compressedData;
+  CARDBPP *pixelPtr;
+  JSAMPROW rowPointer[1];
+  int dx, dy;
+
+  compressedLen = (int)ReadCompactLen();
+  if (compressedLen <= 0) {
+    fprintf(stderr, "Incorrect data received from the server.\n");
+    return False;
+  }
+
+  compressedData = malloc(compressedLen);
+  if (compressedData == NULL) {
+    fprintf(stderr, "Memory allocation error.\n");
+    return False;
+  }
+
+  if (!ReadFromRFBServer((char*)compressedData, compressedLen)) {
+    free(compressedData);
+    return False;
+  }
+
+  cinfo.err = jpeg_std_error(&jerr);
+  jpeg_create_decompress(&cinfo);
+
+  JpegSetSrcManager(&cinfo, compressedData, compressedLen);
+
+  jpeg_read_header(&cinfo, TRUE);
+  cinfo.out_color_space = JCS_RGB;
+
+  jpeg_start_decompress(&cinfo);
+  if (cinfo.output_width != w || cinfo.output_height != h ||
+      cinfo.output_components != 3) {
+    fprintf(stderr, "Tight Encoding: Wrong JPEG data received.\n");
+    jpeg_destroy_decompress(&cinfo);
+    free(compressedData);
+    return False;
+  }
+
+  rowPointer[0] = (JSAMPROW)buffer;
+  dy = 0;
+  while (cinfo.output_scanline < cinfo.output_height) {
+    jpeg_read_scanlines(&cinfo, rowPointer, 1);
+    if (jpegError) {
+      break;
+    }
+    pixelPtr = (CARDBPP *)&buffer[BUFFER_SIZE / 2];
+    for (dx = 0; dx < w; dx++) {
+      *pixelPtr++ =
+	RGB_TO_PIXEL(BPP, buffer[dx*3], buffer[dx*3+1], buffer[dx*3+2]);
+    }
+    CopyDataToScreen(&buffer[BUFFER_SIZE / 2], x, y + dy, w, 1);
+    dy++;
+  }
+
+  if (!jpegError)
+    jpeg_finish_decompress(&cinfo);
+
+  jpeg_destroy_decompress(&cinfo);
+  free(compressedData);
+
+  return !jpegError;
+}
+
+#endif
 
