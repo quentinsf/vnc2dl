@@ -1510,6 +1510,8 @@ rfbSendServerCutText(char *str, int len)
 
     for (cl = rfbClientHead; cl; cl = nextCl) {
 	nextCl = cl->next;
+	if (cl->state != RFB_NORMAL)
+	  continue;
 	sct.type = rfbServerCutText;
 	sct.length = Swap32IfLE(len);
 	if (WriteExact(cl->sock, (char *)&sct,
