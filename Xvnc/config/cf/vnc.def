@@ -105,7 +105,7 @@
 
 #define XVendorString		"AT&T Laboratories Cambridge"
 #define XVendorRelease		3332
-#define XvncRelease		"3r2+tight1.1p8"
+#define XvncRelease		"3r2+tight1.1p9"
 
 
 /*****************************************************************************/
