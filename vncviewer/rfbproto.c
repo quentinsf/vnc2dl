@@ -276,6 +276,11 @@ InitialiseRFBConnection()
   si.nameLength = Swap32IfLE(si.nameLength);
 
   desktopName = malloc(si.nameLength + 1);
+  if (!desktopName) {
+    fprintf(stderr, "Error allocating memory for desktop name, %lu bytes\n",
+            (unsigned long)si.nameLength);
+    return False;
+  }
 
   if (!ReadFromRFBServer(desktopName, si.nameLength)) return False;
 
