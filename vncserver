@@ -404,11 +404,19 @@ sub removeSlashes
 
 sub Usage
 {
-    die("\nusage: $prog [:<number>] [-name <desktop-name>] [-depth <depth>]\n".
-	"                 [-geometry <width>x<height>]\n".
-	"                 [-pixelformat rgbNNN|bgrNNN]\n".
-	"                 <Xvnc-options>...\n\n".
-	"       $prog -kill <X-display>\n\n");
+    die("TightVNC server version 1.2.3 (based on VNC 3.3.3r2)\n".
+	"\n".
+	"Usage: $prog [<OPTIONS>] [:<DISPLAY#>]\n".
+	"       $prog -kill :<DISPLAY#>\n".
+	"\n".
+	"<OPTIONS> are Xvnc options, or:\n".
+	"\n".
+	"        -name <DESKTOP-NAME>\n".
+	"        -depth <DEPTH>\n".
+	"        -geometry <WIDTH>x<HEIGHT>\n".
+	"        -pixelformat rgb<NNN>\n".
+	"        -pixelformat bgr<NNN>\n".
+	"\n");
 }
 
 
