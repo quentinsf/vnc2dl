@@ -9,7 +9,7 @@
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH vncconnect 1 "November 2001" "" "TightVNC"
+.TH vncconnect 1 "March 2002" "" "TightVNC"
 .SH NAME
 vncconnect \- connect a VNC server to a VNC viewer
 .SH SYNOPSIS
