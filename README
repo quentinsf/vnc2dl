@@ -1,10 +1,10 @@
 
-TightVNC 1.2.4 Source Distribution for Unix platforms
+TightVNC 1.2.5 Source Distribution for Unix platforms
          (based on the VNC version 3.3.3r2)
 =====================================================
 
-TightVNC is Copyright (C) Const Kaplinsky.  All Rights Reserved.
-VNC is Copyright (C) AT&T Laboratories Cambridge.  All Rights Reserved.
+TightVNC is Copyright (C) 2001,2002 Constantin Kaplinsky.  All Rights Reserved.
+VNC is Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
 This software is distributed under the GNU General Public Licence as published
 by the Free Software Foundation.  See the file LICENCE.TXT for the conditions
 under which this software is made available.  VNC also contains code from other
