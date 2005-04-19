@@ -1489,6 +1489,8 @@ rfbSendBell()
 
     for (cl = rfbClientHead; cl; cl = nextCl) {
 	nextCl = cl->next;
+	if (cl->state != RFB_NORMAL)
+	  continue;
 	b.type = rfbBell;
 	if (WriteExact(cl->sock, (char *)&b, sz_rfbBellMsg) < 0) {
 	    rfbLogPerror("rfbSendBell: write");
