@@ -107,9 +107,9 @@ void rfbLoginAuthProcessClientMessage(rfbClientPtr cl)
 	       cl->host);
 
 	if (rfbAuthConsiderBlocking()) {
-	    authResult = Swap32IfLE(rfbVncAuthTooMany);
+	    authResult = Swap32IfLE(rfbAuthTooMany);
 	} else {
-	    authResult = Swap32IfLE(rfbVncAuthFailed);
+	    authResult = Swap32IfLE(rfbAuthFailed);
 	}
 
 	if (WriteExact(cl->sock, (char *)&authResult,
@@ -126,7 +126,7 @@ void rfbLoginAuthProcessClientMessage(rfbClientPtr cl)
     rfbLog("Login-style authentication passed for user %s at %s\n",
 	   cl->login, cl->host);
 
-    authResult = Swap32IfLE(rfbVncAuthOK);
+    authResult = Swap32IfLE(rfbAuthOK);
 
     if (WriteExact(cl->sock, (char *)&authResult, sizeof(authResult)) < 0) {
 	rfbLogPerror("rfbLoginAuthProcessClientMessage: write");

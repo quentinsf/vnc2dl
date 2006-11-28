@@ -381,8 +381,7 @@ ddxProcessArgument (argc, argv, i)
     }
 
     if (strcmp(argv[i], "-version") == 0) {
-	ErrorF("Xvnc version %s, protocol %d.%d\n", XVNCRELEASE,
-	       rfbProtocolMajorVersion, rfbProtocolMinorVersion);
+	ErrorF("Xvnc version %s\n", XVNCRELEASE);
 	exit(0);
     }
 
@@ -414,10 +413,7 @@ InitOutput(screenInfo, argc, argv)
     rfbLog("All Rights Reserved.\n");
     rfbLog("See http://www.tightvnc.com/ for information on TightVNC\n");
     rfbLog("Desktop name '%s' (%s:%s)\n",desktopName,rfbThisHost,display);
-    rfbLog("Protocol versions supported: %d.%dt, %d.%d, %d.%d\n",
-	   rfbProtocolMajorVersion, rfbProtocolMinorVersion,
-	   rfbProtocolMajorVersion, rfbProtocolMinorVersion,
-	   rfbProtocolMajorVersion, rfbProtocolFallbackMinorVersion);
+    rfbLog("Protocol versions supported: 3.3, 3.7, 3.8, 3.7t, 3.8t\n");
 
     VNC_LAST_CLIENT_ID = MakeAtom("VNC_LAST_CLIENT_ID",
 				  strlen("VNC_LAST_CLIENT_ID"), TRUE);

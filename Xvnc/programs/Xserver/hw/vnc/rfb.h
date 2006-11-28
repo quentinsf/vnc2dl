@@ -469,7 +469,6 @@ extern void rfbNewClientConnection(int sock);
 extern rfbClientPtr rfbReverseConnection(char *host, int port);
 extern void rfbClientConnectionGone(int sock);
 extern void rfbProcessClientMessage(int sock);
-extern void rfbClientConnFailed(rfbClientPtr cl, char *reason);
 extern void rfbNewUDPConnection(int sock);
 extern void rfbProcessUDPInput(int sock);
 extern Bool rfbSendFramebufferUpdate(rfbClientPtr cl);
@@ -516,6 +515,10 @@ extern void rfbProcessClientSecurityType(rfbClientPtr cl);
 extern void rfbProcessClientTunnelingType(rfbClientPtr cl);
 extern void rfbProcessClientAuthType(rfbClientPtr cl);
 extern void rfbVncAuthProcessResponse(rfbClientPtr cl);
+
+extern void rfbClientConnFailed(rfbClientPtr cl, char *reason);
+extern void rfbClientAuthFailed(rfbClientPtr cl, char *reason);
+extern void rfbClientAuthSucceeded(rfbClientPtr cl);
 
 /* Functions to prevent too many successive authentication failures */
 extern Bool rfbAuthConsiderBlocking(void);
