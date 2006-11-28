@@ -53,7 +53,7 @@ rfbAuthNewClient(cl)
 {
     int securityType = rfbSecTypeInvalid;
 
-    if ((!rfbAuthPasswdFile && !loginAuthEnabled) || cl->reverseConnection) {
+    if (!rfbAuthPasswdFile || cl->reverseConnection) {
 	securityType = rfbSecTypeNone;
     } else {
 	if (rfbAuthIsBlocked()) {
@@ -279,14 +279,9 @@ rfbSendAuthCaps(cl)
     rfbCapabilityInfo caplist[MAX_AUTH_CAPS];
     int count = 0;
 
-    authRequired = ((rfbAuthPasswdFile != NULL || loginAuthEnabled) &&
-		    !cl->reverseConnection);
+    authRequired = (rfbAuthPasswdFile != NULL && !cl->reverseConnection);
 
     if (authRequired) {
-	if (loginAuthEnabled) {
-	    SetCapInfo(&caplist[count], rfbAuthUnixLogin, rfbTightVncVendor);
-	    cl->authCaps[count++] = rfbAuthUnixLogin;
-	}
 	if (rfbAuthPasswdFile != NULL) {
 	    SetCapInfo(&caplist[count], rfbAuthVNC, rfbStandardVendor);
 	    cl->authCaps[count++] = rfbAuthVNC;
@@ -365,10 +360,6 @@ rfbProcessClientAuthType(cl)
 	break;
     case rfbAuthVNC:
 	rfbVncAuthSendChallenge(cl);
-	break;
-    case rfbAuthUnixLogin:
-	/* FIXME: Do (cl->state = RFB_LOGIN_AUTH) instead? */
-	rfbLoginAuthProcessClientMessage(cl);
 	break;
     default:
 	rfbLog("rfbProcessClientAuthType: unknown authentication scheme\n");

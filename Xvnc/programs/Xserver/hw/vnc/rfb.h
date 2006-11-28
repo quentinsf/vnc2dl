@@ -526,12 +526,6 @@ extern void rfbAuthUnblock(void);
 extern Bool rfbAuthIsBlocked(void);
 
 
-/* loginauth.c */
-
-extern Bool loginAuthEnabled;
-
-extern void rfbLoginAuthProcessClientMessage(rfbClientPtr cl);
-
 /* rre.c */
 
 extern Bool rfbSendRectEncodingRRE(rfbClientPtr cl, int x,int y,int w,int h);

@@ -249,14 +249,6 @@ ddxProcessArgument (argc, argv, i)
 	return 2;
     }
 
-    if (strcmp(argv[i], "-loginauth") == 0) {
-	if (geteuid() == 0) {
-	    /* Only when run as root! */
-	    loginAuthEnabled = TRUE;
-	}
-	return 1;
-    }
-
     if (strcmp(argv[i], "-httpd") == 0) {
 	if (i + 1 >= argc) UseMsg();
 	httpDir = argv[i+1];
