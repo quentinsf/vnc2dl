@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2003 Constantin Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2002-2006 Constantin Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -152,9 +152,6 @@ static XtResource appDataResourceList[] = {
   {"passwordFile", "PasswordFile", XtRString, sizeof(String),
    XtOffsetOf(AppData, passwordFile), XtRImmediate, (XtPointer) 0},
 
-  {"userLogin", "UserLogin", XtRString, sizeof(String),
-   XtOffsetOf(AppData, userLogin), XtRImmediate, (XtPointer) 0},
-
   {"passwordDialog", "PasswordDialog", XtRBool, sizeof(Bool),
    XtOffsetOf(AppData, passwordDialog), XtRImmediate, (XtPointer) False},
 
@@ -241,7 +238,6 @@ XrmOptionDescRec cmdLineOptions[] = {
   {"-fullscreen",    "*fullScreen",         XrmoptionNoArg,  "True"},
   {"-noraiseonbeep", "*raiseOnBeep",        XrmoptionNoArg,  "False"},
   {"-passwd",        "*passwordFile",       XrmoptionSepArg, 0},
-  {"-user",          "*userLogin",          XrmoptionSepArg, 0},
   {"-encodings",     "*encodings",          XrmoptionSepArg, 0},
   {"-bgr233",        "*useBGR233",          XrmoptionNoArg,  "True"},
   {"-owncmap",       "*forceOwnCmap",       XrmoptionNoArg,  "True"},
@@ -318,7 +314,6 @@ usage(void)
 	  "        -fullscreen\n"
 	  "        -noraiseonbeep\n"
 	  "        -passwd <PASSWD-FILENAME> (standard VNC authentication)\n"
-	  "        -user <USERNAME> (Unix login authentication)\n"
 	  "        -encodings <ENCODING-LIST> (e.g. \"tight copyrect\")\n"
 	  "        -bgr233\n"
 	  "        -owncmap\n"

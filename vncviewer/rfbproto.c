@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2000-2002 Constantin Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 2000-2006 Constantin Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 2000 Tridia Corporation.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
@@ -37,7 +37,6 @@ static int ReadSecurityType(void);
 static int SelectSecurityType(void);
 static Bool PerformAuthenticationTight(void);
 static Bool AuthenticateVNC(void);
-static Bool AuthenticateUnixLogin(void);
 static Bool ReadInteractionCaps(void);
 static Bool ReadCapabilityList(CapsContainer *caps, int count);
 
@@ -147,8 +146,6 @@ InitCapabilities(void)
   /* Supported authentication methods */
   CapsAdd(authCaps, rfbAuthVNC, rfbStandardVendor, sig_rfbAuthVNC,
 	  "Standard VNC password authentication");
-  CapsAdd(authCaps, rfbAuthUnixLogin, rfbTightVncVendor, sig_rfbAuthUnixLogin,
-	  "Login-style Unix authentication");
 
   /* Supported encoding types */
   CapsAdd(encodingCaps, rfbEncodingCopyRect, rfbStandardVendor,
@@ -479,26 +476,16 @@ PerformAuthenticationTight(void)
   if (!ReadCapabilityList(authCaps, caps.nAuthTypes))
     return False;
 
-  /* Prefer Unix login authentication if a user name was given. */
-  if (appData.userLogin && CapsIsEnabled(authCaps, rfbAuthUnixLogin)) {
-    authScheme = Swap32IfLE(rfbAuthUnixLogin);
-    if (!WriteExact(rfbsock, (char *)&authScheme, sizeof(authScheme)))
-      return False;
-    return AuthenticateUnixLogin();
-  }
-
-  /* Otherwise, try server's preferred authentication scheme. */
+  /* Try server's preferred authentication scheme. */
   for (i = 0; i < CapsNumEnabled(authCaps); i++) {
     authScheme = CapsGetByOrder(authCaps, i);
-    if (authScheme != rfbAuthUnixLogin && authScheme != rfbAuthVNC)
+    if (authScheme != rfbAuthVNC)
       continue;                 /* unknown scheme - cannot use it */
     authScheme = Swap32IfLE(authScheme);
     if (!WriteExact(rfbsock, (char *)&authScheme, sizeof(authScheme)))
       return False;
     authScheme = Swap32IfLE(authScheme); /* convert it back */
-    if (authScheme == rfbAuthUnixLogin) {
-      return AuthenticateUnixLogin();
-    } else if (authScheme == rfbAuthVNC) {
+    if (authScheme == rfbAuthVNC) {
       return AuthenticateVNC();
     } else {
       /* Should never happen. */
@@ -594,78 +581,6 @@ AuthenticateVNC(void)
 
   return True;
 }
-
-/*
- * Unix login-style authentication.
- */
-
-static Bool
-AuthenticateUnixLogin(void)
-{
-  CARD32 loginLen, passwdLen, authResult;
-  char *login;
-  char *passwd;
-  struct passwd *ps;
-
-  fprintf(stderr, "Performing Unix login-style authentication\n");
-
-  if (appData.userLogin) {
-    login = appData.userLogin;
-  } else {
-    ps = getpwuid(getuid());
-    login = ps->pw_name;
-  }
-
-  fprintf(stderr, "Using user name \"%s\"\n", login);
-
-  if (appData.passwordDialog) {
-    passwd = DoPasswordDialog();
-  } else {
-    passwd = getpass("Password: ");
-  }
-  if (!passwd || strlen(passwd) == 0) {
-    fprintf(stderr, "Reading password failed\n");
-    return False;
-  }
-
-  loginLen = Swap32IfLE((CARD32)strlen(login));
-  passwdLen = Swap32IfLE((CARD32)strlen(passwd));
-
-  if (!WriteExact(rfbsock, (char *)&loginLen, sizeof(loginLen)) ||
-      !WriteExact(rfbsock, (char *)&passwdLen, sizeof(passwdLen)))
-    return False;
-
-  if (!WriteExact(rfbsock, login, strlen(login)) ||
-      !WriteExact(rfbsock, passwd, strlen(passwd)))
-    return False;
-
-  /* Lose the password from memory */
-  memset(passwd, '\0', strlen(passwd));
-
-  if (!ReadFromRFBServer((char *)&authResult, sizeof(authResult)))
-    return False;
-
-  authResult = Swap32IfLE(authResult);
-
-  switch (authResult) {
-  case rfbAuthOK:
-    fprintf(stderr, "Authentication succeeded\n");
-    break;
-  case rfbAuthFailed:
-    fprintf(stderr, "Authentication failed\n");
-    return False;
-  case rfbAuthTooMany:
-    fprintf(stderr, "Authentication failed - too many tries\n");
-    return False;
-  default:
-    fprintf(stderr, "Unknown authentication result: %d\n",
-	    (int)authResult);
-    return False;
-  }
-
-  return True;
-}
-
 
 /*
  * In the protocol version 3.7t, the server informs us about supported
