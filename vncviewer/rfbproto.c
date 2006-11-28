@@ -237,13 +237,13 @@ InitialiseRFBConnection(void)
     return False;
   }
 
-  viewer_major = rfbProtocolMajorVersion;
-  if (server_major == 3 && server_minor >= rfbProtocolMinorVersion) {
+  viewer_major = 3;
+  if (server_major == 3 && server_minor >= 7) {
     /* the server supports at least the standard protocol 3.7 */
-    viewer_minor = rfbProtocolMinorVersion;
+    viewer_minor = 7;
   } else {
     /* any other server version, request the standard 3.3 */
-    viewer_minor = rfbProtocolFallbackMinorVersion;
+    viewer_minor = 3;
   }
 
   fprintf(stderr, "Connected to RFB server, using protocol version %d.%d\n",
@@ -255,7 +255,7 @@ InitialiseRFBConnection(void)
     return False;
 
   /* Read or select the security type. */
-  if (viewer_minor == rfbProtocolMinorVersion) {
+  if (viewer_minor == 7) {
     secType = SelectSecurityType();
   } else {
     secType = ReadSecurityType();
@@ -577,13 +577,13 @@ AuthenticateVNC(void)
   authResult = Swap32IfLE(authResult);
 
   switch (authResult) {
-  case rfbVncAuthOK:
+  case rfbAuthOK:
     fprintf(stderr, "VNC authentication succeeded\n");
     break;
-  case rfbVncAuthFailed:
+  case rfbAuthFailed:
     fprintf(stderr, "VNC authentication failed\n");
     return False;
-  case rfbVncAuthTooMany:
+  case rfbAuthTooMany:
     fprintf(stderr, "VNC authentication failed - too many tries\n");
     return False;
   default:
@@ -648,13 +648,13 @@ AuthenticateUnixLogin(void)
   authResult = Swap32IfLE(authResult);
 
   switch (authResult) {
-  case rfbVncAuthOK:
+  case rfbAuthOK:
     fprintf(stderr, "Authentication succeeded\n");
     break;
-  case rfbVncAuthFailed:
+  case rfbAuthFailed:
     fprintf(stderr, "Authentication failed\n");
     return False;
-  case rfbVncAuthTooMany:
+  case rfbAuthTooMany:
     fprintf(stderr, "Authentication failed - too many tries\n");
     return False;
   default:
