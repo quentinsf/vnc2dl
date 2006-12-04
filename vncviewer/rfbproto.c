@@ -147,6 +147,8 @@ InitCapabilities(void)
   encodingCaps  = CapsNewContainer();
 
   /* Supported authentication methods */
+  CapsAdd(authCaps, rfbAuthNone, rfbStandardVendor, sig_rfbAuthNone,
+	  "No authentication");
   CapsAdd(authCaps, rfbAuthVNC, rfbStandardVendor, sig_rfbAuthVNC,
 	  "Standard VNC password authentication");
 
@@ -484,7 +486,7 @@ PerformAuthenticationTight(void)
   /* Try server's preferred authentication scheme. */
   for (i = 0; i < CapsNumEnabled(authCaps); i++) {
     authScheme = CapsGetByOrder(authCaps, i);
-    if (authScheme != rfbAuthVNC)
+    if (authScheme != rfbAuthVNC && authScheme != rfbAuthNone)
       continue;                 /* unknown scheme - cannot use it */
     authScheme = Swap32IfLE(authScheme);
     if (!WriteExact(rfbsock, (char *)&authScheme, sizeof(authScheme)))
