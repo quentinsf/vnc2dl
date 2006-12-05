@@ -345,6 +345,7 @@ GetArgsAndResources(int argc, char **argv)
   int i;
   char *vncServerName, *colonPos;
   int len, portOffset;
+  int disp;
 
   /* Turn app resource specs into our appData structure for the rest of the
      program to use */
@@ -409,6 +410,9 @@ GetArgsAndResources(int argc, char **argv)
     if (!len || strspn(colonPos + 1, "0123456789") != len) {
       usage();
     }
-    vncServerPort = atoi(colonPos + 1) + portOffset;
+    disp = atoi(colonPos + 1);
+    if (portOffset != 0 && disp >= 100)
+      portOffset = 0;
+    vncServerPort = disp + portOffset;
   }
 }
