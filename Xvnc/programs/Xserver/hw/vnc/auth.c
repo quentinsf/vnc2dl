@@ -191,14 +191,8 @@ rfbProcessClientSecurityType(cl)
     /* Now go to the proper authentication procedure. */
     switch (chosenType) {
     case rfbSecTypeNone:
-        if (cl->protocol_minor_ver >= 8) {
-	    /* RFB protocol 3.8 and above requires sending "security
-	       result" even with no authentication. */
-	    rfbClientAuthSucceeded(cl);
-        } else {
-	    /* Dispatch client input to rfbProcessClientInitMessage. */
-	    cl->state = RFB_INITIALISATION;
-	}
+	/* No authentication needed. */
+	rfbClientAuthSucceeded(cl, rfbAuthNone);
 	break;
     case rfbSecTypeVncAuth:
 	/* Begin the standard VNC authentication procedure. */
@@ -312,8 +306,8 @@ rfbSendAuthCaps(cl)
 	/* Dispatch client input to rfbProcessClientAuthType. */
 	cl->state = RFB_AUTH_TYPE;
     } else {
-	/* Dispatch client input to rfbProcessClientInitMessage. */
-	cl->state = RFB_INITIALISATION;
+	/* No authentication needed. */
+        rfbClientAuthSucceeded(cl, rfbAuthNone);
     }
 }
 
@@ -448,7 +442,7 @@ rfbVncAuthProcessResponse(cl)
 
     if (ok) {
 	rfbAuthUnblock();
-	rfbClientAuthSucceeded(cl);
+	rfbClientAuthSucceeded(cl, rfbAuthVNC);
     } else {
 	rfbLog("rfbVncAuthProcessResponse: authentication failed from %s\n",
 	       cl->host);
@@ -527,20 +521,25 @@ rfbClientAuthFailed(cl, reason)
 /*
  * rfbClientAuthSucceeded is called on successful authentication.
  * It just sends rfbAuthOK and dispatches client input to
- * rfbProcessClientInitMessage().
+ * rfbProcessClientInitMessage(). However, rfbAuthOK message is
+ * not sent if authentication was not required and the protocol
+ * version is 3.7 or lower.
  */
 
 void
-rfbClientAuthSucceeded(cl)
+rfbClientAuthSucceeded(cl, authType)
     rfbClientPtr cl;
+    CARD32 authType;
 {
     CARD32 authResult;
 
-    authResult = Swap32IfLE(rfbAuthOK);
-    if (WriteExact(cl->sock, (char *)&authResult, 4) < 0) {
-	rfbLogPerror("rfbClientAuthSucceeded: write");
-	rfbCloseSock(cl->sock);
-	return;
+    if (cl->protocol_minor_ver >= 8 || authType != rfbAuthNone) {
+        authResult = Swap32IfLE(rfbAuthOK);
+        if (WriteExact(cl->sock, (char *)&authResult, 4) < 0) {
+            rfbLogPerror("rfbClientAuthSucceeded: write");
+            rfbCloseSock(cl->sock);
+            return;
+        }
     }
 
     /* Dispatch client input to rfbProcessClientInitMessage(). */

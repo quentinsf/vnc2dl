@@ -518,7 +518,7 @@ extern void rfbVncAuthProcessResponse(rfbClientPtr cl);
 
 extern void rfbClientConnFailed(rfbClientPtr cl, char *reason);
 extern void rfbClientAuthFailed(rfbClientPtr cl, char *reason);
-extern void rfbClientAuthSucceeded(rfbClientPtr cl);
+extern void rfbClientAuthSucceeded(rfbClientPtr cl, CARD32 authType);
 
 /* Functions to prevent too many successive authentication failures */
 extern Bool rfbAuthConsiderBlocking(void);
