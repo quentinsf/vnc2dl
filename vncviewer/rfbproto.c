@@ -475,10 +475,9 @@ PerformAuthenticationTight(void)
 
   caps.nAuthTypes = Swap32IfLE(caps.nAuthTypes);
 
-  if (!caps.nAuthTypes) {
-    fprintf(stderr, "No authentication needed\n");
-    return True;
-  }
+  /* Special case - empty capability list stands for no authentication. */
+  if (!caps.nAuthTypes)
+    return AuthenticateNone();
 
   if (!ReadCapabilityList(authCaps, caps.nAuthTypes))
     return False;
