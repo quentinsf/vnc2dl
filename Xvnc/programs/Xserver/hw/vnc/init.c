@@ -80,6 +80,7 @@ from the X Consortium.
 #include <sys/param.h>
 #include "dix.h"
 #include "rfb.h"
+#include <time.h>
 
 #ifdef CORBA
 #include <vncserverctrl.h>

@@ -30,6 +30,7 @@
 #include <rfbproto.h>
 #include <vncauth.h>
 #include <zlib.h>
+#include <stdarg.h>
 
 /* It's a good idea to keep these values a bit greater than required. */
 #define MAX_ENCODINGS 10
