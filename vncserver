@@ -612,6 +612,7 @@ sub ReadConfiguration
        vncUserDir
        fontPath
        authType
+       colorPath
       );
 
   if (open CONF, "<$configFile") {
