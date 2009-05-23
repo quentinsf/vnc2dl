@@ -31,20 +31,14 @@
 Bool listenSpecified = False;
 int listenPort = 0;
 
-static Bool AllXEventsPredicate(Display *d, XEvent *ev, char *arg);
-
 /*
  * listenForIncomingConnections() - listen for incoming connections from
- * servers, and fork a new process to deal with each connection.  We must do
- * all this before invoking any Xt functions - this is because Xt doesn't
- * cope with forking very well.
+ * servers, and fork a new process to deal with each connection. 
  */
 
 void
 listenForIncomingConnections(int *argc, char **argv, int listenArgIndex)
 {
-  Display *d;
-  XEvent ev;
   int listenSocket, sock;
   fd_set fds;
   int n;
@@ -73,7 +67,6 @@ listenForIncomingConnections(int *argc, char **argv, int listenArgIndex)
 
     removeArgs(argc, argv, listenArgIndex, 1);
 
-    display = XDisplayName(displayname);
     colonPos = strchr(display, ':');
 
     uname(&hostinfo);
@@ -92,12 +85,6 @@ listenForIncomingConnections(int *argc, char **argv, int listenArgIndex)
     }
   }
 
-  if (!(d = XOpenDisplay(displayname))) {
-    fprintf(stderr,"%s: unable to open display %s\n",
-	    programName, XDisplayName(displayname));
-    exit(1);
-  }
-
   listenSocket = ListenAtTcpPort(listenPort);
 
   if (listenSocket < 0) exit(1);
@@ -113,14 +100,9 @@ listenForIncomingConnections(int *argc, char **argv, int listenArgIndex)
     int status, pid;
     while ((pid= wait3(&status, WNOHANG, (struct rusage *)0))>0);
 
-    /* discard any X events */
-    while (XCheckIfEvent(d, &ev, AllXEventsPredicate, NULL))
-      ;
-
     FD_ZERO(&fds); 
 
     FD_SET(listenSocket, &fds);
-    FD_SET(ConnectionNumber(d), &fds);
 
     select(FD_SETSIZE, &fds, NULL, NULL, NULL);
 
@@ -129,42 +111,25 @@ listenForIncomingConnections(int *argc, char **argv, int listenArgIndex)
       if (rfbsock < 0) exit(1);
       if (!SetNonBlocking(rfbsock)) exit(1);
 
-      XCloseDisplay(d);
-
       /* Now fork off a new process to deal with it... */
 
       switch (fork()) {
 
-      case -1: 
-	perror("fork"); 
-	exit(1);
+          case -1: 
+          perror("fork"); 
+          exit(1);
 
-      case 0:
-	/* child - return to caller */
-	close(listenSocket);
-	return;
+          case 0:
+          /* child - return to caller */
+          close(listenSocket);
+          return;
 
-      default:
-	/* parent - go round and listen again */
-	close(rfbsock); 
-	if (!(d = XOpenDisplay(displayname))) {
-	  fprintf(stderr,"%s: unable to open display %s\n",
-		  programName, XDisplayName(displayname));
-	  exit(1);
-	}
-	break;
+          default:
+          /* parent - go round and listen again */
+          close(rfbsock); 
+          break;
       }
-    }
+  }
   }
 }
 
-
-/*
- * AllXEventsPredicate is needed to make XCheckIfEvent return all events.
- */
-
-static Bool
-AllXEventsPredicate(Display *d, XEvent *ev, char *arg)
-{
-  return True;
-}

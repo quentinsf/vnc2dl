@@ -31,13 +31,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <pwd.h>
-#include <X11/IntrinsicP.h>
-#include <X11/StringDefs.h>
-#include <X11/Shell.h>
-#include <X11/Xmd.h>
-#include <X11/keysym.h>
-#include <X11/Xatom.h>
-#include <X11/Xmu/StdSel.h>
 #include "rfbproto.h"
 #include "caps.h"
 
@@ -65,14 +58,11 @@ extern int endianTest;
   (DEFAULT_SSH_CMD " -f -L %L:%H:%R %G sleep 20")
 
 
-/* argsresources.c */
+/* args.c */
 
 typedef struct {
   Bool shareDesktop;
   Bool viewOnly;
-  Bool fullScreen;
-  Bool grabKeyboard;
-  Bool raiseOnBeep;
 
   String encodingsString;
 
@@ -83,22 +73,14 @@ typedef struct {
   Bool forceTrueColour;
   int requestedDepth;
 
-  Bool useShm;
-
-  int wmDecorationWidth;
-  int wmDecorationHeight;
-
   char *userLogin;
 
   char *passwordFile;
-  Bool passwordDialog;
 
   int rawDelay;
   int copyRectDelay;
 
   Bool debug;
-
-  int popupButtonCount;
 
   int bumpScrollTime;
   int bumpScrollPixels;
@@ -107,7 +89,6 @@ typedef struct {
   int qualityLevel;
   Bool enableJPEG;
   Bool useRemoteCursor;
-  Bool useX11Cursor;
   Bool autoPass;
 
 } AppData;
@@ -120,22 +101,13 @@ extern int vncServerPort;
 extern Bool listenSpecified;
 extern int listenPort;
 
-extern XrmOptionDescRec cmdLineOptions[];
+extern char* cmdLineOptions[];
 extern int numCmdLineOptions;
 
 extern void removeArgs(int *argc, char** argv, int idx, int nargs);
 extern void usage(void);
 extern void GetArgsAndResources(int argc, char **argv);
 
-/* colour.c */
-
-extern unsigned long BGR233ToPixel[];
-
-extern Colormap cmap;
-extern Visual *vis;
-extern unsigned int visdepth, visbpp;
-
-extern void SetVisualAndCmap();
 
 /* cursor.c */
 
@@ -145,67 +117,9 @@ extern void SoftCursorLockArea(int x, int y, int w, int h);
 extern void SoftCursorUnlockScreen(void);
 extern void SoftCursorMove(int x, int y);
 
-/* desktop.c */
-
-extern Atom wmDeleteWindow;
-extern Widget form, viewport, desktop;
-extern Window desktopWin;
-extern Cursor dotCursor;
-extern GC gc;
-extern GC srcGC, dstGC;
-extern Dimension dpyWidth, dpyHeight;
-
-extern void DesktopInitBeforeRealization();
-extern void DesktopInitAfterRealization();
-extern void SendRFBEvent(Widget w, XEvent *event, String *params,
-			 Cardinal *num_params);
-extern void CopyDataToScreen(char *buf, int x, int y, int width, int height);
-extern void SynchroniseScreen();
-
-/* dialogs.c */
-
-extern void ServerDialogDone(Widget w, XEvent *event, String *params,
-			     Cardinal *num_params);
-extern char *DoServerDialog();
-extern void PasswordDialogDone(Widget w, XEvent *event, String *params,
-			     Cardinal *num_params);
-extern char *DoPasswordDialog();
-
-/* fullscreen.c */
-
-extern void ToggleFullScreen(Widget w, XEvent *event, String *params,
-			     Cardinal *num_params);
-extern void SetFullScreenState(Widget w, XEvent *event, String *params,
-			       Cardinal *num_params);
-extern Bool BumpScroll(XEvent *ev);
-extern void FullScreenOn();
-extern void FullScreenOff();
-
 /* listen.c */
 
 extern void listenForIncomingConnections();
-
-/* misc.c */
-
-extern void ToplevelInitBeforeRealization();
-extern void ToplevelInitAfterRealization();
-extern Time TimeFromEvent(XEvent *ev);
-extern void Pause(Widget w, XEvent *event, String *params,
-		  Cardinal *num_params);
-extern void RunCommand(Widget w, XEvent *event, String *params,
-		       Cardinal *num_params);
-extern void Quit(Widget w, XEvent *event, String *params,
-		 Cardinal *num_params);
-extern void Cleanup();
-
-/* popup.c */
-
-extern Widget popup;
-extern void ShowPopup(Widget w, XEvent *event, String *params,
-		      Cardinal *num_params);
-extern void HidePopup(Widget w, XEvent *event, String *params,
-		      Cardinal *num_params);
-extern void CreatePopup();
 
 /* rfbproto.c */
 
@@ -231,18 +145,6 @@ extern Bool HandleRFBServerMessage();
 
 extern void PrintPixelFormat(rfbPixelFormat *format);
 
-/* selection.c */
-
-extern void InitialiseSelection();
-extern void SelectionToVNC(Widget w, XEvent *event, String *params,
-			   Cardinal *num_params);
-extern void SelectionFromVNC(Widget w, XEvent *event, String *params,
-			     Cardinal *num_params);
-
-/* shm.c */
-
-extern XImage *CreateShmImage();
-extern void ShmCleanup();
 
 /* sockets.c */
 
@@ -268,6 +170,4 @@ extern Bool createTunnel(int *argc, char **argv, int tunnelArgIndex);
 /* vnc2dl.c */
 
 extern char *programName;
-extern XtAppContext appContext;
-extern Display* dpy;
-extern Widget toplevel;
+

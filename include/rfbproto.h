@@ -44,6 +44,7 @@
  *      messages have to be explained by comments.
  */
 
+#include "xtypes.h"
 
 /*****************************************************************************
  *

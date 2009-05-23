@@ -25,10 +25,6 @@
 #include "vnc2dl.h"
 
 char *programName;
-XtAppContext appContext;
-Display* dpy;
-
-Widget toplevel;
 
 int
 main(int argc, char **argv)
@@ -53,26 +49,12 @@ main(int argc, char **argv)
     }
     if (strcmp(argv[i], "-tunnel") == 0 || strcmp(argv[i], "-via") == 0) {
       if (!createTunnel(&argc, argv, i))
-	exit(1);
+	      exit(1);
       break;
     }
   }
 
-  /* Call the main Xt initialisation function.  It parses command-line options,
-     generating appropriate resource specs, and makes a connection to the X
-     display. */
-
-  toplevel = XtVaAppInitialize(&appContext, "Vncviewer",
-			       cmdLineOptions, numCmdLineOptions,
-			       &argc, argv, fallback_resources,
-			       XtNborderWidth, 0, NULL);
-
-  dpy = XtDisplay(toplevel);
-
-  /* Interpret resource specs and process any remaining command-line arguments
-     (i.e. the VNC server name).  If the server name isn't specified on the
-     command line, getArgsAndResources() will pop up a dialog box and wait
-     for one to be entered. */
+  /* Process any remaining command-line arguments (eg. the VNC server name).  */
 
   GetArgsAndResources(argc, argv);
 
@@ -86,35 +68,6 @@ main(int argc, char **argv)
   /* Initialise the VNC connection, including reading the password */
 
   if (!InitialiseRFBConnection()) exit(1);
-
-  /* Create the "popup" widget - this won't actually appear on the screen until
-     some user-defined event causes the "ShowPopup" action to be invoked */
-
-  CreatePopup();
-
-  /* Find the best pixel format and X visual/colormap to use */
-
-  SetVisualAndCmap();
-
-  /* Create the "desktop" widget, and perform initialisation which needs doing
-     before the widgets are realized */
-
-  ToplevelInitBeforeRealization();
-
-  DesktopInitBeforeRealization();
-
-  /* "Realize" all the widgets, i.e. actually create and map their X windows */
-
-  XtRealizeWidget(toplevel);
-
-  /* Perform initialisation that needs doing after realization, now that the X
-     windows exist */
-
-  InitialiseSelection();
-
-  ToplevelInitAfterRealization();
-
-  DesktopInitAfterRealization();
 
   /* Tell the VNC server which pixel format and encodings we want to use */
 

@@ -1,0 +1,3 @@
+[submodule "libdlo"]
+	path = libdlo
+	url = git://anongit.freedesktop.org/libdlo

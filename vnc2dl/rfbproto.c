@@ -563,8 +563,6 @@ AuthenticateVNC(void)
        if (len > 0 && buffer[len - 1] == '\n')
 	  buffer[len - 1] = '\0';
     }
-  } else if (appData.passwordDialog) {
-    passwd = DoPasswordDialog();
   } else {
     passwd = getpass("Password: ");
   }
@@ -868,9 +866,6 @@ SendPointerEvent(int x, int y, int buttonMask)
   if (x < 0) x = 0;
   if (y < 0) y = 0;
 
-  if (!appData.useX11Cursor)
-    SoftCursorMove(x, y);
-
   pe.x = Swap16IfLE(x);
   pe.y = Swap16IfLE(y);
   return WriteExact(rfbsock, (char *)&pe, sz_rfbPointerEventMsg);
@@ -931,7 +926,6 @@ HandleRFBServerMessage()
   {
     int i;
     CARD16 rgb[3];
-    XColor xc;
 
     if (!ReadFromRFBServer(((char *)&msg) + 1,
 			   sz_rfbSetColourMapEntriesMsg - 1))
@@ -942,13 +936,13 @@ HandleRFBServerMessage()
 
     for (i = 0; i < msg.scme.nColours; i++) {
       if (!ReadFromRFBServer((char *)rgb, 6))
-	return False;
-      xc.pixel = msg.scme.firstColour + i;
-      xc.red = Swap16IfLE(rgb[0]);
-      xc.green = Swap16IfLE(rgb[1]);
-      xc.blue = Swap16IfLE(rgb[2]);
-      xc.flags = DoRed|DoGreen|DoBlue;
-      XStoreColor(dpy, cmap, &xc);
+	      return False;
+      UINT16 pixel = msg.scme.firstColour + i;
+      UINT16 red = Swap16IfLE(rgb[0]);
+      UINT16 green = Swap16IfLE(rgb[1]);
+      UINT16 blue = Swap16IfLE(rgb[2]);
+      UINT16 flags = DoRed|DoGreen|DoBlue;
+      // XStoreColor(dpy, cmap, &xc);
     }
 
     break;
