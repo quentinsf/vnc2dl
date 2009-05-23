@@ -1,7 +1,7 @@
 #define IHaveSubdirs
 #define PassCDebugFlags
 
-SUBDIRS = libvncauth vncviewer vncpasswd vncconnect
+SUBDIRS = libvncauth vnc2dl vncviewer vncpasswd vncconnect
 
 World:
 	make Makefiles
