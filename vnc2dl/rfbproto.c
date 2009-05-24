@@ -81,7 +81,7 @@ int endianTest = 1;
 static int protocolMinorVersion;
 static Bool tightVncProtocol = False;
 static CapsContainer *tunnelCaps;    /* known tunneling/encryption methods */
-static CapsContainer *authCaps;	     /* known authentication schemes       */
+static CapsContainer *authCaps;      /* known authentication schemes       */
 static CapsContainer *serverMsgCaps; /* known non-standard server messages */
 static CapsContainer *clientMsgCaps; /* known non-standard client messages */
 static CapsContainer *encodingCaps;  /* known encodings besides Raw        */
@@ -148,37 +148,37 @@ InitCapabilities(void)
 
   /* Supported authentication methods */
   CapsAdd(authCaps, rfbAuthNone, rfbStandardVendor, sig_rfbAuthNone,
-	  "No authentication");
+          "No authentication");
   CapsAdd(authCaps, rfbAuthVNC, rfbStandardVendor, sig_rfbAuthVNC,
-	  "Standard VNC password authentication");
+          "Standard VNC password authentication");
 
   /* Supported encoding types */
-  CapsAdd(encodingCaps, rfbEncodingCopyRect, rfbStandardVendor,
-	  sig_rfbEncodingCopyRect, "Standard CopyRect encoding");
+  // CapsAdd(encodingCaps, rfbEncodingCopyRect, rfbStandardVendor,
+  //         sig_rfbEncodingCopyRect, "Standard CopyRect encoding");
   CapsAdd(encodingCaps, rfbEncodingRRE, rfbStandardVendor,
-	  sig_rfbEncodingRRE, "Standard RRE encoding");
-  CapsAdd(encodingCaps, rfbEncodingCoRRE, rfbStandardVendor,
-	  sig_rfbEncodingCoRRE, "Standard CoRRE encoding");
-  CapsAdd(encodingCaps, rfbEncodingHextile, rfbStandardVendor,
-	  sig_rfbEncodingHextile, "Standard Hextile encoding");
-  CapsAdd(encodingCaps, rfbEncodingZlib, rfbTridiaVncVendor,
-	  sig_rfbEncodingZlib, "Zlib encoding from TridiaVNC");
-  CapsAdd(encodingCaps, rfbEncodingTight, rfbTightVncVendor,
-	  sig_rfbEncodingTight, "Tight encoding by Constantin Kaplinsky");
+          sig_rfbEncodingRRE, "Standard RRE encoding");
+  // CapsAdd(encodingCaps, rfbEncodingCoRRE, rfbStandardVendor,
+  //         sig_rfbEncodingCoRRE, "Standard CoRRE encoding");
+  // CapsAdd(encodingCaps, rfbEncodingHextile, rfbStandardVendor,
+  //         sig_rfbEncodingHextile, "Standard Hextile encoding");
+  // CapsAdd(encodingCaps, rfbEncodingZlib, rfbTridiaVncVendor,
+  //         sig_rfbEncodingZlib, "Zlib encoding from TridiaVNC");
+  // CapsAdd(encodingCaps, rfbEncodingTight, rfbTightVncVendor,
+  //         sig_rfbEncodingTight, "Tight encoding by Constantin Kaplinsky");
 
   /* Supported "fake" encoding types */
   CapsAdd(encodingCaps, rfbEncodingCompressLevel0, rfbTightVncVendor,
-	  sig_rfbEncodingCompressLevel0, "Compression level");
+          sig_rfbEncodingCompressLevel0, "Compression level");
   CapsAdd(encodingCaps, rfbEncodingQualityLevel0, rfbTightVncVendor,
-	  sig_rfbEncodingQualityLevel0, "JPEG quality level");
-  CapsAdd(encodingCaps, rfbEncodingXCursor, rfbTightVncVendor,
-	  sig_rfbEncodingXCursor, "X-style cursor shape update");
-  CapsAdd(encodingCaps, rfbEncodingRichCursor, rfbTightVncVendor,
-	  sig_rfbEncodingRichCursor, "Rich-color cursor shape update");
-  CapsAdd(encodingCaps, rfbEncodingPointerPos, rfbTightVncVendor,
-	  sig_rfbEncodingPointerPos, "Pointer position update");
-  CapsAdd(encodingCaps, rfbEncodingLastRect, rfbTightVncVendor,
-	  sig_rfbEncodingLastRect, "LastRect protocol extension");
+          sig_rfbEncodingQualityLevel0, "JPEG quality level");
+  // CapsAdd(encodingCaps, rfbEncodingXCursor, rfbTightVncVendor,
+  //         sig_rfbEncodingXCursor, "X-style cursor shape update");
+  // CapsAdd(encodingCaps, rfbEncodingRichCursor, rfbTightVncVendor,
+  //         sig_rfbEncodingRichCursor, "Rich-color cursor shape update");
+  // CapsAdd(encodingCaps, rfbEncodingPointerPos, rfbTightVncVendor,
+  //         sig_rfbEncodingPointerPos, "Pointer position update");
+  // CapsAdd(encodingCaps, rfbEncodingLastRect, rfbTightVncVendor,
+  //         sig_rfbEncodingLastRect, "LastRect protocol extension");
 }
 
 
@@ -203,7 +203,8 @@ ConnectToRFBServer(const char *hostname, int port)
     return False;
   }
 
-  return SetNonBlocking(rfbsock);
+  // return SetNonBlocking(rfbsock);
+  return True;
 }
 
 
@@ -233,7 +234,7 @@ InitialiseRFBConnection(void)
   pv[sz_rfbProtocolVersionMsg] = 0;
 
   if (sscanf(pv, rfbProtocolVersionFormat,
-	     &server_major, &server_minor) != 2) {
+             &server_major, &server_minor) != 2) {
     fprintf(stderr,"Not a valid VNC server\n");
     return False;
   }
@@ -250,7 +251,7 @@ InitialiseRFBConnection(void)
   }
 
   fprintf(stderr, "Connected to RFB server, using protocol version 3.%d\n",
-	  protocolMinorVersion);
+          protocolMinorVersion);
 
   sprintf(pv, rfbProtocolVersionFormat, 3, protocolMinorVersion);
 
@@ -549,7 +550,7 @@ AuthenticateVNC(void)
     passwd = vncDecryptPasswdFromFile(appData.passwordFile);
     if (!passwd) {
       fprintf(stderr, "Cannot read valid password from file \"%s\"\n",
-	      appData.passwordFile);
+              appData.passwordFile);
       return False;
     }
   } else if (appData.autoPass) {
@@ -561,7 +562,7 @@ AuthenticateVNC(void)
     {
        len = strlen(buffer);
        if (len > 0 && buffer[len - 1] == '\n')
-	  buffer[len - 1] = '\0';
+          buffer[len - 1] = '\0';
     }
   } else {
     passwd = getpass("Password: ");
@@ -616,7 +617,7 @@ ReadAuthenticationResult(void)
     return False;
   default:
     fprintf(stderr, "Unknown result of authentication (%d)\n",
-	    (int)authResult);
+            (int)authResult);
     return False;
   }
 
@@ -642,8 +643,8 @@ ReadInteractionCaps(void)
 
   /* Read the lists of server- and client-initiated messages */
   return (ReadCapabilityList(serverMsgCaps, intr_caps.nServerMessageTypes) &&
-	  ReadCapabilityList(clientMsgCaps, intr_caps.nClientMessageTypes) &&
-	  ReadCapabilityList(encodingCaps, intr_caps.nEncodingTypes));
+          ReadCapabilityList(clientMsgCaps, intr_caps.nClientMessageTypes) &&
+          ReadCapabilityList(encodingCaps, intr_caps.nEncodingTypes));
 }
 
 
@@ -688,51 +689,55 @@ SetFormatAndEncodings()
 
   spf.type = rfbSetPixelFormat;
   spf.format = myFormat;
+  printf("Requesting pixel format\n");
+  PrintPixelFormat(&spf.format);
   spf.format.redMax = Swap16IfLE(spf.format.redMax);
   spf.format.greenMax = Swap16IfLE(spf.format.greenMax);
   spf.format.blueMax = Swap16IfLE(spf.format.blueMax);
 
   if (!WriteExact(rfbsock, (char *)&spf, sz_rfbSetPixelFormatMsg))
     return False;
-
+  printf("Setting pixel format done\n");
+  
   se->type = rfbSetEncodings;
   se->nEncodings = 0;
 
+  /*
   if (appData.encodingsString) {
     char *encStr = appData.encodingsString;
     int encStrLen;
     do {
       char *nextEncStr = strchr(encStr, ' ');
       if (nextEncStr) {
-	encStrLen = nextEncStr - encStr;
-	nextEncStr++;
+        encStrLen = nextEncStr - encStr;
+        nextEncStr++;
       } else {
-	encStrLen = strlen(encStr);
+        encStrLen = strlen(encStr);
       }
 
       if (strncasecmp(encStr,"raw",encStrLen) == 0) {
-	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
+        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
       } else if (strncasecmp(encStr,"copyrect",encStrLen) == 0) {
-	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
+        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
       } else if (strncasecmp(encStr,"tight",encStrLen) == 0) {
-	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
-	requestLastRectEncoding = True;
-	if (appData.compressLevel >= 0 && appData.compressLevel <= 9)
-	  requestCompressLevel = True;
-	if (appData.enableJPEG)
-	  requestQualityLevel = True;
+        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
+        requestLastRectEncoding = True;
+        if (appData.compressLevel >= 0 && appData.compressLevel <= 9)
+          requestCompressLevel = True;
+        if (appData.enableJPEG)
+          requestQualityLevel = True;
       } else if (strncasecmp(encStr,"hextile",encStrLen) == 0) {
-	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
+        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
       } else if (strncasecmp(encStr,"zlib",encStrLen) == 0) {
-	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZlib);
-	if (appData.compressLevel >= 0 && appData.compressLevel <= 9)
-	  requestCompressLevel = True;
+        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZlib);
+        if (appData.compressLevel >= 0 && appData.compressLevel <= 9)
+          requestCompressLevel = True;
       } else if (strncasecmp(encStr,"corre",encStrLen) == 0) {
-	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
+        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
       } else if (strncasecmp(encStr,"rre",encStrLen) == 0) {
-	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRRE);
+        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRRE);
       } else {
-	fprintf(stderr,"Unknown encoding '%.*s'\n",encStrLen,encStr);
+        fprintf(stderr,"Unknown encoding '%.*s'\n",encStrLen,encStr);
       }
 
       encStr = nextEncStr;
@@ -740,23 +745,23 @@ SetFormatAndEncodings()
 
     if (se->nEncodings < MAX_ENCODINGS && requestCompressLevel) {
       encs[se->nEncodings++] = Swap32IfLE(appData.compressLevel +
-					  rfbEncodingCompressLevel0);
+                                          rfbEncodingCompressLevel0);
     }
 
     if (se->nEncodings < MAX_ENCODINGS && requestQualityLevel) {
       if (appData.qualityLevel < 0 || appData.qualityLevel > 9)
         appData.qualityLevel = 5;
       encs[se->nEncodings++] = Swap32IfLE(appData.qualityLevel +
-					  rfbEncodingQualityLevel0);
+                                          rfbEncodingQualityLevel0);
     }
 
     if (appData.useRemoteCursor) {
       if (se->nEncodings < MAX_ENCODINGS)
-	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
+        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
       if (se->nEncodings < MAX_ENCODINGS)
-	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
+        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
       if (se->nEncodings < MAX_ENCODINGS)
-	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
+        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
     }
 
     if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding) {
@@ -764,48 +769,49 @@ SetFormatAndEncodings()
     }
   }
   else {
+     */
     if (SameMachine(rfbsock)) {
       if (!tunnelSpecified) {
-	fprintf(stderr,"Same machine: preferring raw encoding\n");
-	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
+        fprintf(stderr,"Same machine: preferring raw encoding\n");
+        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
       } else {
-	fprintf(stderr,"Tunneling active: preferring tight encoding\n");
+        fprintf(stderr,"Tunneling active: preferring tight encoding\n");
       }
     }
 
-    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
-    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
-    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
-    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZlib);
-    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
+    // encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
+    // encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
+    // encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
+    // encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZlib);
+    // encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRRE);
 
-    if (appData.compressLevel >= 0 && appData.compressLevel <= 9) {
-      encs[se->nEncodings++] = Swap32IfLE(appData.compressLevel +
-					  rfbEncodingCompressLevel0);
-    } else if (!tunnelSpecified) {
-      /* If -tunnel option was provided, we assume that server machine is
-	 not in the local network so we use default compression level for
-	 tight encoding instead of fast compression. Thus we are
-	 requesting level 1 compression only if tunneling is not used. */
-      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCompressLevel1);
-    }
-
-    if (appData.enableJPEG) {
-      if (appData.qualityLevel < 0 || appData.qualityLevel > 9)
-	appData.qualityLevel = 5;
-      encs[se->nEncodings++] = Swap32IfLE(appData.qualityLevel +
-					  rfbEncodingQualityLevel0);
-    }
-
-    if (appData.useRemoteCursor) {
-      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
-      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
-      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
-    }
-
+    // if (appData.compressLevel >= 0 && appData.compressLevel <= 9) {
+    //       encs[se->nEncodings++] = Swap32IfLE(appData.compressLevel +
+    //                                           rfbEncodingCompressLevel0);
+    //     } else if (!tunnelSpecified) {
+    //       /* If -tunnel option was provided, we assume that server machine is
+    //          not in the local network so we use default compression level for
+    //          tight encoding instead of fast compression. Thus we are
+    //          requesting level 1 compression only if tunneling is not used. */
+    //       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCompressLevel1);
+    //     }
+    
+    // if (appData.enableJPEG) {
+    //       if (appData.qualityLevel < 0 || appData.qualityLevel > 9)
+    //         appData.qualityLevel = 5;
+    //       encs[se->nEncodings++] = Swap32IfLE(appData.qualityLevel +
+    //                                           rfbEncodingQualityLevel0);
+    //     }
+    // 
+    //     if (appData.useRemoteCursor) {
+    //       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
+    //       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
+    //       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
+    //     }
+    
     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
-  }
+  /* } */
 
   len = sz_rfbSetEncodingsMsg + se->nEncodings * 4;
 
@@ -825,7 +831,7 @@ Bool
 SendIncrementalFramebufferUpdateRequest()
 {
   return SendFramebufferUpdateRequest(0, 0, si.framebufferWidth,
-				      si.framebufferHeight, True);
+                                      si.framebufferHeight, True);
 }
 
 
@@ -904,7 +910,7 @@ SendClientCutText(char *str, int len)
   cct.type = rfbClientCutText;
   cct.length = Swap32IfLE(len);
   return  (WriteExact(rfbsock, (char *)&cct, sz_rfbClientCutTextMsg) &&
-	   WriteExact(rfbsock, str, len));
+           WriteExact(rfbsock, str, len));
 }
 
 
@@ -920,6 +926,7 @@ HandleRFBServerMessage()
   if (!ReadFromRFBServer((char *)&msg, 1))
     return False;
 
+  printf("Got  message %d\n", msg.type);
   switch (msg.type) {
 
   case rfbSetColourMapEntries:
@@ -928,7 +935,7 @@ HandleRFBServerMessage()
     CARD16 rgb[3];
 
     if (!ReadFromRFBServer(((char *)&msg) + 1,
-			   sz_rfbSetColourMapEntriesMsg - 1))
+                           sz_rfbSetColourMapEntriesMsg - 1))
       return False;
 
     msg.scme.firstColour = Swap16IfLE(msg.scme.firstColour);
@@ -936,12 +943,12 @@ HandleRFBServerMessage()
 
     for (i = 0; i < msg.scme.nColours; i++) {
       if (!ReadFromRFBServer((char *)rgb, 6))
-	      return False;
+              return False;
       UINT16 pixel = msg.scme.firstColour + i;
       UINT16 red = Swap16IfLE(rgb[0]);
       UINT16 green = Swap16IfLE(rgb[1]);
       UINT16 blue = Swap16IfLE(rgb[2]);
-      UINT16 flags = DoRed|DoGreen|DoBlue;
+      // UINT16 flags = DoRed|DoGreen|DoBlue;
       // XStoreColor(dpy, cmap, &xc);
     }
 
@@ -957,228 +964,209 @@ HandleRFBServerMessage()
     int usecs;
 
     if (!ReadFromRFBServer(((char *)&msg.fu) + 1,
-			   sz_rfbFramebufferUpdateMsg - 1))
+                           sz_rfbFramebufferUpdateMsg - 1))
       return False;
 
     msg.fu.nRects = Swap16IfLE(msg.fu.nRects);
 
     for (i = 0; i < msg.fu.nRects; i++) {
       if (!ReadFromRFBServer((char *)&rect, sz_rfbFramebufferUpdateRectHeader))
-	return False;
+        return False;
 
       rect.encoding = Swap32IfLE(rect.encoding);
+      printf("encoding %u\n",rect.encoding);
       if (rect.encoding == rfbEncodingLastRect)
-	break;
+        break;
 
       rect.r.x = Swap16IfLE(rect.r.x);
       rect.r.y = Swap16IfLE(rect.r.y);
       rect.r.w = Swap16IfLE(rect.r.w);
       rect.r.h = Swap16IfLE(rect.r.h);
 
-      if (rect.encoding == rfbEncodingXCursor ||
-	  rect.encoding == rfbEncodingRichCursor) {
-	if (!HandleCursorShape(rect.r.x, rect.r.y, rect.r.w, rect.r.h,
-			      rect.encoding)) {
-	  return False;
-	}
-	continue;
-      }
-
-      if (rect.encoding == rfbEncodingPointerPos) {
-	if (!HandleCursorPos(rect.r.x, rect.r.y)) {
-	  return False;
-	}
-	continue;
-      }
-
+      // if (rect.encoding == rfbEncodingXCursor ||
+      //           rect.encoding == rfbEncodingRichCursor) {
+      //         if (!HandleCursorShape(rect.r.x, rect.r.y, rect.r.w, rect.r.h,
+      //                               rect.encoding)) {
+      //           return False;
+      //         }
+      //         continue;
+      //       }
+      // 
+      //       if (rect.encoding == rfbEncodingPointerPos) {
+      //         if (!HandleCursorPos(rect.r.x, rect.r.y)) {
+      //           return False;
+      //         }
+      //         continue;
+      //       }
+      
       if ((rect.r.x + rect.r.w > si.framebufferWidth) ||
-	  (rect.r.y + rect.r.h > si.framebufferHeight))
-	{
-	  fprintf(stderr,"Rect too large: %dx%d at (%d, %d)\n",
-		  rect.r.w, rect.r.h, rect.r.x, rect.r.y);
-	  return False;
-	}
+          (rect.r.y + rect.r.h > si.framebufferHeight))
+        {
+          fprintf(stderr,"Rect too large: %dx%d at (%d, %d)\n",
+                  rect.r.w, rect.r.h, rect.r.x, rect.r.y);
+          return False;
+        }
 
       if (rect.r.h * rect.r.w == 0) {
-	fprintf(stderr,"Zero size rect - ignoring\n");
-	continue;
+        fprintf(stderr,"Zero size rect - ignoring\n");
+        continue;
       }
 
       /* If RichCursor encoding is used, we should prevent collisions
-	 between framebuffer updates and cursor drawing operations. */
-      SoftCursorLockArea(rect.r.x, rect.r.y, rect.r.w, rect.r.h);
+         between framebuffer updates and cursor drawing operations. */
+      // SoftCursorLockArea(rect.r.x, rect.r.y, rect.r.w, rect.r.h);
 
       switch (rect.encoding) {
 
       case rfbEncodingRaw:
+        printf("Raw rect %d x %d\n", rect.r.w, rect.r.h);
+        bytesPerLine = rect.r.w * myFormat.bitsPerPixel / 8;
+        linesToRead = BUFFER_SIZE / bytesPerLine;
 
-	bytesPerLine = rect.r.w * myFormat.bitsPerPixel / 8;
-	linesToRead = BUFFER_SIZE / bytesPerLine;
+        while (rect.r.h > 0) {
+          if (linesToRead > rect.r.h)
+            linesToRead = rect.r.h;
 
-	while (rect.r.h > 0) {
-	  if (linesToRead > rect.r.h)
-	    linesToRead = rect.r.h;
+          printf("  reading %d lines at %d\n", linesToRead, rect.r.y);
+          if (!ReadFromRFBServer(buffer,bytesPerLine * linesToRead))
+            return False;
+          printf("  writing them to %d,%d (%d x %d)\n", rect.r.x, rect.r.y, rect.r.w, linesToRead);
+          CopyDataToScreen(buffer, rect.r.x, rect.r.y, rect.r.w,
+                           linesToRead);
 
-	  if (!ReadFromRFBServer(buffer,bytesPerLine * linesToRead))
-	    return False;
+          rect.r.h -= linesToRead;
+          rect.r.y += linesToRead;
 
-	  CopyDataToScreen(buffer, rect.r.x, rect.r.y, rect.r.w,
-			   linesToRead);
+        }
+        break;
 
-	  rect.r.h -= linesToRead;
-	  rect.r.y += linesToRead;
-
-	}
-	break;
-
-      case rfbEncodingCopyRect:
-      {
-	rfbCopyRect cr;
-
-	if (!ReadFromRFBServer((char *)&cr, sz_rfbCopyRect))
-	  return False;
-
-	cr.srcX = Swap16IfLE(cr.srcX);
-	cr.srcY = Swap16IfLE(cr.srcY);
-
-	/* If RichCursor encoding is used, we should extend our
-	   "cursor lock area" (previously set to destination
-	   rectangle) to the source rectangle as well. */
-	SoftCursorLockArea(cr.srcX, cr.srcY, rect.r.w, rect.r.h);
-
-	if (appData.copyRectDelay != 0) {
-	  XFillRectangle(dpy, desktopWin, srcGC, cr.srcX, cr.srcY,
-			 rect.r.w, rect.r.h);
-	  XFillRectangle(dpy, desktopWin, dstGC, rect.r.x, rect.r.y,
-			 rect.r.w, rect.r.h);
-	  XSync(dpy,False);
-	  usleep(appData.copyRectDelay * 1000);
-	  XFillRectangle(dpy, desktopWin, dstGC, rect.r.x, rect.r.y,
-			 rect.r.w, rect.r.h);
-	  XFillRectangle(dpy, desktopWin, srcGC, cr.srcX, cr.srcY,
-			 rect.r.w, rect.r.h);
-	}
-
-	XCopyArea(dpy, desktopWin, desktopWin, gc, cr.srcX, cr.srcY,
-		  rect.r.w, rect.r.h, rect.r.x, rect.r.y);
-
-	break;
-      }
+      // case rfbEncodingCopyRect:
+      //       {
+      //           rfbCopyRect cr;
+      // 
+      //           if (!ReadFromRFBServer((char *)&cr, sz_rfbCopyRect))
+      //               return False;
+      // 
+      //           cr.srcX = Swap16IfLE(cr.srcX);
+      //           cr.srcY = Swap16IfLE(cr.srcY);
+      // 
+      //           /* If RichCursor encoding is used, we should extend our
+      //               "cursor lock area" (previously set to destination
+      //               rectangle) to the source rectangle as well. */
+      //               SoftCursorLockArea(cr.srcX, cr.srcY, rect.r.w, rect.r.h);
+      // 
+      //           if (appData.copyRectDelay != 0) {
+      //                 /* Draw area, delay */
+      //           }
+      // 
+      //           /*XCopyArea(dpy, desktopWin, desktopWin, gc, cr.srcX, cr.srcY,
+      //               rect.r.w, rect.r.h, rect.r.x, rect.r.y);
+      //           */
+      //           break;
+      //       }
 
       case rfbEncodingRRE:
       {
-	switch (myFormat.bitsPerPixel) {
-	case 8:
-	  if (!HandleRRE8(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-	    return False;
-	  break;
-	case 16:
-	  if (!HandleRRE16(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-	    return False;
-	  break;
-	case 32:
-	  if (!HandleRRE32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-	    return False;
-	  break;
-	}
-	break;
+          switch (myFormat.bitsPerPixel) {
+          case 8:
+              if (!HandleRRE8(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+                  return False;
+              break;
+          case 16:
+              if (!HandleRRE16(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+                  return False;
+              break;
+          case 32:
+              if (!HandleRRE32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+                  return False;
+              break;
+              }
+              break;
       }
 
-      case rfbEncodingCoRRE:
-      {
-	switch (myFormat.bitsPerPixel) {
-	case 8:
-	  if (!HandleCoRRE8(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-	    return False;
-	  break;
-	case 16:
-	  if (!HandleCoRRE16(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-	    return False;
-	  break;
-	case 32:
-	  if (!HandleCoRRE32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-	    return False;
-	  break;
-	}
-	break;
-      }
-
-      case rfbEncodingHextile:
-      {
-	switch (myFormat.bitsPerPixel) {
-	case 8:
-	  if (!HandleHextile8(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-	    return False;
-	  break;
-	case 16:
-	  if (!HandleHextile16(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-	    return False;
-	  break;
-	case 32:
-	  if (!HandleHextile32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-	    return False;
-	  break;
-	}
-	break;
-      }
-
-      case rfbEncodingZlib:
-      {
-	switch (myFormat.bitsPerPixel) {
-	case 8:
-	  if (!HandleZlib8(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-	    return False;
-	  break;
-	case 16:
-	  if (!HandleZlib16(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-	    return False;
-	  break;
-	case 32:
-	  if (!HandleZlib32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-	    return False;
-	  break;
-	}
-	break;
-     }
-
-      case rfbEncodingTight:
-      {
-	switch (myFormat.bitsPerPixel) {
-	case 8:
-	  if (!HandleTight8(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-	    return False;
-	  break;
-	case 16:
-	  if (!HandleTight16(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-	    return False;
-	  break;
-	case 32:
-	  if (!HandleTight32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-	    return False;
-	  break;
-	}
-	break;
-      }
+      // case rfbEncodingCoRRE:
+      //       {
+      //           switch (myFormat.bitsPerPixel) {
+      //           case 8:
+      //               if (!HandleCoRRE8(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+      //                   return False;
+      //               break;
+      //           case 16:
+      //               if (!HandleCoRRE16(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+      //                   return False;
+      //               break;
+      //           case 32:
+      //               if (!HandleCoRRE32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+      //                   return False;
+      //               break;
+      //       }
+      //         break;
+      //       }
+      // 
+      //       case rfbEncodingHextile:
+      //       {
+      //         switch (myFormat.bitsPerPixel) {
+      //         case 8:
+      //           if (!HandleHextile8(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+      //             return False;
+      //           break;
+      //         case 16:
+      //           if (!HandleHextile16(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+      //             return False;
+      //           break;
+      //         case 32:
+      //           if (!HandleHextile32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+      //             return False;
+      //           break;
+      //         }
+      //         break;
+      //       }
+      // 
+      //       case rfbEncodingZlib:
+      //       {
+      //         switch (myFormat.bitsPerPixel) {
+      //         case 8:
+      //           if (!HandleZlib8(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+      //             return False;
+      //           break;
+      //         case 16:
+      //           if (!HandleZlib16(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+      //             return False;
+      //           break;
+      //         case 32:
+      //           if (!HandleZlib32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+      //             return False;
+      //           break;
+      //         }
+      //         break;
+      //      }
+      // 
+      //       case rfbEncodingTight:
+      //       {
+      //         switch (myFormat.bitsPerPixel) {
+      //         case 8:
+      //           if (!HandleTight8(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+      //             return False;
+      //           break;
+      //         case 16:
+      //           if (!HandleTight16(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+      //             return False;
+      //           break;
+      //         case 32:
+      //           if (!HandleTight32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+      //             return False;
+      //           break;
+      //         }
+      //         break;
+      //       }
 
       default:
-	fprintf(stderr,"Unknown rect encoding %d\n",
-		(int)rect.encoding);
-	return False;
+        fprintf(stderr,"Unknown rect encoding %d\n",
+                (int)rect.encoding);
+        return False;
       }
 
-      /* Now we may discard "soft cursor locks". */
-      SoftCursorUnlockScreen();
     }
-
-#ifdef MITSHM
-    /* if using shared memory PutImage, make sure that the X server has
-       updated its framebuffer before we reuse the shared memory.  This is
-       mainly to avoid copyrect using invalid screen contents - not sure
-       if we'd need it otherwise. */
-
-    if (appData.useShm)
-      XSync(dpy, False);
-#endif
 
     if (!SendIncrementalFramebufferUpdateRequest())
       return False;
@@ -1188,22 +1176,14 @@ HandleRFBServerMessage()
 
   case rfbBell:
   {
-    Window toplevelWin;
-
-    XBell(dpy, 0);
-
-    if (appData.raiseOnBeep) {
-      toplevelWin = XtWindow(toplevel);
-      XMapRaised(dpy, toplevelWin);
-    }
-
+    /* beep */
     break;
   }
 
   case rfbServerCutText:
   {
     if (!ReadFromRFBServer(((char *)&msg) + 1,
-			   sz_rfbServerCutTextMsg - 1))
+                           sz_rfbServerCutTextMsg - 1))
       return False;
 
     msg.sct.length = Swap32IfLE(msg.sct.length);
@@ -1235,12 +1215,12 @@ HandleRFBServerMessage()
 #define GET_PIXEL8(pix, ptr) ((pix) = *(ptr)++)
 
 #define GET_PIXEL16(pix, ptr) (((CARD8*)&(pix))[0] = *(ptr)++, \
-			       ((CARD8*)&(pix))[1] = *(ptr)++)
+                               ((CARD8*)&(pix))[1] = *(ptr)++)
 
 #define GET_PIXEL32(pix, ptr) (((CARD8*)&(pix))[0] = *(ptr)++, \
-			       ((CARD8*)&(pix))[1] = *(ptr)++, \
-			       ((CARD8*)&(pix))[2] = *(ptr)++, \
-			       ((CARD8*)&(pix))[3] = *(ptr)++)
+                               ((CARD8*)&(pix))[1] = *(ptr)++, \
+                               ((CARD8*)&(pix))[2] = *(ptr)++, \
+                               ((CARD8*)&(pix))[3] = *(ptr)++)
 
 /* CONCAT2 concatenates its two arguments.  CONCAT2E does the same but also
    expands its arguments if they are macros */
@@ -1250,24 +1230,24 @@ HandleRFBServerMessage()
 
 #define BPP 8
 #include "rre.c"
-#include "corre.c"
-#include "hextile.c"
-#include "zlib.c"
-#include "tight.c"
+// #include "corre.c"
+// #include "hextile.c"
+// #include "zlib.c"
+// #include "tight.c"
 #undef BPP
 #define BPP 16
 #include "rre.c"
-#include "corre.c"
-#include "hextile.c"
-#include "zlib.c"
-#include "tight.c"
+// #include "corre.c"
+// #include "hextile.c"
+// #include "zlib.c"
+// #include "tight.c"
 #undef BPP
 #define BPP 32
 #include "rre.c"
-#include "corre.c"
-#include "hextile.c"
-#include "zlib.c"
-#include "tight.c"
+// #include "corre.c"
+// #include "hextile.c"
+// #include "zlib.c"
+// #include "tight.c"
 #undef BPP
 
 /*
@@ -1307,19 +1287,19 @@ PrintPixelFormat(format)
   if (format->bitsPerPixel == 1) {
     fprintf(stderr,"  Single bit per pixel.\n");
     fprintf(stderr,
-	    "  %s significant bit in each byte is leftmost on the screen.\n",
-	    (format->bigEndian ? "Most" : "Least"));
+            "  %s significant bit in each byte is leftmost on the screen.\n",
+            (format->bigEndian ? "Most" : "Least"));
   } else {
     fprintf(stderr,"  %d bits per pixel.\n",format->bitsPerPixel);
     if (format->bitsPerPixel != 8) {
       fprintf(stderr,"  %s significant byte first in each pixel.\n",
-	      (format->bigEndian ? "Most" : "Least"));
+              (format->bigEndian ? "Most" : "Least"));
     }
     if (format->trueColour) {
       fprintf(stderr,"  True colour: max red %d green %d blue %d",
-	      format->redMax, format->greenMax, format->blueMax);
+              format->redMax, format->greenMax, format->blueMax);
       fprintf(stderr,", shift red %d green %d blue %d\n",
-	      format->redShift, format->greenShift, format->blueShift);
+              format->redShift, format->greenShift, format->blueShift);
     } else {
       fprintf(stderr,"  Colour map (not true colour).\n");
     }
@@ -1346,7 +1326,7 @@ ReadCompactLen (void)
     len |= ((int)b & 0x7F) << 7;
     if (b & 0x80) {
       if (!ReadFromRFBServer((char *)&b, 1))
-	return -1;
+        return -1;
       len |= ((int)b & 0xFF) << 14;
     }
   }
@@ -1399,7 +1379,7 @@ JpegTermSource(j_decompress_ptr cinfo)
 
 static void
 JpegSetSrcManager(j_decompress_ptr cinfo, CARD8 *compressedData,
-		  int compressedLen)
+                  int compressedLen)
 {
   jpegBufferPtr = (JOCTET *)compressedData;
   jpegBufferLen = (size_t)compressedLen;

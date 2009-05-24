@@ -36,7 +36,7 @@ void PrintInHex(char *buf, int len);
 
 Bool errorMessageOnReadFailure = True;
 
-#define BUF_SIZE 8192
+#define VNC_BUF_SIZE 8192
 static char buf[BUF_SIZE];
 static char *bufoutptr = buf;
 static int buffered = 0;
@@ -56,23 +56,12 @@ static int buffered = 0;
  */
 
 static Bool rfbsockReady = False;
-static void
-rfbsockReadyCallback(XtPointer clientData, int *fd, XtInputId *id)
-{
-  rfbsockReady = True;
-  XtRemoveInput(*id);
-}
-
-static void
-ProcessXtEvents()
-{
-  rfbsockReady = False;
-  XtAppAddInput(appContext, rfbsock, (XtPointer)XtInputReadMask,
-		rfbsockReadyCallback, NULL);
-  while (!rfbsockReady) {
-    XtAppProcessEvent(appContext, XtIMAll);
-  }
-}
+// static void
+// rfbsockReadyCallback(XtPointer clientData, int *fd, XtInputId *id)
+// {
+//   rfbsockReady = True;
+//   // XtRemoveInput(*id);
+// }
 
 Bool
 ReadFromRFBServer(char *out, unsigned int n)
@@ -92,14 +81,14 @@ ReadFromRFBServer(char *out, unsigned int n)
   bufoutptr = buf;
   buffered = 0;
 
-  if (n <= BUF_SIZE) {
+  if (n <= VNC_BUF_SIZE) {
 
     while (buffered < n) {
-      int i = read(rfbsock, buf + buffered, BUF_SIZE - buffered);
+      int i = read(rfbsock, buf + buffered, VNC_BUF_SIZE - buffered);
       if (i <= 0) {
 	if (i < 0) {
 	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
-	    ProcessXtEvents();
+        // ProcessXtEvents();
 	    i = 0;
 	  } else {
 	    fprintf(stderr,programName);
@@ -128,7 +117,7 @@ ReadFromRFBServer(char *out, unsigned int n)
       if (i <= 0) {
 	if (i < 0) {
 	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
-	    ProcessXtEvents();
+        // ProcessXtEvents();
 	    i = 0;
 	  } else {
 	    fprintf(stderr,programName);

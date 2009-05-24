@@ -1,4 +1,5 @@
 /*
+ *  Copyright (c) 2009 Cambridge Visual Networks Ltd.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -32,51 +33,44 @@
 static Bool
 HandleRREBPP (int rx, int ry, int rw, int rh)
 {
-  rfbRREHeader hdr;
-  XGCValues gcv;
-  int i;
-  CARDBPP pix;
-  rfbRectangle subrect;
+    rfbRREHeader hdr;
+    int i;
+    CARDBPP pix;
+    rfbRectangle subrect;
+    dlo_rect_t rec;
 
-  if (!ReadFromRFBServer((char *)&hdr, sz_rfbRREHeader))
-    return False;
+    if (!ReadFromRFBServer((char *)&hdr, sz_rfbRREHeader))
+        return False;
 
-  hdr.nSubrects = Swap32IfLE(hdr.nSubrects);
+    hdr.nSubrects = Swap32IfLE(hdr.nSubrects);
 
-  if (!ReadFromRFBServer((char *)&pix, sizeof(pix)))
-    return False;
-
-#if (BPP == 8)
-  gcv.foreground = (appData.useBGR233 ? BGR233ToPixel[pix] : pix);
-#else
-  gcv.foreground = pix;
-#endif
-
-  XChangeGC(dpy, gc, GCForeground, &gcv);
-  XFillRectangle(dpy, desktopWin, gc, rx, ry, rw, rh);
-
-  for (i = 0; i < hdr.nSubrects; i++) {
     if (!ReadFromRFBServer((char *)&pix, sizeof(pix)))
-      return False;
+        return False;
 
-    if (!ReadFromRFBServer((char *)&subrect, sz_rfbRectangle))
-      return False;
+    rec.origin.x = rx;
+    rec.origin.y = ry;
+    rec.width = rw;
+    rec.height = rh;
+    ERR(dlo_fill_rect(dl_uid, NULL, &rec, pix)); 
+    // ERR(dlo_fill_rect(dl_uid, NULL, &rec, DLO_RGB(0, 0, 0))); 
 
-    subrect.x = Swap16IfLE(subrect.x);
-    subrect.y = Swap16IfLE(subrect.y);
-    subrect.w = Swap16IfLE(subrect.w);
-    subrect.h = Swap16IfLE(subrect.h);
+    for (i = 0; i < hdr.nSubrects; i++) {
+        if (!ReadFromRFBServer((char *)&pix, sizeof(pix)))
+            return False;
 
-#if (BPP == 8)
-    gcv.foreground = (appData.useBGR233 ? BGR233ToPixel[pix] : pix);
-#else
-    gcv.foreground = pix;
-#endif
+        if (!ReadFromRFBServer((char *)&subrect, sz_rfbRectangle))
+            return False;
 
-    XChangeGC(dpy, gc, GCForeground, &gcv);
-    XFillRectangle(dpy, desktopWin, gc, rx + subrect.x, ry + subrect.y,
-		   subrect.w, subrect.h);
-  }
+        rec.origin.x = rx + Swap16IfLE(subrect.x);
+        rec.origin.y = ry + Swap16IfLE(subrect.y);
+        rec.width  = Swap16IfLE(subrect.w);
+        rec.height = Swap16IfLE(subrect.h);
 
-  return True;
+        ERR(dlo_fill_rect(dl_uid, NULL, &rec, pix));
+    }
+
+    return True;
+
+    error:
+        return False;
 }

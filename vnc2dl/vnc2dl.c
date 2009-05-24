@@ -58,6 +58,9 @@ main(int argc, char **argv)
 
   GetArgsAndResources(argc, argv);
 
+  /* Connect to the first DisplayLink device */ 
+  if (!InitialiseDevice()) exit(1);
+  
   /* Unless we accepted an incoming connection, make a TCP connection to the
      given VNC server */
 
@@ -73,15 +76,19 @@ main(int argc, char **argv)
 
   SetFormatAndEncodings();
 
-  /* Now enter the main loop, processing VNC messages.  X events will
-     automatically be processed whenever the VNC connection is idle. */
-
+  
+  /* And kick things off */
+  SendIncrementalFramebufferUpdateRequest();
+  
+  /* Now enter the main loop, processing VNC messages. */
+  
   while (1) {
     if (!HandleRFBServerMessage())
       break;
   }
 
-  Cleanup();
+  // Cleanup();
+  ReleaseDevice();
 
   return 0;
 }

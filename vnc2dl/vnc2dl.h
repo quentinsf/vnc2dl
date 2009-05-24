@@ -33,6 +33,8 @@
 #include <pwd.h>
 #include "rfbproto.h"
 #include "caps.h"
+#include "dlo_defs.h"
+#include "libdlo.h"
 
 extern int endianTest;
 
@@ -109,13 +111,12 @@ extern void usage(void);
 extern void GetArgsAndResources(int argc, char **argv);
 
 
-/* cursor.c */
+/* dldevice.c */
 
-extern Bool HandleCursorShape(int xhot, int yhot, int width, int height,
-                              CARD32 enc);
-extern void SoftCursorLockArea(int x, int y, int w, int h);
-extern void SoftCursorUnlockScreen(void);
-extern void SoftCursorMove(int x, int y);
+extern dlo_dev_t dl_uid; 
+extern Bool InitialiseDevice();
+extern void CopyDataToScreen(char *buf, int x, int y, int width, int height);
+extern void ReleaseDevice();
 
 /* listen.c */
 

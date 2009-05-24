@@ -40,6 +40,8 @@ int vncServerPort = 0;
  * file.
  */
 
+AppData appData;
+
 /*
 static appDataResourceList[] = {
   {"shareDesktop",  bool, True},

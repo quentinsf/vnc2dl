@@ -14,8 +14,10 @@ ZLIB_INC = -I/usr/local/include
 JPEG_INC = -I/usr/local/include
 INCLUDES = -I../include -I. -I../libdlo/src $(ZLIB_INC) $(JPEG_INC) -I/usr/include
 VNCAUTH_LIB = ../libvncauth/libvncauth.a
-DL_LIB = ../libdlo/src/libdlo.la
+USB_LIB = -lusb
+DL_LIB = ../libdlo/src/.libs/libdlo.a
 ZLIB_LIB = -L/usr/local/lib -lz
+CFLAGS=-g
 #ifdef OSF1Architecture
 XCOMM Avoid linking with different libjpeg in /usr/shlib under Tru64.
 JPEG_LIB = /usr/local/lib/libjpeg.a
@@ -24,11 +26,12 @@ JPEG_LIB = -L/usr/local/lib -ljpeg
 #endif
 
 DEPLIBS = $(DL_LIB) $(VNCAUTH_LIB)
-LOCAL_LIBRARIES = $(DL_LIB) $(VNCAUTH_LIB) $(ZLIB_LIB) $(JPEG_LIB)
+LOCAL_LIBRARIES = $(DL_LIB) $(VNCAUTH_LIB) $(ZLIB_LIB) $(JPEG_LIB) $(USB_LIB)
 
 SRCS = \
   args.c \
   caps.c \
+  dldevice.c \
   listen.c \
   rfbproto.c \
   sockets.c \
