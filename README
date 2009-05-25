@@ -40,9 +40,9 @@ to be installed.
 
 To build everything, do:
 
-    % cd vnc2dl/libdlo
+    % cd libdlo
     % ./configure && make
-    % cd ../..
+    % cd ..
 	% xmkmf
 	% make World
 
