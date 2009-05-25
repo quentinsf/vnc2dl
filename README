@@ -23,26 +23,14 @@ sources.  See the Acknowledgements section below, and the individual files for
 details of the conditions under which they are made available.
 
 
-There are five programs here:
+There are two programs here:
 
 	vnc2dl - this is a VNC viewer which outputs to a DisplayLink device
 	        instead of to the desktop.
 	        
-	vncviewer - this is the VNC viewer, or client, program for X.
-
-	vncserver - this is a wrapper script which makes starting an X VNC
-		    server (i.e. desktop) more convenient.  It is written in
-		    Perl, so to use the script you need that.
-
 	vncpasswd - this program allows you to change the password used to
 		    access your X VNC desktops.  The vncserver script uses
 		    this program when you first start a VNC server.
-
-	vncconnect - this program tells a running instance of Xvnc to connect
-		     to a listening VNC viewer (normally the connection is made
-		     the other way round i.e. the viewer connects to Xvnc).
-
-
 
 First you must have a reasonably recent version of X installed (this includes
 /usr/openwin on Solaris machines).  Also, TightVNC requires JPEG and zlib

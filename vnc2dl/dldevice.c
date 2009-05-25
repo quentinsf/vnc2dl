@@ -56,8 +56,9 @@ Bool InitialiseDevice() {
         (int)info->view.base); 
 
 
-    /* Clear the screen (to black) */ 
-    ERR(dlo_fill_rect(dl_uid, NULL, NULL, DLO_RGB(rand() & 0xff, rand() & 0xff, rand() & 0xff))); 
+    /* Clear the screen */ 
+    srandom(time(NULL));
+    ERR(dlo_fill_rect(dl_uid, NULL, NULL, DLO_RGB(random() & 0xff, random() & 0xff, random() & 0xff))); 
     
     // We want the VNC server to use the device's pixel format
     myFormat.bitsPerPixel = 32;
@@ -106,13 +107,19 @@ CopyDataToScreen(char *buf, int x, int y, int width, int height)
     //   scr += scrWidthInBytes;
     // }
 
-    // dot.x = x;
-    //     dot.y = y;
+    dlo_rect_t r;
+    
+    dot.x = x;
+    dot.y = y;
     fbuf.width = width;
     fbuf.height = height;
     fbuf.base = buf;
     fbuf.stride = width;
     fbuf.fmt = dlo_pixfmt_abgr8888;
+    // r.origin = dot;
+    // r.width = width;
+    // r.height = height;
+    // ERR(dlo_fill_rect(dl_uid, NULL, &r, DLO_RGB(random() & 0xff, random() & 0xff, random() & 0xff))); 
     ERR_GOTO(dlo_copy_host_bmp(dl_uid, bflags, &fbuf, NULL, &dot));
     return;
     

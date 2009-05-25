@@ -11,9 +11,9 @@
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" distribution.
 .\"
-.TH vnc2dl 1 "August 2006" "" "TightVNC"
+.TH vnc2dl 1 "May 2009" "" ""
 .SH NAME
-vnc2dl \- an X viewer client for VNC
+vnc2dl \- a viewer client for VNC on a DisplayLink device
 .SH SYNOPSIS
 .B vnc2dl
 .RI [\| options \|]
@@ -33,13 +33,13 @@ vnc2dl \- an X viewer client for VNC
 .br
 .SH DESCRIPTION
 .B vnc2dl
-is an Xt\-based client application for the VNC (Virtual Network
-Computing) system. It can connect to any VNC\-compatible server such
-as \fBXvnc\fR or WinVNC, allowing you to control desktop environment
-of a different machine.
+is a client application for the VNC (Virtual Network
+Computing) system, which outputs to a DisplayLink USB device. 
+It can connect to any VNC\-compatible server such as \fBXvnc\fR or 
+WinVNC, allowing you to view the desktop environment of a different machine.
 
-You can use F8 to display a pop\-up utility menu. Press F8 twice to
-pass single F8 to the remote side.
+Most of the following options are NOT YET IMPLEMENTED!
+
 .SH OPTIONS
 .TP
 \fB\-help\fR

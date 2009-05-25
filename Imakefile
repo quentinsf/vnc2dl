@@ -1,7 +1,7 @@
 #define IHaveSubdirs
 #define PassCDebugFlags
 
-SUBDIRS = libvncauth vnc2dl vncviewer vncpasswd vncconnect
+SUBDIRS = libvncauth vnc2dl vncpasswd 
 
 World:
 	make Makefiles
@@ -9,7 +9,6 @@ World:
 	make all
 	@echo ""
 	@echo Built $(SUBDIRS).
-	@echo 'To build Xvnc, do "cd Xvnc", followed by "./configure" then "make"'
 	@echo ""
 
 libs:

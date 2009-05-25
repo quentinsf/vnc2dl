@@ -17,7 +17,7 @@ VNCAUTH_LIB = ../libvncauth/libvncauth.a
 USB_LIB = -lusb
 DL_LIB = ../libdlo/src/.libs/libdlo.a
 ZLIB_LIB = -L/usr/local/lib -lz
-CFLAGS=-g
+CDEBUGFLAGS=-g
 #ifdef OSF1Architecture
 XCOMM Avoid linking with different libjpeg in /usr/shlib under Tru64.
 JPEG_LIB = /usr/local/lib/libjpeg.a

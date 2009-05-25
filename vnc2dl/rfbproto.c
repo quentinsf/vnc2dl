@@ -926,7 +926,6 @@ HandleRFBServerMessage()
   if (!ReadFromRFBServer((char *)&msg, 1))
     return False;
 
-  printf("Got  message %d\n", msg.type);
   switch (msg.type) {
 
   case rfbSetColourMapEntries:
@@ -974,7 +973,6 @@ HandleRFBServerMessage()
         return False;
 
       rect.encoding = Swap32IfLE(rect.encoding);
-      printf("encoding %u\n",rect.encoding);
       if (rect.encoding == rfbEncodingLastRect)
         break;
 
@@ -1019,7 +1017,6 @@ HandleRFBServerMessage()
       switch (rect.encoding) {
 
       case rfbEncodingRaw:
-        printf("Raw rect %d x %d\n", rect.r.w, rect.r.h);
         bytesPerLine = rect.r.w * myFormat.bitsPerPixel / 8;
         linesToRead = BUFFER_SIZE / bytesPerLine;
 
@@ -1027,12 +1024,9 @@ HandleRFBServerMessage()
           if (linesToRead > rect.r.h)
             linesToRead = rect.r.h;
 
-          printf("  reading %d lines at %d\n", linesToRead, rect.r.y);
           if (!ReadFromRFBServer(buffer,bytesPerLine * linesToRead))
             return False;
-          printf("  writing them to %d,%d (%d x %d)\n", rect.r.x, rect.r.y, rect.r.w, linesToRead);
-          CopyDataToScreen(buffer, rect.r.x, rect.r.y, rect.r.w,
-                           linesToRead);
+          CopyDataToScreen(buffer, rect.r.x, rect.r.y, rect.r.w, linesToRead);
 
           rect.r.h -= linesToRead;
           rect.r.y += linesToRead;
