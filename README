@@ -1,6 +1,7 @@
 
   VNC2DL
   VNC output to DisplayLink devices.
+  Quentin Stafford-Fraser,  Camvine
 
 ======================================================================
 
@@ -29,14 +30,15 @@ There are two programs here:
 	        instead of to the desktop.
 	        
 	vncpasswd - this program allows you to change the password used to
-		    access your X VNC desktops.  The vncserver script uses
-		    this program when you first start a VNC server.
+		    access your X VNC desktops.  It creates a password file which
+		    vnc2dl might one day be able to use!
 
-First you must have a reasonably recent version of X installed (this includes
-/usr/openwin on Solaris machines).  Also, TightVNC requires JPEG and zlib
-libraries installed in the system (e.g. under /usr/local), and the DisplayLink
-libdlo library requires a recent libusb to be installed.  To build
-everything, do:
+First you must have X installed because vnc2dl still uses some of the X build utilities.
+Also, the TightVNC components require JPEG and zlib libraries installed in the system 
+(e.g. under /usr/local), and the DisplayLink libdlo library requires a recent libusb 
+to be installed.  
+
+To build everything, do:
 
     % cd vnc2dl/libdlo
     % ./configure && make
@@ -46,46 +48,14 @@ everything, do:
 
 This should build first the libdlo library for communication with DisplayLink
 hardware, then then vncauth library which is used by each of the programs, 
-then vnc2dl, vncviewer, vncpasswd and vncconnect.
-
-If it all builds OK you should copy the programs to some directory which
-is in your PATH environment variable, such as /usr/local/bin.  Also, it's
-handy to install manual pages in a directory where the man utility can find
-them.  You can use the vncinstall script to do this for you (man path is
-optional):
-
-	% cd ..
-	% ./vncinstall /usr/local/bin /usr/local/man
-
-If you want to use the Java VNC viewer, you should copy the class files from
-the classes directory to some suitable installation directory such as
-/usr/local/vnc/classes:
-
-	% mkdir -p /usr/local/vnc/classes
-	% cp classes/* /usr/local/vnc/classes
-
-We recommend that you use the vncserver script to run Xvnc for you.  You can
-edit the script as appropriate for your site.  Things you may need to change
-include:
-
- * The location of Perl - if Perl is not installed in /usr/bin you'll need
-   to edit the "#!/usr/bin/perl" first line of vncserver.
-
- * $vncClasses - this specifies the location of the Java classes for
-   the VNC viewer applet.  The default is /usr/local/vnc/classes.
-
- * Xvnc's font path and color database.  If you have an installation of
-   X which is not in the standard place you may need to add arguments to the
-   Xvnc command line to set these.  These should be appended to the $cmd
-   variable at the comment "# Add font path and color database...".
-
-
+then vnc2dl and vncpasswd.
 
 ACKNOWLEDGEMENTS
 ================
 
-This distribution contains public domain DES software by Richard Outerbridge.
-This is:
+As well as the VNC code from AT&T Labs Cambridge, RealVNC and TightVC, and the
+libdlo library from DisplayLink, this distribution contains public domain DES software 
+by Richard Outerbridge.
 
     Copyright (c) 1988,1989,1990,1991,1992 by Richard Outerbridge.
     (GEnie : OUTER; CIS : [71755,204]) Graven Imagery, 1992.
