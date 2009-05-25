@@ -35,19 +35,15 @@ There are two programs here:
 
 First you must have X installed because vnc2dl still uses some of the X build utilities.
 Also, the TightVNC components require JPEG and zlib libraries installed in the system 
-(e.g. under /usr/local), and the DisplayLink libdlo library requires a recent libusb 
-to be installed.  
+(e.g. under /usr/local)
+You'll need the DisplayLink libdlo library installed, and this also requires a recent libusb.  
 
 To build everything, do:
 
-    % cd libdlo
-    % ./configure && make
-    % cd ..
 	% xmkmf
 	% make World
 
-This should build first the libdlo library for communication with DisplayLink
-hardware, then then vncauth library which is used by each of the programs, 
+This should build the vncauth library which is used by each of the programs, 
 then vnc2dl and vncpasswd.
 
 ACKNOWLEDGEMENTS
@@ -60,4 +56,7 @@ by Richard Outerbridge.
     Copyright (c) 1988,1989,1990,1991,1992 by Richard Outerbridge.
     (GEnie : OUTER; CIS : [71755,204]) Graven Imagery, 1992.
 
+
+Quentin Stafford-Fraser
+May 2009
 

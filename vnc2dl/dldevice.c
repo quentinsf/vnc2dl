@@ -21,7 +21,6 @@
 #include "vnc2dl.h"
 #include <stdio.h> 
 #include "libdlo.h" 
-#include "dlo_defs.h"
 
 dlo_dev_t dl_uid; 
 

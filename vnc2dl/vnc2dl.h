@@ -33,8 +33,8 @@
 #include <pwd.h>
 #include "rfbproto.h"
 #include "caps.h"
-#include "dlo_defs.h"
 #include "libdlo.h"
+#include "dlo_defs.h"
 
 extern int endianTest;
 
@@ -58,7 +58,6 @@ extern int endianTest;
   (DEFAULT_SSH_CMD " -f -L %L:localhost:%R %H sleep 20")
 #define DEFAULT_VIA_CMD     \
   (DEFAULT_SSH_CMD " -f -L %L:%H:%R %G sleep 20")
-
 
 /* args.c */
 

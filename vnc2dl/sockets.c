@@ -37,7 +37,7 @@ void PrintInHex(char *buf, int len);
 Bool errorMessageOnReadFailure = True;
 
 #define VNC_BUF_SIZE 8192
-static char buf[BUF_SIZE];
+static char buf[VNC_BUF_SIZE];
 static char *bufoutptr = buf;
 static int buffered = 0;
 
