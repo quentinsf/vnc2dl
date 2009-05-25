@@ -127,7 +127,27 @@ CopyDataToScreen(char *buf, int x, int y, int width, int height)
         printf("dlo_copy_host_bmp error %u '%s'\n", (int)err, dlo_strerror(err));
 }
 
-
+void
+CopyRect(int src_x, int src_y, int width, int height, int dest_x, int dest_y)
+{
+    dlo_rect_t r;
+    dlo_dot_t  dest; 
+    dlo_retcode_t err; 
+    r.origin.x = src_x;
+    r.origin.y = src_y;
+    r.width = width;
+    r.height = height;
+    dest.x = dest_x;
+    dest.y = dest_y;
+    
+    ERR_GOTO(dlo_copy_rect(dl_uid, NULL, &r, NULL, &dest));
+    return;
+    
+    error:
+    // Not much we can do here
+        printf("dlo_copy_rect error %u '%s'\n", (int)err, dlo_strerror(err));
+}
+    
 void ReleaseDevice() {
     dlo_final_t   fin_flags = { 0 }; 
     dlo_retcode_t err; 

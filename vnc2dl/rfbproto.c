@@ -153,8 +153,8 @@ InitCapabilities(void)
           "Standard VNC password authentication");
 
   /* Supported encoding types */
-  // CapsAdd(encodingCaps, rfbEncodingCopyRect, rfbStandardVendor,
-  //         sig_rfbEncodingCopyRect, "Standard CopyRect encoding");
+  CapsAdd(encodingCaps, rfbEncodingCopyRect, rfbStandardVendor,
+          sig_rfbEncodingCopyRect, "Standard CopyRect encoding");
   CapsAdd(encodingCaps, rfbEncodingRRE, rfbStandardVendor,
           sig_rfbEncodingRRE, "Standard RRE encoding");
   // CapsAdd(encodingCaps, rfbEncodingCoRRE, rfbStandardVendor,
@@ -678,98 +678,97 @@ ReadCapabilityList(CapsContainer *caps, int count)
 Bool
 SetFormatAndEncodings()
 {
-  rfbSetPixelFormatMsg spf;
-  char buf[sz_rfbSetEncodingsMsg + MAX_ENCODINGS * 4];
-  rfbSetEncodingsMsg *se = (rfbSetEncodingsMsg *)buf;
-  CARD32 *encs = (CARD32 *)(&buf[sz_rfbSetEncodingsMsg]);
-  int len = 0;
-  Bool requestCompressLevel = False;
-  Bool requestQualityLevel = False;
-  Bool requestLastRectEncoding = False;
+    rfbSetPixelFormatMsg spf;
+    char buf[sz_rfbSetEncodingsMsg + MAX_ENCODINGS * 4];
+    rfbSetEncodingsMsg *se = (rfbSetEncodingsMsg *)buf;
+    CARD32 *encs = (CARD32 *)(&buf[sz_rfbSetEncodingsMsg]);
+    int len = 0;
+    Bool requestCompressLevel = False;
+    Bool requestQualityLevel = False;
+    Bool requestLastRectEncoding = False;
 
-  spf.type = rfbSetPixelFormat;
-  spf.format = myFormat;
-  printf("Requesting pixel format\n");
-  PrintPixelFormat(&spf.format);
-  spf.format.redMax = Swap16IfLE(spf.format.redMax);
-  spf.format.greenMax = Swap16IfLE(spf.format.greenMax);
-  spf.format.blueMax = Swap16IfLE(spf.format.blueMax);
+    spf.type = rfbSetPixelFormat;
+    spf.format = myFormat;
+    printf("Requesting pixel format\n");
+    PrintPixelFormat(&spf.format);
+    spf.format.redMax = Swap16IfLE(spf.format.redMax);
+    spf.format.greenMax = Swap16IfLE(spf.format.greenMax);
+    spf.format.blueMax = Swap16IfLE(spf.format.blueMax);
 
-  if (!WriteExact(rfbsock, (char *)&spf, sz_rfbSetPixelFormatMsg))
-    return False;
-  printf("Setting pixel format done\n");
+    if (!WriteExact(rfbsock, (char *)&spf, sz_rfbSetPixelFormatMsg))
+        return False;
+    printf("Setting pixel format done\n");
+
+    se->type = rfbSetEncodings;
+    se->nEncodings = 0;
+
+    if (appData.encodingsString) {
+        char *encStr = appData.encodingsString;
+        int encStrLen;
+        do {
+            char *nextEncStr = strchr(encStr, ' ');
+            if (nextEncStr) {
+                encStrLen = nextEncStr - encStr;
+                nextEncStr++;
+            } else {
+                encStrLen = strlen(encStr);
+            }
+
+            if (strncasecmp(encStr,"raw",encStrLen) == 0) {
+                encs[se->nEncodings++]  = Swap32IfLE(rfbEncodingRaw);
+            } else if (strncasecmp(encStr,"copyrect",encStrLen) == 0) {
+                encs[se->nEncodings++]  = Swap32IfLE(rfbEncodingCopyRect);
+            } else if (strncasecmp(encStr,"tight",encStrLen) == 0) {
+                encs[se->nEncodings++]  = Swap32IfLE(rfbEncodingTight);
+                requestLastRectEncoding = True;
+                if (appData.compressLevel >= 0 && appData.compressLevel <= 9)
+                  requestCompressLevel = True;
+                if (appData.enableJPEG)
+                  requestQualityLevel = True;
+            } else if (strncasecmp(encStr,"hextile",encStrLen) == 0) {
+                encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
+            } else if (strncasecmp(encStr,"zlib",encStrLen) == 0) {
+                encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZlib);
+                if (appData.compressLevel >= 0 && appData.compressLevel <= 9)
+                  requestCompressLevel = True;
+            } else if (strncasecmp(encStr,"corre",encStrLen) == 0) {
+                encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
+            } else if (strncasecmp(encStr,"rre",encStrLen) == 0) {
+                encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRRE);
+            } else {
+                fprintf(stderr,"Unknown encoding '%.*s'\n",encStrLen,encStr);
+            }
+
+            encStr = nextEncStr;
+        } while (encStr && se->nEncodings < MAX_ENCODINGS);
+
+        if (se->nEncodings < MAX_ENCODINGS && requestCompressLevel) {
+          encs[se->nEncodings++] = Swap32IfLE(appData.compressLevel +
+                                              rfbEncodingCompressLevel0);
+        }
+
+        if (se->nEncodings < MAX_ENCODINGS && requestQualityLevel) {
+          if (appData.qualityLevel < 0 || appData.qualityLevel > 9)
+            appData.qualityLevel = 5;
+          encs[se->nEncodings++] = Swap32IfLE(appData.qualityLevel +
+                                              rfbEncodingQualityLevel0);
+        }
+
+        // if (appData.useRemoteCursor) {
+        //      if (se->nEncodings < MAX_ENCODINGS)
+        //        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
+        //      if (se->nEncodings < MAX_ENCODINGS)
+        //        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
+        //      if (se->nEncodings < MAX_ENCODINGS)
+        //        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
+        //    }
+
+        if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding) {
+          encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
+        }
   
-  se->type = rfbSetEncodings;
-  se->nEncodings = 0;
-
-  /*
-  if (appData.encodingsString) {
-    char *encStr = appData.encodingsString;
-    int encStrLen;
-    do {
-      char *nextEncStr = strchr(encStr, ' ');
-      if (nextEncStr) {
-        encStrLen = nextEncStr - encStr;
-        nextEncStr++;
-      } else {
-        encStrLen = strlen(encStr);
-      }
-
-      if (strncasecmp(encStr,"raw",encStrLen) == 0) {
-        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
-      } else if (strncasecmp(encStr,"copyrect",encStrLen) == 0) {
-        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
-      } else if (strncasecmp(encStr,"tight",encStrLen) == 0) {
-        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
-        requestLastRectEncoding = True;
-        if (appData.compressLevel >= 0 && appData.compressLevel <= 9)
-          requestCompressLevel = True;
-        if (appData.enableJPEG)
-          requestQualityLevel = True;
-      } else if (strncasecmp(encStr,"hextile",encStrLen) == 0) {
-        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
-      } else if (strncasecmp(encStr,"zlib",encStrLen) == 0) {
-        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZlib);
-        if (appData.compressLevel >= 0 && appData.compressLevel <= 9)
-          requestCompressLevel = True;
-      } else if (strncasecmp(encStr,"corre",encStrLen) == 0) {
-        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
-      } else if (strncasecmp(encStr,"rre",encStrLen) == 0) {
-        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRRE);
-      } else {
-        fprintf(stderr,"Unknown encoding '%.*s'\n",encStrLen,encStr);
-      }
-
-      encStr = nextEncStr;
-    } while (encStr && se->nEncodings < MAX_ENCODINGS);
-
-    if (se->nEncodings < MAX_ENCODINGS && requestCompressLevel) {
-      encs[se->nEncodings++] = Swap32IfLE(appData.compressLevel +
-                                          rfbEncodingCompressLevel0);
-    }
-
-    if (se->nEncodings < MAX_ENCODINGS && requestQualityLevel) {
-      if (appData.qualityLevel < 0 || appData.qualityLevel > 9)
-        appData.qualityLevel = 5;
-      encs[se->nEncodings++] = Swap32IfLE(appData.qualityLevel +
-                                          rfbEncodingQualityLevel0);
-    }
-
-    if (appData.useRemoteCursor) {
-      if (se->nEncodings < MAX_ENCODINGS)
-        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
-      if (se->nEncodings < MAX_ENCODINGS)
-        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
-      if (se->nEncodings < MAX_ENCODINGS)
-        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
-    }
-
-    if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding) {
-      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
-    }
-  }
-  else {
-     */
+  } else {
+    
     if (SameMachine(rfbsock)) {
       if (!tunnelSpecified) {
         fprintf(stderr,"Same machine: preferring raw encoding\n");
@@ -779,7 +778,7 @@ SetFormatAndEncodings()
       }
     }
 
-    // encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
+    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
     // encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
     // encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
     // encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZlib);
@@ -797,21 +796,21 @@ SetFormatAndEncodings()
     //       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCompressLevel1);
     //     }
     
-    // if (appData.enableJPEG) {
-    //       if (appData.qualityLevel < 0 || appData.qualityLevel > 9)
-    //         appData.qualityLevel = 5;
-    //       encs[se->nEncodings++] = Swap32IfLE(appData.qualityLevel +
-    //                                           rfbEncodingQualityLevel0);
-    //     }
-    // 
-    //     if (appData.useRemoteCursor) {
-    //       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
-    //       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
-    //       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
-    //     }
+    if (appData.enableJPEG) {
+       if (appData.qualityLevel < 0 || appData.qualityLevel > 9)
+           appData.qualityLevel = 5;
+       encs[se->nEncodings++] = Swap32IfLE(appData.qualityLevel +
+                                               rfbEncodingQualityLevel0);
+    }
+     
+       // if (appData.useRemoteCursor) {
+       //            encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
+       //            encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
+       //            encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
+       //        }
+  }
     
-    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
-  /* } */
+  encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
 
   len = sz_rfbSetEncodingsMsg + se->nEncodings * 4;
 
@@ -1034,30 +1033,28 @@ HandleRFBServerMessage()
         }
         break;
 
-      // case rfbEncodingCopyRect:
-      //       {
-      //           rfbCopyRect cr;
-      // 
-      //           if (!ReadFromRFBServer((char *)&cr, sz_rfbCopyRect))
-      //               return False;
-      // 
-      //           cr.srcX = Swap16IfLE(cr.srcX);
-      //           cr.srcY = Swap16IfLE(cr.srcY);
-      // 
-      //           /* If RichCursor encoding is used, we should extend our
-      //               "cursor lock area" (previously set to destination
-      //               rectangle) to the source rectangle as well. */
-      //               SoftCursorLockArea(cr.srcX, cr.srcY, rect.r.w, rect.r.h);
-      // 
-      //           if (appData.copyRectDelay != 0) {
-      //                 /* Draw area, delay */
-      //           }
-      // 
-      //           /*XCopyArea(dpy, desktopWin, desktopWin, gc, cr.srcX, cr.srcY,
-      //               rect.r.w, rect.r.h, rect.r.x, rect.r.y);
-      //           */
-      //           break;
-      //       }
+        case rfbEncodingCopyRect:
+        {
+            rfbCopyRect cr;
+            if (!ReadFromRFBServer((char *)&cr, sz_rfbCopyRect))
+                return False;
+
+            cr.srcX = Swap16IfLE(cr.srcX);
+            cr.srcY = Swap16IfLE(cr.srcY);
+
+            //           /* If RichCursor encoding is used, we should extend our
+            // "cursor lock area" (previously set to destination
+            //     rectangle) to the source rectangle as well. */
+            //     SoftCursorLockArea(cr.srcX, cr.srcY, rect.r.w, rect.r.h);
+
+            if (appData.copyRectDelay != 0) {
+                            /* Draw area, delay */
+            }
+
+           CopyRect(cr.srcX, cr.srcY, rect.r.w, rect.r.h, rect.r.x, rect.r.y);
+
+            break;
+        }
 
       case rfbEncodingRRE:
       {

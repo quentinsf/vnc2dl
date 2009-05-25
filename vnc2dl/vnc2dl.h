@@ -99,6 +99,7 @@ extern void ProcessArgs(int argc, char **argv);
 extern dlo_dev_t dl_uid; 
 extern Bool InitialiseDevice();
 extern void CopyDataToScreen(char *buf, int x, int y, int width, int height);
+extern void CopyRect(int src_x, int src_y, int width, int height, int dest_x, int dest_y);
 extern void ReleaseDevice();
 
 /* listen.c */
