@@ -1,5 +1,5 @@
 /*
- *  Some portions (c) 2009 Q.Stafford-Fraser. All Rights Reserved.
+ *  Copyright (c) 2009 Q.Stafford-Fraser, Camvine. All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify

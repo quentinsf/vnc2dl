@@ -1,4 +1,5 @@
 /*
+ *  Copyright (c) 2009 Q.Stafford-Fraser, Camvine. All Rights Reserved.
  *  Copyright (C) 2003 Constantin Kaplinsky.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify

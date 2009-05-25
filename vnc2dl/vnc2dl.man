@@ -38,7 +38,7 @@ Computing) system, which outputs to a DisplayLink USB device.
 It can connect to any VNC\-compatible server such as \fBXvnc\fR or 
 WinVNC, allowing you to view the desktop environment of a different machine.
 
-Most of the following options are NOT YET IMPLEMENTED!
+NOTE!!  THIS MAN PAGE IS OUT OF DATE!!! DO NOT TRUST AT ALL!!
 
 .SH OPTIONS
 .TP
