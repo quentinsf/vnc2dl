@@ -8,7 +8,7 @@ JPEG_INC = -I/usr/local/include
 INCLUDES = -I../include -I. $(ZLIB_INC) $(JPEG_INC) -I/usr/include
 VNCAUTH_LIB = ../libvncauth/libvncauth.a
 USB_LIB = -lusb
-DL_LIB =  -ldlo
+DL_LIB =  /usr/local/lib/libdlo.a
 ZLIB_LIB = -L/usr/local/lib -lz
 #ifdef OSF1Architecture
 XCOMM Avoid linking with different libjpeg in /usr/shlib under Tru64.

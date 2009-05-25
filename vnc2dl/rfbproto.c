@@ -223,7 +223,7 @@ InitialiseRFBConnection(void)
   /* if the connection is immediately closed, don't report anything, so
        that pmw's monitor can make test connections */
 
-  if (listenSpecified)
+  if (appData.listen)
     errorMessageOnReadFailure = False;
 
   if (!ReadFromRFBServer(pv, sz_rfbProtocolVersionMsg))

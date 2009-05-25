@@ -23,7 +23,7 @@
  */
 
 #include "vnc2dl.h"
-
+#include <getopt.h>
 
 /*
  * vncServerHost and vncServerPort are set either from the command line or
@@ -40,97 +40,51 @@ int vncServerPort = 0;
  * file.
  */
 
-AppData appData;
-
-/*
-static appDataResourceList[] = {
-  {"shareDesktop",  bool, True},
-
-  {"viewOnly", bool, False},
-
-  {"fullScreen", bool, False},
-
-  {"passwordFile", string,  (XtPointer) 0},
-
-  {"passwordDialog",  bool,  False},
-
-  {"encodings", string, null},
-
-  {"useBGR233",bool, False},
-
-  {"nColours",int, 256},
-
-  {"useSharedColours",bool, True},
-
-  {"forceOwnCmap",  bool, False},
-
-  {"forceTrueColour", bool, False},
-
-  {"debug", bool, False},
-
-  {"rawDelay",  int, 0},
-
-  {"copyRectDelay", int, 0},
-
-  {"bumpScrollTime", int, 25},
-
-  {"bumpScrollPixels", int, 20},
-
-  {"compressLevel", int,  -1},
-
-  {"qualityLevel", int, 6},
-
-  {"enableJPEG", bool, True},
-
-  {"useRemoteCursor", bool, True},
-
-  {"autoPass", bool, False}
+AppData appData = {
+   0,       // Bool shareDesktop;
+   0,       // Bool viewOnly;
+   0,       // Bool listen;
+   LISTEN_PORT_OFFSET, // Bool listenPort;
+   NULL,   // char encodingsString[256];
+   0,       // Bool useBGR233;
+   24,       // int nColours;
+   0,       // Bool useSharedColours;
+   0,       // Bool forceOwnCmap;
+   1,       // Bool forceTrueColour;
+   24,       // int requestedDepth;
+   0,       // char *userLogin;
+   0,       // char passwordFile[256];
+   0,       // int rawDelay;
+   0,       // int copyRectDelay;
+   0,       // Bool debug;
+   0,       // int compressLevel;
+   0,       // int qualityLevel;
+   0,       // Bool enableJPEG;
+   0,       // Bool autoPass;
 };
 
-*/
 
 /*
- * The cmdLineOptions array specifies how certain app resource specs can be set
- * with command-line options.
+ * The command-line options.
  */
 
-/* char * cmdLineOptions[] = {
-  {"-shared",        "*shareDesktop",       XrmoptionNoArg,  "True"},
-  {"-noshared",      "*shareDesktop",       XrmoptionNoArg,  "False"},
-  {"-viewonly",      "*viewOnly",           XrmoptionNoArg,  "True"},
-  {"-fullscreen",    "*fullScreen",         XrmoptionNoArg,  "True"},
-  {"-noraiseonbeep", "*raiseOnBeep",        XrmoptionNoArg,  "False"},
-  {"-passwd",        "*passwordFile",       XrmoptionSepArg, 0},
-  {"-encodings",     "*encodings",          XrmoptionSepArg, 0},
-  {"-bgr233",        "*useBGR233",          XrmoptionNoArg,  "True"},
-  {"-owncmap",       "*forceOwnCmap",       XrmoptionNoArg,  "True"},
-  {"-truecolor",     "*forceTrueColour",    XrmoptionNoArg,  "True"},
-  {"-truecolour",    "*forceTrueColour",    XrmoptionNoArg,  "True"},
-  {"-depth",         "*requestedDepth",     XrmoptionSepArg, 0},
-  {"-compresslevel", "*compressLevel",      XrmoptionSepArg, 0},
-  {"-quality",       "*qualityLevel",       XrmoptionSepArg, 0},
-  {"-nojpeg",        "*enableJPEG",         XrmoptionNoArg,  "False"},
-  {"-nocursorshape", "*useRemoteCursor",    XrmoptionNoArg,  "False"},
-  {"-x11cursor",     "*useX11Cursor",       XrmoptionNoArg,  "True"},
-  {"-autopass",      "*autoPass",           XrmoptionNoArg,  "True"}
-
+static struct option long_options[] = {
+  {"shared",       no_argument,          &appData.shareDesktop,   1},
+  {"noshared",     no_argument,          &appData.shareDesktop,   0},
+  {"viewonly",     no_argument,          &appData.viewOnly,       1},
+  {"passwd",       required_argument,    NULL,                    'p'},
+  {"encodings",    required_argument,    NULL,                    'e'},
+  {"bgr233",       no_argument,          &appData.useBGR233,      1},
+  {"depth",        required_argument,    NULL,                    'd'},
+  {"compresslevel",required_argument,    &appData.compressLevel,  'c'},
+  {"quality",      required_argument,    &appData.qualityLevel,   'q'},
+  {"nojpeg",       no_argument,          &appData.enableJPEG,     0},
+  {"autopass",     no_argument,          &appData.autoPass,       1},
+  {"listen",       no_argument,          &appData.listen,         1},
+  {"listenPort",   required_argument,    NULL,                    'L'},
+  {0,              0,                      0,                     0}
 };
-/*
 
-/*
- * removeArgs() is used to remove some of command line arguments.
- */
-
-void
-removeArgs(int *argc, char** argv, int idx, int nargs)
-{
-  int i;
-  if ((idx+nargs) > *argc) return;
-  for (i = idx+nargs; i < *argc; i++) {
-    argv[i-nargs] = argv[i];
-  }
-  *argc -= nargs;
-}
 
 /*
  * usage() prints out the usage message.
@@ -144,12 +98,12 @@ usage(void)
 	  "\n"
 	  "Usage: %s [<OPTIONS>] [<HOST>][:<DISPLAY#>]\n"
 	  "       %s [<OPTIONS>] [<HOST>][::<PORT#>]\n"
-	  "       %s [<OPTIONS>] -listen [<DISPLAY#>]\n"
+	  "       %s [<OPTIONS>] -listen [-listenPort <PORT#>]\n"
 	  "       %s -help\n"
 	  "\n"
 	  "<OPTIONS> include:\n"
 	  "        -via <GATEWAY>\n"
-	  "        -shared (set by default)\n"
+	  "        -shared\n"
 	  "        -noshared\n"
 	  "        -passwd <PASSWD-FILENAME> (standard VNC authentication)\n"
 	  "        -encodings <ENCODING-LIST> (e.g. \"tight copyrect\")\n"
@@ -157,8 +111,9 @@ usage(void)
 	  "        -compresslevel <COMPRESS-VALUE> (0..9: 0-fast, 9-best)\n"
 	  "        -quality <JPEG-QUALITY-VALUE> (0..9: 0-low, 9-high)\n"
 	  "        -nojpeg\n"
-	  "        -nocursorshape\n"
 	  "        -autopass\n"
+	  "        -listen\n"
+  	  "        -listenPort <PORTNUM>\n"
 	  "\n"
 	  "See the manual page for more information."
 	  "\n", programName, programName, programName, programName);
@@ -167,71 +122,116 @@ usage(void)
 
 
 /*
- * GetArgsAndResources() deals with resources and any command-line arguments
- * not already processed by XtVaAppInitialize().  It sets vncServerHost and
+ * ProcessArgs() deals with any command-line arguments.  It sets vncServerHost and
  * vncServerPort and all the fields in appData.
  */
 
 void
-GetArgsAndResources(int argc, char **argv)
+ProcessArgs(int argc, char **argv)
 {
   int i;
   char *vncServerName, *colonPos;
   int len, portOffset;
   int disp;
+  int option_index = 0;
 
- /* Check any remaining command-line arguments.  If -listen was specified
-     there should be none.  Otherwise the only argument should be the VNC
-     server name.  If not given then pop up a dialog box and wait for the
-     server name to be entered. */
+  while (1) {
+      int c = getopt_long_only(argc, argv, "p:e:d:c:q:L:", long_options, &option_index);
+   
+      if (c == -1)  break; /* end of options */
+      
+      switch (c) {
+          case 0:
+          /* If this option set a flag, do nothing else now. */
+          if (long_options[option_index].flag != 0)
+              break;
+          printf ("option %s", long_options[option_index].name);
+          if (optarg)
+              printf (" with arg %s", optarg);
+          printf ("\n");
+          break;
 
-  if (listenSpecified) {
-    if (argc != 1) {
-      fprintf(stderr,"\n%s -listen: invalid command line argument: %s\n",
-	      programName, argv[1]);
-      usage();
-    }
-    return;
+          case 'p':
+          appData.passwordFile = strdup(optarg);
+          printf ("Password file set to `%s'\n", optarg);
+          break;
+          
+          case 'e':
+          appData.encodingsString = strdup(optarg);
+          printf ("Encodings set to `%s'\n", optarg);
+          break;
+
+          case 'd':
+          appData.requestedDepth = atoi(optarg);
+          printf ("Depth set to %d\n", appData.requestedDepth);
+          break;
+
+          case 'c':
+          appData.compressLevel = atoi(optarg);
+          printf ("Compression level set to `%s'\n", optarg);
+          break;
+
+          case 'q':
+          appData.qualityLevel = atoi(optarg);
+          printf ("Quality level set to `%s'\n", optarg);
+          break;
+          
+          case 'L':
+          appData.listenPort = atoi(optarg);
+          printf ("Listening port set to %d\n", appData.listenPort);
+          break;
+          
+          default:
+          usage();
+          break;
+      }
   }
-
-  if (argc == 1) {
-    usage();
-  } else if (argc != 2) {
-    usage();
+  
+  if (appData.listen) {
+      vncServerName = "Incoming";
+      if (argc != optind) {
+          usage();
+      }
   } else {
-    vncServerName = argv[1];
+      if (argc == 1) {
+        usage();
+      } else if (argc != optind+1) {
+        usage();
+      } else {
+        vncServerName = argv[optind];
 
-    if (vncServerName[0] == '-')
-      usage();
-  }
+        if (vncServerName[0] == '-')
+          usage();
+      }
 
-  if (strlen(vncServerName) > 255) {
-    fprintf(stderr,"VNC server name too long\n");
-    exit(1);
-  }
+      if (strlen(vncServerName) > 255) {
+        fprintf(stderr,"VNC server name too long\n");
+        exit(1);
+      }
 
-  colonPos = strchr(vncServerName, ':');
-  if (colonPos == NULL) {
-    /* No colon -- use default port number */
-    strcpy(vncServerHost, vncServerName);
-    vncServerPort = SERVER_PORT_OFFSET;
-  } else {
-    memcpy(vncServerHost, vncServerName, colonPos - vncServerName);
-    vncServerHost[colonPos - vncServerName] = '\0';
-    len = strlen(colonPos + 1);
-    portOffset = SERVER_PORT_OFFSET;
-    if (colonPos[1] == ':') {
-      /* Two colons -- interpret as a port number */
-      colonPos++;
-      len--;
-      portOffset = 0;
-    }
-    if (!len || strspn(colonPos + 1, "0123456789") != len) {
-      usage();
-    }
-    disp = atoi(colonPos + 1);
-    if (portOffset != 0 && disp >= 100)
-      portOffset = 0;
-    vncServerPort = disp + portOffset;
+      colonPos = strchr(vncServerName, ':');
+      if (colonPos == NULL) {
+        /* No colon -- use default port number */
+        strcpy(vncServerHost, vncServerName);
+        vncServerPort = SERVER_PORT_OFFSET;
+      } else {
+        memcpy(vncServerHost, vncServerName, colonPos - vncServerName);
+        vncServerHost[colonPos - vncServerName] = '\0';
+        len = strlen(colonPos + 1);
+        portOffset = SERVER_PORT_OFFSET;
+        if (colonPos[1] == ':') {
+          /* Two colons -- interpret as a port number */
+          colonPos++;
+          len--;
+          portOffset = 0;
+        }
+        if (!len || strspn(colonPos + 1, "0123456789") != len) {
+          usage();
+        }
+        disp = atoi(colonPos + 1);
+        if (portOffset != 0 && disp >= 100)
+          portOffset = 0;
+        vncServerPort = disp + portOffset;
+      }
   }
 }

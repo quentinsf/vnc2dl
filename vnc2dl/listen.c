@@ -28,69 +28,30 @@
 #include <sys/utsname.h>
 #include <vnc2dl.h>
 
-Bool listenSpecified = False;
-int listenPort = 0;
-
 /*
  * listenForIncomingConnections() - listen for incoming connections from
  * servers, and fork a new process to deal with each connection. 
  */
 
 void
-listenForIncomingConnections(int *argc, char **argv, int listenArgIndex)
+listenForIncomingConnections()
 {
   int listenSocket, sock;
   fd_set fds;
   int n;
   int i;
   char *displayname = NULL;
+  char *display;
+  char *colonPos;
+  struct utsname hostinfo;
+  uname(&hostinfo);
 
-  listenSpecified = True;
-
-  for (i = 1; i < *argc; i++) {
-    if (strcmp(argv[i], "-display") == 0 && i+1 < *argc) {
-      displayname = argv[i+1];
-    }
-  }
-
-  if (listenArgIndex+1 < *argc && argv[listenArgIndex+1][0] >= '0' &&
-					    argv[listenArgIndex+1][0] <= '9') {
-
-    listenPort = (LISTEN_PORT_OFFSET + atoi(argv[listenArgIndex+1])) & 0xFFFF;
-    removeArgs(argc, argv, listenArgIndex, 2);
-
-  } else {
-
-    char *display;
-    char *colonPos;
-    struct utsname hostinfo;
-
-    removeArgs(argc, argv, listenArgIndex, 1);
-
-    colonPos = strchr(display, ':');
-
-    uname(&hostinfo);
-
-    if (colonPos && ((colonPos == display) ||
-		     (strncmp(hostinfo.nodename, display,
-			      strlen(hostinfo.nodename)) == 0))) {
-
-      listenPort = LISTEN_PORT_OFFSET + atoi(colonPos+1);
-
-    } else {
-      fprintf(stderr,"%s: cannot work out which display number to "
-	      "listen on.\n", programName);
-      fprintf(stderr,"Please specify explicitly with -listen <num>\n");
-      exit(1);
-    }
-  }
-
-  listenSocket = ListenAtTcpPort(listenPort);
+  listenSocket = ListenAtTcpPort(appData.listenPort);
 
   if (listenSocket < 0) exit(1);
 
-  fprintf(stderr,"%s -listen: Listening on port %d\n",
-	  programName, listenPort);
+  fprintf(stderr,"%s Listening on port %d\n",
+	  programName, appData.listenPort);
   fprintf(stderr,"%s -listen: Command line errors are not reported until "
 	  "a connection comes in.\n", programName);
 

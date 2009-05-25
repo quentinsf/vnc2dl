@@ -47,7 +47,7 @@ Bool InitialiseDevice() {
     /* Read current mode information */ 
     info = dlo_get_mode(dl_uid); 
     NERR(info); 
-    printf("Mode %ux%u @ %u Hz %u bpp base &%X\n", 
+    printf("DL device mode %ux%u @ %u Hz %u bpp base &%X\n", 
         info->view.width, 
         info->view.height, 
         info->refresh, 

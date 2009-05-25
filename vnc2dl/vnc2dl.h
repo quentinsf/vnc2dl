@@ -64,34 +64,24 @@ extern int endianTest;
 typedef struct {
   Bool shareDesktop;
   Bool viewOnly;
-
-  String encodingsString;
-
+  Bool listen;
+  Bool listenPort;
+  char *encodingsString;
   Bool useBGR233;
   int nColours;
   Bool useSharedColours;
   Bool forceOwnCmap;
   Bool forceTrueColour;
   int requestedDepth;
-
   char *userLogin;
-
   char *passwordFile;
-
   int rawDelay;
   int copyRectDelay;
-
   Bool debug;
-
-  int bumpScrollTime;
-  int bumpScrollPixels;
-
   int compressLevel;
   int qualityLevel;
   Bool enableJPEG;
-  Bool useRemoteCursor;
   Bool autoPass;
-
 } AppData;
 
 extern AppData appData;
@@ -99,15 +89,9 @@ extern AppData appData;
 extern char *fallback_resources[];
 extern char vncServerHost[];
 extern int vncServerPort;
-extern Bool listenSpecified;
-extern int listenPort;
 
-extern char* cmdLineOptions[];
-extern int numCmdLineOptions;
-
-extern void removeArgs(int *argc, char** argv, int idx, int nargs);
 extern void usage(void);
-extern void GetArgsAndResources(int argc, char **argv);
+extern void ProcessArgs(int argc, char **argv);
 
 
 /* dldevice.c */

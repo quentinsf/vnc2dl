@@ -32,39 +32,24 @@ main(int argc, char **argv)
   int i;
   programName = argv[0];
 
-  /* The -listen option is used to make us a daemon process which listens for
-     incoming connections from servers, rather than actively connecting to a
-     given server. The -tunnel and -via options are useful to create
-     connections tunneled via SSH port forwarding. We must test for the
-     -listen option before invoking any Xt functions - this is because we use
-     forking, and Xt doesn't seem to cope with forking very well. For -listen
-     option, when a successful incoming connection has been accepted,
-     listenForIncomingConnections() returns, setting the listenSpecified
-     flag. */
+  /* Process any command-line arguments (eg. the VNC server name).  */
+  ProcessArgs(argc, argv);
 
-  for (i = 1; i < argc; i++) {
-    if (strcmp(argv[i], "-listen") == 0) {
-      listenForIncomingConnections(&argc, argv, i);
-      break;
-    }
-    if (strcmp(argv[i], "-tunnel") == 0 || strcmp(argv[i], "-via") == 0) {
-      if (!createTunnel(&argc, argv, i))
-	      exit(1);
-      break;
-    }
-  }
-
-  /* Process any remaining command-line arguments (eg. the VNC server name).  */
-
-  GetArgsAndResources(argc, argv);
 
   /* Connect to the first DisplayLink device */ 
   if (!InitialiseDevice()) exit(1);
   
-  /* Unless we accepted an incoming connection, make a TCP connection to the
-     given VNC server */
 
-  if (!listenSpecified) {
+  /* The -listen option is used to make us a daemon process which listens for
+     incoming connections from servers, rather than actively connecting to a
+     given server. For -listen option, when a successful incoming connection has been accepted,
+     listenForIncomingConnections() returns, setting the appData.listen
+     flag. */
+
+  if (appData.listen) {
+    listenForIncomingConnections();
+  } else {
+    /* Otherwise, we make an outgoing connection */
     if (!ConnectToRFBServer(vncServerHost, vncServerPort)) exit(1);
   }
 

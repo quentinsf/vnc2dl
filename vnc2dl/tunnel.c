@@ -20,6 +20,8 @@
 
 /*
  * tunnel.c - tunneling support (e.g. for using standalone SSH installation)
+ *
+ * XXX NEEDS REWRITING TO USE GETOPT AND args.c
  */
 
 #include <unistd.h>
@@ -122,7 +124,7 @@ processTunnelArgs(char **remoteHost, int *remotePort, int localPort,
   *remoteHost = argv[*pargc - 1];
   argv[*pargc - 1] = lastArgv;
 
-  removeArgs(pargc, argv, tunnelArgIndex, 1);
+  // removeArgs(pargc, argv, tunnelArgIndex, 1);
 }
 
 static void
@@ -169,7 +171,7 @@ processViaArgs(char **gatewayHost, char **remoteHost,
 
   argv[*pargc - 1] = lastArgv;
 
-  removeArgs(pargc, argv, tunnelArgIndex, 2);
+  // removeArgs(pargc, argv, tunnelArgIndex, 2);
 }
 
 static char *
