@@ -33,10 +33,17 @@ There are two programs here:
 		    access your X VNC desktops.  It creates a password file which
 		    vnc2dl might one day be able to use!
 
-First you must have X installed because vnc2dl still uses some of the X build utilities.
+First you must have at least some parts of X installed because vnc2dl still uses some of the X build utilities.
 Also, the TightVNC components require JPEG and zlib libraries installed in the system 
 (e.g. under /usr/local)
 You'll need the DisplayLink libdlo library installed, and this also requires a recent libusb.  
+
+On Ubuntu 10.04, I had to do:
+
+   sudo aptitude install xutils-dev zlib1g zlib1g-dev libjpeg62 libjpeg62-dev libusb-dev
+
+to pull in some of the dependencies.
+
 
 To build everything, do:
 
@@ -59,4 +66,4 @@ by Richard Outerbridge.
 
 Quentin Stafford-Fraser
 May 2009
-
+Updated July 2011
